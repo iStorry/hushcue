@@ -14,7 +14,7 @@ public class GoldenTests
         var data = new TheoryData<string>();
         var folders = new[] { Path.Combine(AppContext.BaseDirectory, "Golden"), RealCasesFolder() };
         foreach (var folder in folders.Where(Directory.Exists))
-            foreach (var file in Directory.EnumerateFiles(folder!, "*.json").Order())
+            foreach (var file in Directory.EnumerateFiles(folder!, folder == folders[0] ? "synthetic-*.json" : "*.json").Order())
                 data.Add(file);
         return data;
     }

@@ -40,19 +40,27 @@ Full results: [docs/phase1-engine-spike.md](docs/phase1-engine-spike.md). Benchm
       (median 0.4 s, 1 in 10 off by 5 s+), quantized models loop, and it runs at about half SubGen's speed
 - [x] **New engine plan: CTranslate2** (SubGen's own engine) called natively from C#, so speed and output match
 
-## Phase 1b — CTranslate2 engine
+## Phase 1b — CTranslate2 engine ✅ done
 
-- [ ] Install a C++ toolchain: Visual Studio 2022 Build Tools (C++ workload) + CMake (needs your OK, ~5–7 GB)
-- [ ] C++ bridge DLL (`native/hushcue_ct2`): plain C functions over CTranslate2 4.8.2's `models::Whisper`
-      (load, encode, generate with beam / repetition penalty / no-speech prob, align for word timestamps,
-      detect language, free). Build against CTranslate2's headers and the `ctranslate2.dll` from the PyPI wheel
-- [ ] C#: P/Invoke layer + `SafeHandle`s in `Hushcue.Core`
-- [ ] Port faster-whisper's Python layer to C#: log-mel spectrogram, Whisper tokenizer (byte-level BPE, encode
-      for the vocabulary prompt), 30 s window seeking, segment splitting on timestamp tokens, word timestamps from
-      `align` (incl. punctuation merging), no-speech / log-prob filtering, `hallucination_silence_threshold`
-- [ ] Use the CTranslate2 models SubGen already downloads (`Systran/faster-whisper-*`, `mobiuslabsgmbh/...-turbo`)
-- [ ] Check against SubGen on the four reference clips: same words, same timings, same speed
-- [ ] Remove the Whisper.net spike code and packages from `Hushcue.Cli`
+Full results: [docs/phase1b-ctranslate2.md](docs/phase1b-ctranslate2.md).
+
+- [x] Installed Visual Studio 2022 Build Tools (C++ workload) and CMake
+- [x] C++ bridge DLL (`native/hushcue_ct2`): plain C functions over CTranslate2 4.8.2's `models::Whisper`
+      (load, encode, generate, align, detect language), built against its headers and the PyPI wheel's
+      `ctranslate2.dll` by `native/build.ps1`
+- [x] C#: P/Invoke layer and `WhisperModel` wrapper (`Engine/Native.cs`, `Engine/WhisperModel.cs`)
+- [x] Ported faster-whisper 1.2.1's Python layer: log-mel features, byte-level BPE tokenizer, 30 s window loop,
+      temperature fallback, segment splitting, word timestamps with punctuation merging, no-speech skipping,
+      hallucination silence threshold, language detection (`Engine/`)
+- [x] Uses the CTranslate2 models SubGen already downloaded
+- [x] Decoder identical to faster-whisper on all 4 reference clips in every mode SubGen uses (same features in);
+      with its own features (98% bit-identical to numpy's) it reproduces 98% of SubGen's words, WER 52.8% vs 54.9%
+- [x] Speed: same engine time as faster-whisper measured call by call; a clean speed table needs an idle GPU
+      (another app was using it during the runs)
+- [x] Removed the Whisper.net spike; `Hushcue.Cli transcribe` now runs the CTranslate2 engine
+- [x] Tests: features vs faster-whisper's (committed fixture), tokenizer vs faster-whisper's (skipped without the model)
+- [ ] Speed table on an idle GPU (Phase 7)
+- [ ] Non-ASCII model paths: CTranslate2 opens files with narrow strings; check or copy models to an ASCII path
 
 ## Phase 2 — Port the subtitle cleanup (pure logic) ✅ done
 
@@ -96,13 +104,15 @@ Port `run_job` / `transcribe_file`.
 
 - [ ] Presets: Fast, Balanced (default), Thorough. **Best (Demucs) is dropped**
 - [ ] Settings: language, enhance, vocabulary, skip silence, embed mode, keep .srt, delete original
-- [ ] Silero VAD (ONNX Runtime, same model and parameters as faster-whisper) when the preset or "skip silence" asks for it
+- [ ] Silero VAD (ONNX Runtime, same model and parameters as faster-whisper) when the preset or "skip silence" asks
+      for it, plus faster-whisper's restore_speech_timestamps
 - [ ] Drop segments with no-speech prob > 0.6 and avg log-prob < -1.0
 - [ ] Loop recovery: re-decode looped passages in isolation with repetition penalty 1.3
 - [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`), finished files leave the queue
 - [ ] One combined progress value + status line across both stages
 - [ ] GPU → CPU fallback (int8 on CPU) on CUDA errors
 - [ ] Error handling: an embed failure keeps the .srt; summary error at the end
+- [ ] Write .srt files with CRLF line endings: SubGen's Python writes them in text mode on Windows
 - [ ] Port the 14 tests from `test_run_job.py`, and the 7 model tests left from `test_pipeline.py`
       (6 loop-recovery / `transcribe_file`, 1 presets-are-deterministic)
 

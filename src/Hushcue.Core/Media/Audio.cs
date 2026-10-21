@@ -9,14 +9,15 @@ public static class Audio
 
     /// <summary>
     /// The audio of any video or audio file as 16 kHz mono float samples, decoded by ffmpeg straight into memory
-    /// (no temporary WAV).
+    /// (no temporary WAV). Samples go through 16-bit first, exactly as SubGen's WAV and faster-whisper's decoder do,
+    /// so the model hears the same values.
     /// </summary>
     public static async Task<float[]> ReadAsync(string path, bool enhance = false, CancellationToken cancel = default)
     {
         List<string> cmd = [Tools.Ffmpeg, "-v", "error", "-nostdin", "-i", path, "-vn", "-ac", "1", "-ar", $"{SampleRate}"];
         if (enhance)
             cmd.AddRange(["-af", EnhanceFilter]);
-        cmd.AddRange(["-f", "f32le", "pipe:1"]);
+        cmd.AddRange(["-f", "s16le", "pipe:1"]);
 
         using var process = System.Diagnostics.Process.Start(Tools.StartInfo(cmd))
                             ?? throw new MediaException("ffmpeg did not start");
@@ -37,8 +38,10 @@ public static class Audio
             var tail = (await errors).Trim().Split('\n').TakeLast(3).Select(l => l.Trim());
             throw new MediaException("ffmpeg could not read audio from this file.\n" + string.Join("\n", tail));
         }
-        var samples = new float[pcm.Length / sizeof(float)];
-        Buffer.BlockCopy(pcm.GetBuffer(), 0, samples, 0, samples.Length * sizeof(float));
+        var pcm16 = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(pcm.GetBuffer().AsSpan(0, (int)pcm.Length));
+        var samples = new float[pcm16.Length];
+        for (var i = 0; i < samples.Length; i++)
+            samples[i] = pcm16[i] / 32768.0f;
         return samples;
     }
 }

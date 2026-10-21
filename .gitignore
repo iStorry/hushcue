@@ -483,3 +483,8 @@ $RECYCLE.BIN/
 
 # Benchmark output (transcripts of local media)
 bench-out/
+
+# Native build: fetched sources and build output
+native/deps/
+native/build/
+native/bin/
