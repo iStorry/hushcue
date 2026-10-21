@@ -56,7 +56,7 @@ public class CleanupTests
         {
             var file = Path.Combine(folder.FullName, "a.srt");
             File.WriteAllText(file, "x");
-            Assert.Equal("a (1).srt", Path.GetFileName(Srt.UniquePath(file)));
+            Assert.Equal("a (1).srt", Path.GetFileName(FileNames.Unique(file)));
         }
         finally
         {

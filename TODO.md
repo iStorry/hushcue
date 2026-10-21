@@ -61,7 +61,7 @@ Ported from `../subgen/pipeline.py` into `src/Hushcue.Core/Subtitles/`, same con
 - [x] `Word`, `Cue` records; constants (MAX_LINE 42, MAX_CUE_CHARS 84, MAX_CUE_SECONDS 6.0, MIN_CUE_SECONDS 0.7, WORD_GAP_SPLIT 0.8, MIN_CUE_GAP 0.2)
 - [x] `StripMarkers`, `SquashStretched`, `FindRepeatRuns`, `CollapseRepeats`
 - [x] `BuildCues`, `MergeOrphans`, `DropJunk` (hallucination list), `FixTiming`
-- [x] `WrapLines`, `Srt.Write`, `CoverageWarnings`, `Srt.UniquePath`
+- [x] `WrapLines`, `Srt.Write`, `CoverageWarnings`, `FileNames.Unique`
 - [x] Python string rules that affect output (whitespace set, `len` in code points, round half to even) in `Py.cs`
 - [x] 13 of the 22 tests in `test_pipeline.py` are clean-up tests: ported to xUnit (`CleanupTests.cs`).
       The 7 that need a model (loop recovery, `transcribe_file`, presets) move to Phase 4; the other 2 test
@@ -70,21 +70,25 @@ Ported from `../subgen/pipeline.py` into `src/Hushcue.Core/Subtitles/`, same con
       40 real transcripts (`bench-out/golden/`, local only). Regenerate with `tools/bench/make_golden.py`
 - [x] Checked the golden test catches bugs: 4 deliberate changes each failed 1–11 cases
 
-## Phase 3 — Media (ffmpeg / ffprobe)
+## Phase 3 — Media (ffmpeg / ffprobe) ✅ done
 
-Port from `../subgen/burn.py` and `extract_audio`.
+Ported from `../subgen/burn.py` and `extract_audio` into `src/Hushcue.Core/Media/`.
 
-- [ ] Locate ffmpeg/ffprobe (bundled first, then PATH), clear error if missing
-- [ ] Extract audio as 16 kHz mono PCM, piped straight into memory (no temp WAV), with the optional enhance filter (`highpass=f=80,afftdn=nf=-25,dynaudnorm=f=150:g=15`)
-- [ ] Cancellation kills the ffmpeg process; partial outputs are deleted (with the retry-while-locked behaviour)
-- [ ] `ffprobe` JSON → `VideoInfo` (width, height, duration, audio codecs)
-- [ ] Embed: soft track (.mkv, stream copy) and burn (.mp4, libass style sized to the picture)
-- [ ] NVENC probe with x264 fallback, cached
-- [ ] `-progress pipe:1` parsing → fraction done
-- [ ] Output naming (`name.mkv`, `.subbed` if taken)
-- [ ] MKV → MP4 tool: remux without subtitle tracks, optional .srt extraction
-- [ ] Recycle Bin via `Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(..., RecycleOption.SendToRecycleBin)`
-- [ ] Port the 17 tests from `test_burn.py`
+- [x] Locate ffmpeg/ffprobe (bundled `ffmpeg\` next to the app first, then PATH), clear error if missing (`Tools`)
+- [x] Extract audio as 16 kHz mono float, piped straight into memory (no temp WAV), with the optional enhance
+      filter (`Audio.ReadAsync`)
+- [x] Cancellation (`CancellationToken`) kills the ffmpeg process tree; partial outputs are deleted, retrying while
+      Windows still holds the file
+- [x] `ffprobe` JSON → `VideoInfo` (width, height, duration, audio codecs) (`Probe`)
+- [x] Embed: soft track (.mkv, stream copy) and burn (.mp4, libass style sized to the picture) (`Embed`)
+- [x] NVENC probe with x264 fallback, cached
+- [x] `-progress pipe:1` parsing → fraction done
+- [x] Output naming (`name.mkv`, `.subbed` if taken)
+- [x] MKV → MP4 tool: remux without subtitle tracks, optional .srt extraction, batch with Recycle Bin
+- [x] Recycle Bin via `SHFileOperationW` with the same silent, undoable flags as SubGen (the VisualBasic helper shows
+      error dialogs). Checked by hand: a test file landed in the Recycle Bin, restorable
+- [x] Ported all 17 tests from `test_burn.py` (`MediaTests.cs`, real ffmpeg encodes; skipped if ffmpeg is missing),
+      plus 2 audio-extraction tests
 
 ## Phase 4 — Pipeline
 

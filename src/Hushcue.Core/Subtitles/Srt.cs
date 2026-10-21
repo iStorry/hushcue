@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Hushcue.Core.Subtitles;
 
 public static class Srt
@@ -18,21 +16,5 @@ public static class Srt
 
         var blocks = cues.Select((c, i) => $"{i + 1}\n{Ts(c.Start)} --> {Ts(c.End)}\n{Cleanup.WrapLines(c.Text)}\n");
         return string.Join("\n", blocks);
-    }
-
-    /// <summary><paramref name="path"/> if it is free, else "name (1).ext", "name (2).ext", ...</summary>
-    public static string UniquePath(string path)
-    {
-        if (!File.Exists(path) && !Directory.Exists(path))
-            return path;
-        var folder = Path.GetDirectoryName(path) ?? "";
-        var stem = Path.GetFileNameWithoutExtension(path);
-        var extension = Path.GetExtension(path);
-        for (var i = 1; ; i++)
-        {
-            var candidate = Path.Combine(folder, $"{stem} ({i}){extension}");
-            if (!File.Exists(candidate) && !Directory.Exists(candidate))
-                return candidate;
-        }
     }
 }
