@@ -3,19 +3,16 @@
 Accurate subtitles from any video, generated privately on your PC.
 A C# + WinUI 3 rewrite of SubGen (`../subgen`, Python + PySide6 + faster-whisper).
 
-Work top to bottom. Phase 1 is a go/no-go gate: don't start the UI until the engine is proven.
+Work top to bottom. The engine must match SubGen before the UI work starts.
 
-## Targets (measured on the Python app, RTX 4070, large-v3-turbo, Balanced)
+## Targets
+
+The goal is a native app that performs the same as SubGen. RAM and VRAM are not tracked.
 
 | | SubGen today | Hushcue goal |
 |---|---|---|
-| RAM, window idle | ~85 MB | ≤ 110 MB (empty WinUI 3 window already measures ~110 MB) |
-| RAM while transcribing (2 min file) | ~800 MB | ≤ 500 MB |
-| RAM peak on a 30 min file | 1.8 GB (grows with length) | ≤ 600 MB, flat with length |
-| VRAM | ~2.2 GB | ≤ 1.5 GB |
-| Speed | ~51× real time | ≥ 40× real time |
-| Accuracy (WER on `reference/` clips) | baseline | no worse than +1 point |
-| Install size (without models) | ~3 GB venv (7.3 GB with torch) | ≤ 700 MB (CUDA) / ≤ 100 MB (Vulkan) |
+| Speed (RTX 4070, large-v3-turbo, Balanced) | 46–53× real time | the same |
+| Accuracy (WER on `reference/` clips, SubGen clean-up) | 54.9% | the same, ideally identical output |
 | Setup | Python + setup.bat + winget ffmpeg | one installer |
 
 ## Phase 0 — Setup
@@ -30,21 +27,32 @@ Work top to bottom. Phase 1 is a go/no-go gate: don't start the UI until the eng
   - `src/Hushcue.App`: WinUI 3 app (Windows App SDK 2.x, WinUI component only, unpackaged, runtime self-contained)
   - `tests/Hushcue.Core.Tests`: xUnit
 - [x] `Directory.Build.props`: nullable on, warnings as errors, shared version, x64
-- [x] Measured: the empty WinUI 3 window idles at ~110 MB RAM (Release), more than SubGen's whole PySide6 UI (~85 MB). Retry with trimming / Native AOT in Phase 8
 
-## Phase 1 — Engine spike (go / no-go)
+## Phase 1 — Engine spike: Whisper.net ✅ done, no-go
 
-Whisper.net (whisper.cpp for .NET) is the only practical engine; CTranslate2 has no .NET bindings.
+Full results: [docs/phase1-engine-spike.md](docs/phase1-engine-spike.md). Benchmark tools: `tools/bench/`.
 
-- [ ] Console app: Whisper.net + CUDA runtime + `large-v3-turbo` ggml model (try f16, q8_0, q5_0)
-- [ ] Match SubGen's decoding: beam 5, **`WithTemperature(0)` and `WithTemperatureInc(0)`** (defaults are 0.2 and give non-reproducible output), `WithNoContext()`, `WithPrompt(vocabulary)`, English, no-speech 0.6, log-prob -1.0, token timestamps on
-- [ ] Find the beam-size option, and confirm `ProcessAsync` accepts a `CancellationToken`
-- [ ] Write SRTs for every clip in `../subgen/reference/` (plain text join, no cleanup yet)
-- [ ] Score with `python ../subgen/evaluate.py` against the Python app's output on the same clips
-- [ ] Record: WER, speed (× real time), RAM idle / peak, VRAM, model load time
-- [ ] Repeat with the Vulkan runtime (works on AMD/Intel too; much smaller install)
-- [ ] Run the same clip twice and confirm identical output
-- [ ] **Decision:** CUDA or Vulkan runtime, which model quantization, go or no-go. Write the numbers into README
+- [x] `Hushcue.Cli transcribe`: Whisper.net 1.9.1 with CUDA 12 / Vulkan runtimes, `large-v3-turbo` ggml (f16, q8_0, q5_0)
+- [x] Matched SubGen's decoding (beam 5, temperature 0 with no fallback, no context, English, no-speech 0.6, log-prob -1.0)
+- [x] Scored all four reference clips against the references and against SubGen, through SubGen's own clean-up
+- [x] Repeatability: identical output on repeat runs
+- [x] **Decision: no-go.** Best Whisper.net setup is 12 WER points worse than SubGen, word timings are off
+      (median 0.4 s, 1 in 10 off by 5 s+), quantized models loop, and it runs at about half SubGen's speed
+- [x] **New engine plan: CTranslate2** (SubGen's own engine) called natively from C#, so speed and output match
+
+## Phase 1b — CTranslate2 engine
+
+- [ ] Install a C++ toolchain: Visual Studio 2022 Build Tools (C++ workload) + CMake (needs your OK, ~5–7 GB)
+- [ ] C++ bridge DLL (`native/hushcue_ct2`): plain C functions over CTranslate2 4.8.2's `models::Whisper`
+      (load, encode, generate with beam / repetition penalty / no-speech prob, align for word timestamps,
+      detect language, free). Build against CTranslate2's headers and the `ctranslate2.dll` from the PyPI wheel
+- [ ] C#: P/Invoke layer + `SafeHandle`s in `Hushcue.Core`
+- [ ] Port faster-whisper's Python layer to C#: log-mel spectrogram, Whisper tokenizer (byte-level BPE, encode
+      for the vocabulary prompt), 30 s window seeking, segment splitting on timestamp tokens, word timestamps from
+      `align` (incl. punctuation merging), no-speech / log-prob filtering, `hallucination_silence_threshold`
+- [ ] Use the CTranslate2 models SubGen already downloads (`Systran/faster-whisper-*`, `mobiuslabsgmbh/...-turbo`)
+- [ ] Check against SubGen on the four reference clips: same words, same timings, same speed
+- [ ] Remove the Whisper.net spike code and packages from `Hushcue.Cli`
 
 ## Phase 2 — Port the subtitle cleanup (pure logic)
 
@@ -55,7 +63,7 @@ Port from `../subgen/pipeline.py`, keeping the same constants and behaviour.
 - [ ] `BuildCues`, `MergeOrphans`, `DropJunk` (hallucination list), `FixTiming`
 - [ ] `WrapLines`, `ToSrt`, `CoverageWarnings`, `UniquePath`
 - [ ] Port the 22 tests from `test_pipeline.py` to xUnit
-- [ ] Golden test: dump word lists from the Python app to JSON for each reference clip, check C# produces a byte-identical SRT
+- [ ] Golden test: feed SubGen's word lists (`bench-out/subgen-a/*.words.json`) through the C# clean-up, check the SRT is byte-identical
 
 ## Phase 3 — Media (ffmpeg / ffprobe)
 
@@ -79,22 +87,20 @@ Port `run_job` / `transcribe_file`.
 
 - [ ] Presets: Fast, Balanced (default), Thorough. **Best (Demucs) is dropped**
 - [ ] Settings: language, enhance, vocabulary, skip silence, embed mode, keep .srt, delete original
-- [ ] Silero VAD via Whisper.net's VAD processor (threshold, min silence, 500 ms padding) when the preset or "skip silence" asks for it
+- [ ] Silero VAD (ONNX Runtime, same model and parameters as faster-whisper) when the preset or "skip silence" asks for it
 - [ ] Drop segments with no-speech prob > 0.6 and avg log-prob < -1.0
-- [ ] Loop recovery: re-decode looped passages in isolation. Whisper.net has no repetition penalty, so measure whether the re-decode alone fixes loops; if not, fork Whisper.net or P/Invoke whisper.cpp's logits filter
-- [ ] Port faster-whisper's `hallucination_silence_threshold` (2.0 s) logic
+- [ ] Loop recovery: re-decode looped passages in isolation with repetition penalty 1.3
 - [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`), finished files leave the queue
 - [ ] One combined progress value + status line across both stages
-- [ ] GPU → CPU fallback. whisper.cpp may crash the process on CUDA errors, so probe the GPU up front or run the engine in a child process
+- [ ] GPU → CPU fallback (int8 on CPU) on CUDA errors
 - [ ] Error handling: an embed failure keeps the .srt; summary error at the end
 - [ ] Port the 14 tests from `test_run_job.py`
-- [ ] Check the 30 min file: RAM stays flat with file length
 
 ## Phase 5 — Models
 
-- [ ] Store models in `%LOCALAPPDATA%\Hushcue\models`
-- [ ] First-run download (ggml Whisper model + Silero VAD) with progress, resume and checksum
-- [ ] Load the model once and keep it loaded between runs; free it after the app has been idle for a while
+- [ ] Store models in `%LOCALAPPDATA%\Hushcue\models` (CTranslate2 format, from Hugging Face)
+- [ ] First-run download with progress, resume and checksum
+- [ ] Load the model once and keep it loaded between runs
 
 ## Phase 6 — WinUI 3 app
 
@@ -112,21 +118,14 @@ Port `run_job` / `transcribe_file`.
 
 ## Phase 7 — Measure and compare
 
-- [ ] Re-run the Phase 1 measurements on the finished app against the targets table
-- [ ] WER on all reference clips vs SubGen
+- [ ] Speed and WER on all reference clips vs SubGen (`tools/bench/compare.py`)
 - [ ] Publish the numbers in README
 
 ## Phase 8 — Ship
 
-- [ ] Self-contained publish; try Native AOT / trimming (Whisper.net doesn't state support, so test it)
+- [ ] Self-contained publish; try trimming / Native AOT
 - [ ] Installer: MSIX or unpackaged (e.g. Inno Setup / WiX), decide
 - [ ] ffmpeg bundling: GPL builds (with libx264) affect the licence; pick an LGPL build + NVENC, or keep ffmpeg as a user install
-- [ ] CUDA runtime: ship the needed DLLs or require the CUDA toolkit; or go Vulkan only
+- [ ] Ship `ctranslate2.dll`, cuBLAS and cuDNN (~1.7 GB), or download them on first run
 - [ ] GitHub Actions: build, test, release artifacts
 - [ ] GitHub repo `hushcue`, README with screenshots, first release
-
-## Open questions
-
-- Is token-timestamp accuracy close enough to faster-whisper's word timestamps? (Phase 1 answers this)
-- Do loops come back without a repetition penalty? (Phase 4)
-- CUDA vs Vulkan as the default runtime? (Phase 1)
