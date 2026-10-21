@@ -7,6 +7,7 @@
     <RootNamespace>Hushcue</RootNamespace>
     <AssemblyName>Hushcue</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Hushcue.ico</ApplicationIcon>
     <UseWinUI>true</UseWinUI>
     <!-- Unpackaged, with the Windows App SDK runtime copied next to the exe: no separate runtime install for users. -->
     <WindowsPackageType>None</WindowsPackageType>
@@ -22,6 +23,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Hushcue.Core\Hushcue.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Made by tools/make-icon.ps1; also loaded at runtime for the window's title bar -->
+    <Content Include="Assets\Hushcue.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -122,7 +122,11 @@ Port `run_job` / `transcribe_file`.
 - [ ] First-run download with progress, resume and checksum
 - [ ] Load the model once and keep it loaded between runs
 
-## Phase 6 — WinUI 3 app
+## Phase 6 — WinUI 3 app (first version in place)
+
+Built ahead of Phase 4/5. "Generate subtitles" runs a basic job (`Pipeline/SubtitleJob.cs`): no loop recovery,
+VAD or embed overlap yet, and models come from the Hugging Face cache until Phase 5. Tested by UI Automation: a clip
+went through Generate (soft track + .srt) end to end. MKV to MP4 page still to be tested by hand.
 
 - [ ] Window shell, Mica, dark/light theme following Windows, app icon
 - [ ] Mode switch: "Generate subtitles" / "MKV to MP4"

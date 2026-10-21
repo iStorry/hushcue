@@ -488,3 +488,15 @@ bench-out/
 native/deps/
 native/build/
 native/bin/
+
+# Python tools
+__pycache__/
+*.pyc
+
+# Local media and subtitles never belong in the repo
+*.mp4
+*.mkv
+*.wav
+*.srt
+
+# Line endings: keep binary fixtures untouched

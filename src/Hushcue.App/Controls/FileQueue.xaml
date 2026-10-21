@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Hushcue.Controls.FileQueue"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Hushcue.Controls">
+
+    <Grid RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Drop zone: dashed outline, empty state until files are added -->
+        <Grid MinHeight="96">
+            <Rectangle x:Name="Outline" RadiusX="8" RadiusY="8" StrokeThickness="1.5" StrokeDashArray="4,3"
+                       Stroke="{ThemeResource ControlStrongStrokeColorDefaultBrush}"
+                       Fill="{ThemeResource LayerOnMicaBaseAltFillColorTransparentBrush}" />
+            <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
+                <FontIcon Glyph="&#xE898;" FontSize="32" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock x:Name="EmptyTitle" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <TextBlock Text="or use Add files below" HorizontalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <ListView x:Name="List" Margin="6" SelectionMode="Extended" Visibility="Collapsed"
+                      AutomationProperties.Name="Files to process">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="local:QueuedFile">
+                        <StackPanel Padding="0,6" ToolTipService.ToolTip="{x:Bind Path}"
+                                    AutomationProperties.Name="{x:Bind Name}">
+                            <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind Folder}" TextTrimming="CharacterEllipsis"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="AddButton" Content="Add files" Click="OnAdd" />
+            <Button Grid.Column="1" Content="Remove selected" Click="OnRemove" />
+            <Button Grid.Column="2" Content="Clear" Click="OnClear" Style="{ThemeResource SubtleButtonStyle}" />
+            <TextBlock x:Name="CountText" Grid.Column="3" Text="No files" HorizontalAlignment="Right" VerticalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Grid>
+    </Grid>
+</UserControl>
