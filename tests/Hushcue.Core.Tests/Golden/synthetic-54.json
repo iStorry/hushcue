@@ -1,0 +1,75 @@
+{
+ "words": [
+  {
+   "word": " 5*3",
+   "start": 3.12,
+   "end": 3.12
+  },
+  {
+   "word": " it's",
+   "start": 3.3,
+   "end": 5.07
+  },
+  {
+   "word": "-",
+   "start": 5.07,
+   "end": 5.07
+  },
+  {
+   "word": " yes",
+   "start": 5.25,
+   "end": 5.84
+  },
+  {
+   "word": " \ud83d\ude00",
+   "start": 5.84,
+   "end": 6.29
+  },
+  {
+   "word": " la",
+   "start": 6.29,
+   "end": 7.11
+  },
+  {
+   "word": " \u266a",
+   "start": 7.11,
+   "end": 7.67
+  },
+  {
+   "word": " there",
+   "start": 7.67,
+   "end": 8.01
+  },
+  {
+   "word": " \u266a",
+   "start": 8.29,
+   "end": 8.29
+  },
+  {
+   "word": " [Music]",
+   "start": 8.29,
+   "end": 8.29
+  },
+  {
+   "word": " Mmmmmmmmmm",
+   "start": 8.29,
+   "end": 8.5
+  },
+  {
+   "word": " mmm",
+   "start": 8.5,
+   "end": 14.06
+  },
+  {
+   "word": " 5*3",
+   "start": 0.0,
+   "end": 0.0
+  },
+  {
+   "word": " here",
+   "start": 14.36,
+   "end": 14.95
+  }
+ ],
+ "srt": "1\n00:00:03,120 --> 00:00:07,110\n5*3 it's- yes \ud83d\ude00 la\n\n2\n00:00:08,290 --> 00:00:08,990\nMmmm mmm 5*3\n\n3\n00:00:14,360 --> 00:00:15,060\nhere\n"
+}

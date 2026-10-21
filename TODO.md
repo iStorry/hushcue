@@ -54,16 +54,21 @@ Full results: [docs/phase1-engine-spike.md](docs/phase1-engine-spike.md). Benchm
 - [ ] Check against SubGen on the four reference clips: same words, same timings, same speed
 - [ ] Remove the Whisper.net spike code and packages from `Hushcue.Cli`
 
-## Phase 2 — Port the subtitle cleanup (pure logic)
+## Phase 2 — Port the subtitle cleanup (pure logic) ✅ done
 
-Port from `../subgen/pipeline.py`, keeping the same constants and behaviour.
+Ported from `../subgen/pipeline.py` into `src/Hushcue.Core/Subtitles/`, same constants and behaviour.
 
-- [ ] `Word`, `Cue` records; constants (MAX_LINE 42, MAX_CUE_CHARS 84, MAX_CUE_SECONDS 6.0, MIN_CUE_SECONDS 0.7, WORD_GAP_SPLIT 0.8, MIN_CUE_GAP 0.2)
-- [ ] `StripMarkers`, `SquashStretched`, `FindRepeatRuns`, `CollapseRepeats`
-- [ ] `BuildCues`, `MergeOrphans`, `DropJunk` (hallucination list), `FixTiming`
-- [ ] `WrapLines`, `ToSrt`, `CoverageWarnings`, `UniquePath`
-- [ ] Port the 22 tests from `test_pipeline.py` to xUnit
-- [ ] Golden test: feed SubGen's word lists (`bench-out/subgen-a/*.words.json`) through the C# clean-up, check the SRT is byte-identical
+- [x] `Word`, `Cue` records; constants (MAX_LINE 42, MAX_CUE_CHARS 84, MAX_CUE_SECONDS 6.0, MIN_CUE_SECONDS 0.7, WORD_GAP_SPLIT 0.8, MIN_CUE_GAP 0.2)
+- [x] `StripMarkers`, `SquashStretched`, `FindRepeatRuns`, `CollapseRepeats`
+- [x] `BuildCues`, `MergeOrphans`, `DropJunk` (hallucination list), `FixTiming`
+- [x] `WrapLines`, `Srt.Write`, `CoverageWarnings`, `Srt.UniquePath`
+- [x] Python string rules that affect output (whitespace set, `len` in code points, round half to even) in `Py.cs`
+- [x] 13 of the 22 tests in `test_pipeline.py` are clean-up tests: ported to xUnit (`CleanupTests.cs`).
+      The 7 that need a model (loop recovery, `transcribe_file`, presets) move to Phase 4; the other 2 test
+      `evaluate.py` and a faster-whisper Python type, which don't carry over
+- [x] Golden test (`GoldenTests.cs`): C# writes byte-identical SRTs to SubGen on 60 synthetic cases (committed) and
+      40 real transcripts (`bench-out/golden/`, local only). Regenerate with `tools/bench/make_golden.py`
+- [x] Checked the golden test catches bugs: 4 deliberate changes each failed 1–11 cases
 
 ## Phase 3 — Media (ffmpeg / ffprobe)
 
@@ -94,7 +99,8 @@ Port `run_job` / `transcribe_file`.
 - [ ] One combined progress value + status line across both stages
 - [ ] GPU → CPU fallback (int8 on CPU) on CUDA errors
 - [ ] Error handling: an embed failure keeps the .srt; summary error at the end
-- [ ] Port the 14 tests from `test_run_job.py`
+- [ ] Port the 14 tests from `test_run_job.py`, and the 7 model tests left from `test_pipeline.py`
+      (6 loop-recovery / `transcribe_file`, 1 presets-are-deterministic)
 
 ## Phase 5 — Models
 

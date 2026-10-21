@@ -1,0 +1,285 @@
+{
+ "words": [
+  {
+   "word": "ing",
+   "start": 1.06,
+   "end": 1.06
+  },
+  {
+   "word": " right",
+   "start": 1.35,
+   "end": 1.6
+  },
+  {
+   "word": " yes",
+   "start": 1.6,
+   "end": 1.6
+  },
+  {
+   "word": " maybe",
+   "start": 1.64,
+   "end": 3.92
+  },
+  {
+   "word": " please",
+   "start": 6.38,
+   "end": 6.38
+  },
+  {
+   "word": " yes",
+   "start": 6.52,
+   "end": 9.01
+  },
+  {
+   "word": " maybe",
+   "start": 9.06,
+   "end": 15.97
+  },
+  {
+   "word": " please",
+   "start": 15.97,
+   "end": 16.45
+  },
+  {
+   "word": " yes",
+   "start": 16.62,
+   "end": 17.19
+  },
+  {
+   "word": " maybe",
+   "start": 19.78,
+   "end": 26.74
+  },
+  {
+   "word": " please",
+   "start": 27.58,
+   "end": 27.58
+  },
+  {
+   "word": " yes",
+   "start": 27.58,
+   "end": 28.06
+  },
+  {
+   "word": " maybe",
+   "start": 28.06,
+   "end": 34.25
+  },
+  {
+   "word": " please",
+   "start": 34.25,
+   "end": 38.89
+  },
+  {
+   "word": " yes",
+   "start": 40.98,
+   "end": 40.98
+  },
+  {
+   "word": " maybe",
+   "start": 41.1,
+   "end": 41.2
+  },
+  {
+   "word": " please",
+   "start": 43.74,
+   "end": 49.45
+  },
+  {
+   "word": " yes",
+   "start": 49.45,
+   "end": 50.0
+  },
+  {
+   "word": " maybe",
+   "start": 50.0,
+   "end": 50.0
+  },
+  {
+   "word": " please",
+   "start": 50.0,
+   "end": 54.55
+  },
+  {
+   "word": " yes",
+   "start": 54.55,
+   "end": 61.18
+  },
+  {
+   "word": " maybe",
+   "start": 61.18,
+   "end": 61.31
+  },
+  {
+   "word": " please",
+   "start": 61.45,
+   "end": 65.19
+  },
+  {
+   "word": "yes",
+   "start": 65.57,
+   "end": 65.57
+  },
+  {
+   "word": " maybe",
+   "start": 65.92,
+   "end": 66.23
+  },
+  {
+   "word": " please",
+   "start": 66.4,
+   "end": 66.47
+  },
+  {
+   "word": " yes",
+   "start": 68.5,
+   "end": 70.49
+  },
+  {
+   "word": " maybe",
+   "start": 70.49,
+   "end": 74.21
+  },
+  {
+   "word": " please",
+   "start": 74.21,
+   "end": 78.95
+  },
+  {
+   "word": " yes",
+   "start": 80.56,
+   "end": 81.13
+  },
+  {
+   "word": " maybe",
+   "start": 81.37,
+   "end": 81.37
+  },
+  {
+   "word": " please",
+   "start": 81.37,
+   "end": 81.37
+  },
+  {
+   "word": " yes",
+   "start": 81.37,
+   "end": 82.03
+  },
+  {
+   "word": " maybe",
+   "start": 82.03,
+   "end": 82.03
+  },
+  {
+   "word": " please",
+   "start": 82.19,
+   "end": 83.48
+  },
+  {
+   "word": " yes",
+   "start": 83.48,
+   "end": 83.6
+  },
+  {
+   "word": " maybe",
+   "start": 83.6,
+   "end": 83.94
+  },
+  {
+   "word": " please",
+   "start": 83.94,
+   "end": 84.64
+  },
+  {
+   "word": " yes",
+   "start": 87.4,
+   "end": 87.99
+  },
+  {
+   "word": " maybe",
+   "start": 88.38,
+   "end": 88.38
+  },
+  {
+   "word": " please",
+   "start": 88.38,
+   "end": 92.14
+  },
+  {
+   "word": " Thank",
+   "start": 95.91,
+   "end": 97.25
+  },
+  {
+   "word": " you",
+   "start": 97.25,
+   "end": 98.07
+  },
+  {
+   "word": " for",
+   "start": 98.12,
+   "end": 98.42
+  },
+  {
+   "word": " watching.",
+   "start": 98.52,
+   "end": 98.91
+  },
+  {
+   "word": " Mmmmmmmmmm",
+   "start": 99.05,
+   "end": 99.05
+  },
+  {
+   "word": " oh,",
+   "start": 99.05,
+   "end": 99.05
+  },
+  {
+   "word": " wow,",
+   "start": 99.05,
+   "end": 101.94
+  },
+  {
+   "word": "oh,",
+   "start": 104.44,
+   "end": 108.54
+  },
+  {
+   "word": " wow,",
+   "start": 108.78,
+   "end": 115.42
+  },
+  {
+   "word": " oh,",
+   "start": 116.18,
+   "end": 116.27
+  },
+  {
+   "word": " wow,",
+   "start": 116.56,
+   "end": 116.56
+  },
+  {
+   "word": " oh,",
+   "start": 116.56,
+   "end": 116.8
+  },
+  {
+   "word": " wow,",
+   "start": 117.09,
+   "end": 120.8
+  },
+  {
+   "word": " oh,",
+   "start": 121.98,
+   "end": 123.72
+  },
+  {
+   "word": " wow,",
+   "start": 125.02,
+   "end": 131.8
+  }
+ ],
+ "srt": "1\n00:00:01,060 --> 00:00:03,920\ning right yes maybe\n\n2\n00:00:06,380 --> 00:00:09,010\nplease yes\n\n3\n00:00:09,060 --> 00:00:15,950\nmaybe\n\n4\n00:00:15,970 --> 00:00:17,190\nplease yes\n\n5\n00:00:19,780 --> 00:00:26,740\nmaybe\n\n6\n00:00:27,580 --> 00:00:29,580\nplease\n\n7\n00:01:39,050 --> 00:01:41,940\nMmmm oh, wow,\n\n8\n00:01:44,440 --> 00:01:48,540\noh,\n\n9\n00:01:48,780 --> 00:01:55,420\nwow,\n\n10\n00:01:56,180 --> 00:01:58,560\noh, wow,\n"
+}

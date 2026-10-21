@@ -1,0 +1,95 @@
+{
+ "words": [
+  {
+   "word": " please",
+   "start": 0.97,
+   "end": 1.2
+  },
+  {
+   "word": "please",
+   "start": 2.34,
+   "end": 2.34
+  },
+  {
+   "word": " (heavy",
+   "start": 2.34,
+   "end": 2.34
+  },
+  {
+   "word": " so",
+   "start": 2.42,
+   "end": 2.42
+  },
+  {
+   "word": " Thanks",
+   "start": 4.32,
+   "end": 4.32
+  },
+  {
+   "word": " for",
+   "start": 5.11,
+   "end": 7.92
+  },
+  {
+   "word": " listening.",
+   "start": 7.92,
+   "end": 7.92
+  },
+  {
+   "word": " now",
+   "start": 7.92,
+   "end": 7.92
+  },
+  {
+   "word": " heavily*",
+   "start": 7.92,
+   "end": 8.44
+  },
+  {
+   "word": " What?",
+   "start": 8.44,
+   "end": 8.69
+  },
+  {
+   "word": " oh,",
+   "start": 8.75,
+   "end": 12.79
+  },
+  {
+   "word": " now",
+   "start": 12.79,
+   "end": 12.79
+  },
+  {
+   "word": " please",
+   "start": 12.83,
+   "end": 12.94
+  },
+  {
+   "word": " \u00a0hey",
+   "start": 12.99,
+   "end": 14.77
+  },
+  {
+   "word": " Thank",
+   "start": 17.65,
+   "end": 24.13
+  },
+  {
+   "word": " *",
+   "start": 24.13,
+   "end": 24.13
+  },
+  {
+   "word": " na\u00efve",
+   "start": 24.43,
+   "end": 25.32
+  },
+  {
+   "word": " my",
+   "start": 25.64,
+   "end": 25.78
+  }
+ ],
+ "srt": "1\n00:00:00,970 --> 00:00:02,340\nplease please\n"
+}

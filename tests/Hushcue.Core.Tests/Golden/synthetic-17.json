@@ -1,0 +1,80 @@
+{
+ "words": [
+  {
+   "word": " la",
+   "start": 1.64,
+   "end": 4.88
+  },
+  {
+   "word": " good.",
+   "start": 6.44,
+   "end": 6.44
+  },
+  {
+   "word": " now",
+   "start": 6.44,
+   "end": 6.56
+  },
+  {
+   "word": " \ud83d\ude00",
+   "start": 6.89,
+   "end": 6.89
+  },
+  {
+   "word": " oh,",
+   "start": 6.89,
+   "end": 7.25
+  },
+  {
+   "word": " don't",
+   "start": 7.47,
+   "end": 13.92
+  },
+  {
+   "word": "yes",
+   "start": 13.92,
+   "end": 14.03
+  },
+  {
+   "word": " maybe",
+   "start": 15.6,
+   "end": 15.6
+  },
+  {
+   "word": " please",
+   "start": 15.96,
+   "end": 15.96
+  },
+  {
+   "word": " yes",
+   "start": 16.13,
+   "end": 16.13
+  },
+  {
+   "word": " maybe",
+   "start": 19.03,
+   "end": 19.33
+  },
+  {
+   "word": " please",
+   "start": 19.42,
+   "end": 19.86
+  },
+  {
+   "word": " \u00a0hey",
+   "start": 20.16,
+   "end": 20.16
+  },
+  {
+   "word": " ...",
+   "start": 20.31,
+   "end": 20.31
+  },
+  {
+   "word": " you",
+   "start": 22.02,
+   "end": 22.54
+  }
+ ],
+ "srt": "1\n00:00:01,640 --> 00:00:04,880\nla\n\n2\n00:00:06,440 --> 00:00:07,250\ngood. now \ud83d\ude00 oh,\n\n3\n00:00:07,470 --> 00:00:13,900\ndon't\n\n4\n00:00:13,920 --> 00:00:14,620\nyes\n\n5\n00:00:15,600 --> 00:00:16,300\nmaybe please yes\n\n6\n00:00:19,030 --> 00:00:20,310\nmaybe please hey ...\n\n7\n00:00:22,020 --> 00:00:22,720\nyou\n"
+}

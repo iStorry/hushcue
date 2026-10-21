@@ -1,0 +1,340 @@
+{
+ "words": [
+  {
+   "word": " caf\u00e9",
+   "start": 1.42,
+   "end": 1.42
+  },
+  {
+   "word": "(heavy",
+   "start": 1.81,
+   "end": 3.07
+  },
+  {
+   "word": " laughs]",
+   "start": 4.81,
+   "end": 11.28
+  },
+  {
+   "word": "yes",
+   "start": 11.28,
+   "end": 11.45
+  },
+  {
+   "word": " maybe",
+   "start": 11.45,
+   "end": 11.89
+  },
+  {
+   "word": " please",
+   "start": 11.9,
+   "end": 11.9
+  },
+  {
+   "word": " yes",
+   "start": 11.9,
+   "end": 11.9
+  },
+  {
+   "word": " maybe",
+   "start": 11.9,
+   "end": 15.6
+  },
+  {
+   "word": " please",
+   "start": 15.6,
+   "end": 18.8
+  },
+  {
+   "word": " yes",
+   "start": 18.95,
+   "end": 18.95
+  },
+  {
+   "word": " maybe",
+   "start": 21.92,
+   "end": 21.92
+  },
+  {
+   "word": " please",
+   "start": 21.92,
+   "end": 22.39
+  },
+  {
+   "word": " yes",
+   "start": 22.39,
+   "end": 24.37
+  },
+  {
+   "word": " maybe",
+   "start": 24.75,
+   "end": 25.14
+  },
+  {
+   "word": " please",
+   "start": 25.14,
+   "end": 25.43
+  },
+  {
+   "word": " yes",
+   "start": 25.77,
+   "end": 26.02
+  },
+  {
+   "word": " maybe",
+   "start": 26.21,
+   "end": 31.48
+  },
+  {
+   "word": " please",
+   "start": 31.73,
+   "end": 31.73
+  },
+  {
+   "word": " yes",
+   "start": 31.99,
+   "end": 31.99
+  },
+  {
+   "word": " yes",
+   "start": 32.74,
+   "end": 32.95
+  },
+  {
+   "word": " maybe",
+   "start": 32.95,
+   "end": 32.95
+  },
+  {
+   "word": " please",
+   "start": 33.31,
+   "end": 33.51
+  },
+  {
+   "word": " yes",
+   "start": 33.51,
+   "end": 33.57
+  },
+  {
+   "word": " maybe",
+   "start": 33.57,
+   "end": 34.4
+  },
+  {
+   "word": " please",
+   "start": 34.51,
+   "end": 37.88
+  },
+  {
+   "word": " yes",
+   "start": 37.88,
+   "end": 38.14
+  },
+  {
+   "word": " maybe",
+   "start": 38.22,
+   "end": 38.22
+  },
+  {
+   "word": " please",
+   "start": 39.79,
+   "end": 39.79
+  },
+  {
+   "word": " yes",
+   "start": 40.03,
+   "end": 40.11
+  },
+  {
+   "word": "maybe",
+   "start": 42.37,
+   "end": 48.5
+  },
+  {
+   "word": " please",
+   "start": 48.5,
+   "end": 54.73
+  },
+  {
+   "word": " yes",
+   "start": 54.73,
+   "end": 55.36
+  },
+  {
+   "word": " maybe",
+   "start": 55.36,
+   "end": 61.04
+  },
+  {
+   "word": " please",
+   "start": 63.41,
+   "end": 67.48
+  },
+  {
+   "word": " yes",
+   "start": 67.76,
+   "end": 67.76
+  },
+  {
+   "word": " maybe",
+   "start": 67.82,
+   "end": 67.82
+  },
+  {
+   "word": " please",
+   "start": 67.89,
+   "end": 67.89
+  },
+  {
+   "word": " yes",
+   "start": 68.15,
+   "end": 68.15
+  },
+  {
+   "word": " maybe",
+   "start": 69.85,
+   "end": 70.31
+  },
+  {
+   "word": "please",
+   "start": 70.48,
+   "end": 70.48
+  },
+  {
+   "word": " yes",
+   "start": 70.48,
+   "end": 70.48
+  },
+  {
+   "word": " maybe",
+   "start": 70.48,
+   "end": 71.42
+  },
+  {
+   "word": " please",
+   "start": 73.63,
+   "end": 73.74
+  },
+  {
+   "word": " yes",
+   "start": 73.74,
+   "end": 79.4
+  },
+  {
+   "word": " maybe",
+   "start": 79.73,
+   "end": 80.13
+  },
+  {
+   "word": " please",
+   "start": 80.3,
+   "end": 80.3
+  },
+  {
+   "word": " yes",
+   "start": 80.68,
+   "end": 81.24
+  },
+  {
+   "word": " maybe",
+   "start": 81.24,
+   "end": 81.24
+  },
+  {
+   "word": " please",
+   "start": 82.7,
+   "end": 83.25
+  },
+  {
+   "word": " yes",
+   "start": 86.12,
+   "end": 86.12
+  },
+  {
+   "word": " maybe",
+   "start": 86.73,
+   "end": 87.32
+  },
+  {
+   "word": " please",
+   "start": 87.32,
+   "end": 87.32
+  },
+  {
+   "word": " sighing)",
+   "start": 87.32,
+   "end": 90.25
+  },
+  {
+   "word": "oh,",
+   "start": 90.43,
+   "end": 90.43
+  },
+  {
+   "word": " wow,",
+   "start": 93.42,
+   "end": 99.92
+  },
+  {
+   "word": " oh,",
+   "start": 102.34,
+   "end": 102.77
+  },
+  {
+   "word": " wow,",
+   "start": 102.77,
+   "end": 102.77
+  },
+  {
+   "word": " oh,",
+   "start": 102.77,
+   "end": 102.77
+  },
+  {
+   "word": " wow,",
+   "start": 104.92,
+   "end": 107.67
+  },
+  {
+   "word": " oh,",
+   "start": 107.67,
+   "end": 113.18
+  },
+  {
+   "word": " wow,",
+   "start": 113.18,
+   "end": 113.18
+  },
+  {
+   "word": " oh,",
+   "start": 113.28,
+   "end": 114.01
+  },
+  {
+   "word": " wow,",
+   "start": 114.01,
+   "end": 114.01
+  },
+  {
+   "word": " oh,",
+   "start": 114.01,
+   "end": 114.9
+  },
+  {
+   "word": " wow,",
+   "start": 115.14,
+   "end": 115.81
+  },
+  {
+   "word": " oh,",
+   "start": 116.02,
+   "end": 116.02
+  },
+  {
+   "word": " wow,",
+   "start": 116.18,
+   "end": 116.18
+  }
+ ],
+ "srt": "1\n00:00:01,420 --> 00:00:02,120\ncaf\u00e9\n\n2\n00:00:11,280 --> 00:00:15,580\nyes maybe please yes maybe\n\n3\n00:00:15,600 --> 00:00:18,950\nplease yes\n\n4\n00:00:21,920 --> 00:00:23,920\nmaybe please\n\n5\n00:00:31,990 --> 00:00:37,860\nyes yes maybe please yes maybe please\n\n6\n00:00:37,880 --> 00:00:38,580\nyes maybe\n\n7\n00:00:39,790 --> 00:00:41,790\nplease\n\n8\n00:01:30,430 --> 00:01:31,130\noh,\n\n9\n00:01:33,420 --> 00:01:39,920\nwow,\n\n10\n00:01:42,340 --> 00:01:43,040\noh, wow, oh,\n\n11\n00:01:44,920 --> 00:01:47,670\nwow,\n"
+}

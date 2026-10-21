@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\src\Hushcue.Core\Hushcue.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Golden\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
