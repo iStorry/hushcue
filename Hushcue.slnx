@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Hushcue.App/Hushcue.App.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/Hushcue.Cli/Hushcue.Cli.csproj" />
+    <Project Path="src/Hushcue.Core/Hushcue.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hushcue.Core.Tests/Hushcue.Core.Tests.csproj" />
+  </Folder>
+</Solution>
