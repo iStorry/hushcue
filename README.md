@@ -20,11 +20,23 @@ It can save an `.srt` file, add a subtitle track to an `.mkv`, or burn the text 
 | `src/Hushcue.App` | The WinUI 3 desktop app. |
 | `tests/Hushcue.Core.Tests` | xUnit tests for Core. |
 
+## Install
+
+Windows 10 (1809) or 11, x64. From a [release](https://github.com/iStorry/hushcue/releases):
+
+- `Hushcue-<version>-setup.exe` installs for your user account (no admin needed), adds a Start menu entry and, if
+  you keep the option ticked, "Generate subtitles with Hushcue" on the right-click menu of video and audio files.
+- `Hushcue-<version>-win-x64.zip` is the same app, portable: unzip anywhere and run `Hushcue.exe`.
+
+Hushcue needs ffmpeg on PATH: `winget install Gyan.FFmpeg`. On first use it downloads the speech model (1.6 GB) and,
+on a PC with an NVIDIA GPU, NVIDIA's cuBLAS (630 MB) into `%LOCALAPPDATA%\Hushcue`; without a GPU it runs on the CPU,
+more slowly. Nothing else leaves your PC.
+
 ## Build
 
 Needs the .NET 10 SDK (pinned in `global.json`) on Windows 10 1809 or later, x64. The engine bridge also needs
-Visual Studio 2022 or later Build Tools (C++ workload), CMake, and a Python environment with the `ctranslate2==4.8.2`,
-`nvidia-cublas-cu12` and `nvidia-cudnn-cu12` wheels (SubGen's venv by default).
+Visual Studio 2022 or later Build Tools (C++ workload), CMake, and a Python environment with the `ctranslate2==4.8.2`
+wheel, plus `nvidia-cublas-cu12` to run on the GPU during development (SubGen's venv by default).
 
 ```bash
 powershell -ExecutionPolicy Bypass -File native/build.ps1
@@ -32,3 +44,15 @@ dotnet build Hushcue.slnx
 dotnet test Hushcue.slnx
 dotnet run --project src/Hushcue.App
 ```
+
+## Release
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools/publish.ps1 -Version 0.2.0 -SmokeTest
+powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Version 0.2.0 -Iscc <path to ISCC.exe>
+```
+
+`tools/publish.ps1` makes a self-contained folder in `artifacts/publish/Hushcue`; `installer/build.ps1` turns it into
+an installer with Inno Setup 6. Pushing a `v*` tag runs the same steps on GitHub (`.github/workflows/release.yml`)
+and attaches the installer and a zip to a draft release. Details, measurements and the open ffmpeg/licence
+decisions: [docs/shipping.md](docs/shipping.md). Third-party licences: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

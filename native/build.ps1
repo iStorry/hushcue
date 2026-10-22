@@ -5,7 +5,8 @@ Builds native\bin\hushcue_ct2.dll and gathers the runtime DLLs it needs into %LO
 
 Needs Visual Studio 2022 or later Build Tools (C++ workload), CMake and git. The CTranslate2 binaries come from a
 Python environment with the ctranslate2 4.8.2 wheel installed (by default SubGen's venv), together with the
-nvidia-cublas-cu12 and nvidia-cudnn-cu12 wheels. -CpuOnly skips the two nvidia wheels (CI has no GPU).
+nvidia-cublas-cu12 wheel (cuDNN is not needed: CTranslate2's Windows build does not use it). -CpuOnly skips the
+nvidia wheels (CI has no GPU; release builds don't need them either, the app downloads cuBLAS on first run).
 #>
 param(
     [string]$SitePackages = (Join-Path $PSScriptRoot "..\..\subgen\.venv\Lib\site-packages"),
@@ -74,8 +75,8 @@ if (Test-Path $nvidia) {
 foreach ($dir in $sources) {
     Get-ChildItem $dir -Filter *.dll | Copy-Item -Destination $runtime -Force
 }
-$requiredDlls = if ($CpuOnly) { @("ctranslate2.dll") } else { @("ctranslate2.dll", "cublas64_12.dll", "cudnn64_9.dll") }
+$requiredDlls = if ($CpuOnly) { @("ctranslate2.dll") } else { @("ctranslate2.dll", "cublas64_12.dll", "cublasLt64_12.dll") }
 foreach ($required in $requiredDlls) {
-    if (-not (Test-Path (Join-Path $runtime $required))) { throw "Missing $required (install the nvidia-cublas-cu12 and nvidia-cudnn-cu12 wheels)" }
+    if (-not (Test-Path (Join-Path $runtime $required))) { throw "Missing $required (install the nvidia-cublas-cu12 wheel)" }
 }
 Write-Host "Built $bin\hushcue_ct2.dll; runtime DLLs in $runtime"
