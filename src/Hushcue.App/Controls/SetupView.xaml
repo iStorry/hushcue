@@ -17,8 +17,15 @@
 
                 <StackPanel Spacing="16">
                     <local:CheckRow x:Name="GpuRow" />
-                    <!-- HOOK(gpu-runtime): the step that downloads the GPU runtime libraries goes here; see SetupView.xaml.cs -->
-                    <local:CheckRow x:Name="GpuRuntimeRow" Visibility="Collapsed" />
+                    <!-- The GPU libraries (cuBLAS, NVRTC): only with a CUDA device -->
+                    <StackPanel Spacing="10">
+                        <local:CheckRow x:Name="GpuRuntimeRow" Visibility="Collapsed" />
+                        <StackPanel x:Name="RuntimePanel" Spacing="6" Margin="32,0,0,0" Visibility="Collapsed">
+                            <ProgressBar x:Name="RuntimeBar" Maximum="1000" AutomationProperties.Name="GPU libraries download" />
+                            <TextBlock x:Name="RuntimeText" Style="{StaticResource Hint}" />
+                        </StackPanel>
+                        <Button x:Name="RuntimeButton" Margin="32,0,0,0" Visibility="Collapsed" Click="OnRuntimeDownload" />
+                    </StackPanel>
                     <local:CheckRow x:Name="FfmpegRow" />
                     <StackPanel Spacing="10">
                         <local:CheckRow x:Name="ModelRow" />

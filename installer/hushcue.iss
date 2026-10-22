@@ -35,6 +35,8 @@ AppPublisherURL=https://github.com/iStorry/hushcue
 AppSupportURL=https://github.com/iStorry/hushcue/issues
 AppUpdatesURL=https://github.com/iStorry/hushcue/releases
 AppComments=Accurate subtitles from any video, generated privately on your PC.
+; the app holds this mutex while it runs (Services/SingleInstance.cs): setup asks to close it first
+AppMutex=Hushcue
 VersionInfoVersion={#FileVersion}
 VersionInfoProductVersion={#FileVersion}
 VersionInfoDescription={#AppName} Setup

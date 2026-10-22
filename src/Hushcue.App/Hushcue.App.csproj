@@ -12,6 +12,8 @@
     <!-- Unpackaged, with the Windows App SDK runtime copied next to the exe: no separate runtime install for users. -->
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Program.cs has the entry point: a second launch hands its files to the running app -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

@@ -19,9 +19,18 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        _window = new MainWindow();
-        // Files passed on the command line ("Open with Hushcue") go straight into the queue.
-        _window.AddFiles(Environment.GetCommandLineArgs().Skip(1).Where(File.Exists).Select(Path.GetFullPath));
-        _window.Activate();
+        var window = _window = new MainWindow();
+        // Files passed on the command line ("Open with Hushcue") go straight into the queue
+        window.AddFiles(Program.Files(Environment.GetCommandLineArgs().Skip(1)));
+        window.Activate();
+        // ... and so do those of later launches, which hand them over and exit
+        if (Program.Instance is { IsFirst: true } instance)
+        {
+            instance.Listen(paths => window.DispatcherQueue.TryEnqueue(() =>
+            {
+                window.AddFiles(paths);
+                Services.SingleInstance.BringToFront(WindowHandle);
+            }));
+        }
     }
 }

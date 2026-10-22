@@ -20,6 +20,8 @@ public sealed partial class SetupView : UserControl
     private const string StagingSuffix = ".download";
 
     private CancellationTokenSource? _download;
+    private CancellationTokenSource? _runtimeDownload;
+    private bool _runtimeReady;
     private bool _ffmpeg;
     private bool _engine = true;
     private bool _model;
@@ -36,7 +38,7 @@ public sealed partial class SetupView : UserControl
     /// <summary>The GPU check finished: what the title bar badge should show.</summary>
     public event EventHandler<GpuStatus>? GpuChecked;
 
-    public bool IsDownloading => _download is not null;
+    public bool IsDownloading => _download is not null || _runtimeDownload is not null;
 
     /// <summary>ffmpeg, the model and the engine are all in place (as far as checked so far).</summary>
     public bool IsReadyToRun => _ffmpeg && _model && _engine;
@@ -72,8 +74,8 @@ public sealed partial class SetupView : UserControl
         _cudaDevices = devices;
         _engine = error is null;
         ShowGpu(name, devices, error);
-        OfferGpuRuntime(name is not null, devices);
-        GpuChecked?.Invoke(this, new GpuStatus(name, devices > 0));
+        await CheckGpuRuntimeAsync();
+        GpuChecked?.Invoke(this, new GpuStatus(name, devices > 0 && _runtimeReady));
 
         if (nvenc is not null)
         {
@@ -87,7 +89,11 @@ public sealed partial class SetupView : UserControl
     }
 
     /// <summary>Stop a download (the window is closing); it resumes next time.</summary>
-    public void Stop() => _download?.Cancel();
+    public void Stop()
+    {
+        _download?.Cancel();
+        _runtimeDownload?.Cancel();
+    }
 
     private static bool SafeHasNvenc()
     {
@@ -116,20 +122,82 @@ public sealed partial class SetupView : UserControl
     }
 
     /// <summary>
-    /// HOOK(gpu-runtime): where setup will offer to download the GPU runtime libraries (CTranslate2's CUDA build,
-    /// cuBLAS, cuDNN) once Core has an API for it; today they ship with the app, so this does nothing. To add the step:
-    /// when there is an NVIDIA GPU (<paramref name="hasNvidiaGpu"/>) but the libraries are missing, show
-    /// <see cref="GpuRuntimeRow"/> with a download button, report progress the way <see cref="OnDownload"/> does for
-    /// the model, keep Continue disabled while it runs, then call <see cref="CheckAsync"/> again so the GPU row and the
-    /// title bar badge pick up CUDA.
+    /// The GPU runtime step (cuBLAS and NVRTC, which CTranslate2 needs on the GPU; not shipped with the app): only with
+    /// a CUDA device. Without the libraries Hushcue still works, on the CPU.
     /// </summary>
-    private void OfferGpuRuntime(bool hasNvidiaGpu, int cudaDevices)
+    private async Task CheckGpuRuntimeAsync()
     {
-        _ = hasNvidiaGpu;
-        _ = cudaDevices;
-        GpuRuntimeRow.Visibility = Visibility.Collapsed;
+        if (_cudaDevices == 0 || !_engine)
+        {
+            _runtimeReady = false;
+            GpuRuntimeRow.Visibility = RuntimePanel.Visibility = RuntimeButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        if (_runtimeDownload is not null)
+            return;
+        GpuRuntimeRow.Visibility = Visibility.Visible;
+        var status = await Task.Run(RuntimeDownload.Check);
+        _runtimeReady = status.IsReady;
+        if (status.IsReady)
+        {
+            GpuRuntimeRow.Set(CheckState.Ok, "GPU libraries ready", "cuBLAS and NVRTC from NVIDIA, for transcribing on the GPU.");
+            RuntimeButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        GpuRuntimeRow.Set(CheckState.Warning, "GPU libraries needed",
+            $"cuBLAS and NVRTC from NVIDIA: a one-time {Size(status.DownloadSize)} download. Until then Hushcue transcribes on the CPU.");
+        RuntimeButton.Content = $"Download ({Size(status.DownloadSize)})";
+        RuntimeButton.Visibility = Visibility.Visible;
     }
 
+    private async void OnRuntimeDownload(object sender, RoutedEventArgs e)
+    {
+        if (_runtimeDownload is not null)
+        {
+            _runtimeDownload.Cancel();
+            return;
+        }
+        _runtimeDownload = new CancellationTokenSource();
+        RuntimeButton.Content = "Cancel";
+        GpuRuntimeRow.Set(CheckState.Checking, "Downloading the GPU libraries", "cuBLAS and NVRTC, checked against their published checksums");
+        RuntimeBar.Value = 0;
+        RuntimeText.Text = "";
+        RuntimePanel.Visibility = Visibility.Visible;
+        UpdateButtons();
+        var ui = DispatcherQueue;
+        var token = _runtimeDownload.Token;
+        string? failure = null;
+        try
+        {
+            await Task.Run(() => RuntimeDownload.DownloadAsync((done, total) => ui.TryEnqueue(() =>
+            {
+                RuntimeBar.Value = total > 0 ? done * 1000.0 / total : 0;
+                RuntimeText.Text = done < total ? $"{Size(done)} of {Size(total)}" : "Unpacking...";
+            }), token), token);
+        }
+        catch (OperationCanceledException)
+        {
+            failure = "The download was cancelled. It continues where it stopped next time.";
+        }
+        catch (RuntimeDownloadException error)
+        {
+            failure = error.Message;
+        }
+        finally
+        {
+            _runtimeDownload.Dispose();
+            _runtimeDownload = null;
+            RuntimePanel.Visibility = Visibility.Collapsed;
+        }
+        if (failure is not null)
+        {
+            GpuRuntimeRow.Set(CheckState.Error, "The GPU libraries were not downloaded", failure);
+            RuntimeButton.Content = "Try again";
+            UpdateButtons();
+            return;
+        }
+        await CheckAsync(); // the GPU row and the title bar badge pick the GPU up
+    }
     private void CheckModel()
     {
         if (_download is not null)
@@ -225,9 +293,9 @@ public sealed partial class SetupView : UserControl
 
     private void UpdateButtons()
     {
-        ContinueButton.IsEnabled = _ffmpeg && _model && _engine && _download is null;
+        ContinueButton.IsEnabled = _ffmpeg && _model && _engine && _download is null && _runtimeDownload is null;
         if (Heading.Text != "System check")
-            ContinueButton.Content = _cudaDevices > 0 || !_engine ? "Continue" : "Continue on CPU";
+            ContinueButton.Content = (_cudaDevices > 0 && _runtimeReady) || !_engine ? "Continue" : "Continue on CPU";
     }
 
     private async void OnRecheck(object sender, RoutedEventArgs e) => await CheckAsync();
