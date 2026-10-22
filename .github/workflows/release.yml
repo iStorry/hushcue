@@ -103,7 +103,12 @@ jobs:
             gh release upload $env:TAG @files --clobber
           }
           else {
+            # this version's section of CHANGELOG.md goes first: the app's update dialog shows the start of the notes
+            $changes = ""
+            $section = [regex]::Match((Get-Content CHANGELOG.md -Raw), "(?ms)^## $([regex]::Escape($env:VERSION))\b[^\n]*\n(.*?)(?=^## |\z)")
+            if ($section.Success) { $changes = "What's new in $($env:VERSION):`n`n" + $section.Groups[1].Value.Trim() + "`n`n" }
             $notes = @"
+          $changes
           Hushcue $env:VERSION for Windows 10 (1809) and 11, x64: subtitles from any video, made on your own PC.
 
           - **Hushcue-$env:VERSION-setup.exe**: installer. Installs for the current user (no admin needed) and can add

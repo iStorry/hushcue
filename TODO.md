@@ -4,7 +4,8 @@ Accurate subtitles from any video, generated privately on your PC.
 
 v0.1.0 is out: the CTranslate2 engine with a C# port of faster-whisper 1.2.1, the subtitle job (loop recovery,
 clean-up, embedding), the app (Generate subtitles, Edit subtitles, MKV to MP4, Settings, About), the installer and
-automatic updates. How it got there is in the git history; this file holds what's next.
+automatic updates. v0.1.1 adds the "not sure" review flags and fixes the vocabulary (CHANGELOG.md). How it got there
+is in the git history; this file holds what's next.
 
 ## Open from v0.1.0
 
@@ -17,7 +18,7 @@ automatic updates. How it got there is in the git history; this file holds what'
 - [ ] Subtitle tracks inside an `.mkv`: extract to edit, write back as a new file
 - [ ] Compact mini window that stays on top while a batch runs
 
-## v0.1.1 — Subtitle quality: the right word, not just a similar one
+## v0.1.1 — Subtitle quality: the right word, not just a similar one (released; the open items move to v0.1.2)
 
 Whisper's misses are mostly words that sound alike: calm / come / cum, their / there, your / you're, then / than,
 knew / new, weather / whether, here / hear. "come" and "cum" sound the same, so only the words around them can
@@ -79,4 +80,7 @@ a stronger language model, and the person reviewing a fast way to fix what is st
 - [ ] **Spelling preferences in Settings**: "Words Whisper should never write" become suppressed tokens, so the
       decoder picks its next best word for the same sound in its context (better than find-and-replace, which
       can't tell "come" from "calm"). "Always write X as Y" for names and brands, applied after the clean-up
-- [ ] Release v0.1.1: version in `Directory.Build.props`, release notes with the measured gains, tag `v0.1.1`
+- [x] Release v0.1.1: version in `Directory.Build.props`, notes in `CHANGELOG.md` (the release workflow puts the
+      version's section first in the GitHub release, so the update dialog shows it), tag `v0.1.1`
+- [ ] Check the v0.1.1 release run on GitHub Actions, and that an installed v0.1.0 offers the update (needs the
+      repository to be public)
