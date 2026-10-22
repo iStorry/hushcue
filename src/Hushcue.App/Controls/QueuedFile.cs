@@ -13,11 +13,11 @@ public sealed record FileCheck(string Warning, bool Skip);
 /// <summary>A file in the queue and where it is: waiting, being worked on, done, or failed.</summary>
 public sealed class QueuedFile(string path) : INotifyPropertyChanged
 {
-    private const string WaitingGlyph = ""; // clock
-    private const string WarningGlyph = "";
-    private const string WorkingGlyph = ""; // play
-    private const string DoneGlyph = ""; // check mark
-    private const string FailedGlyph = "";
+    private const string WaitingGlyph = "\uE823"; // clock
+    private const string WarningGlyph = "\uE7BA";
+    private const string WorkingGlyph = "\uE768"; // play
+    private const string DoneGlyph = "\uE73E"; // check mark
+    private const string FailedGlyph = "\uE783";
 
     private FileProgress _progress = FileProgress.Waiting(path);
     private bool _locked;

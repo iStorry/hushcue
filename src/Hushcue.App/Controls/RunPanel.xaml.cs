@@ -40,6 +40,13 @@ public sealed partial class RunPanel : UserControl
 
     public bool IsRunning => CancelButton.IsEnabled;
 
+    /// <summary>Ctrl+Enter anywhere in the window: the same as the start button, when it is enabled.</summary>
+    public void RequestStart()
+    {
+        if (StartButton.IsEnabled)
+            StartRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     public void SetRunning(bool running)
     {
         StartButton.IsEnabled = !running;

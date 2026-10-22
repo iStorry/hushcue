@@ -30,8 +30,12 @@ public sealed partial class FinishedPanel : UserControl
     {
         _summary = summary;
         var files = summary.Done == 1 ? "1 file done" : $"{summary.Done} files done";
-        HeadText.Text = string.Join(", ", new[] { files, summary.Failed > 0 ? $"{summary.Failed} failed" : "", summary.Skipped > 0 ? $"{summary.Skipped} skipped" : "" }.Where(p => p.Length > 0));
-        HeadIcon.Glyph = summary.Failed > 0 ? "" : "";
+        string[] parts =
+        [
+            files, summary.Failed > 0 ? $"{summary.Failed} failed" : "", summary.Skipped > 0 ? $"{summary.Skipped} skipped" : "",
+        ];
+        HeadText.Text = string.Join(", ", parts.Where(p => p.Length > 0));
+        HeadIcon.Glyph = summary.Failed > 0 ? "\uE7BA" : "\uE930";
         HeadIcon.Foreground = ThemeBrushes.Get(summary.Failed > 0 ? ThemeBrushes.Caution : ThemeBrushes.Success);
 
         VideoText.Text = Length(summary.Video);

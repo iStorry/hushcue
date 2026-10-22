@@ -10,7 +10,7 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="Root" AllowDrop="True" DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnDrop">
+    <Grid x:Name="Root" AllowDrop="True" PreviewKeyDown="OnPreviewKeyDown" DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnDrop">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />

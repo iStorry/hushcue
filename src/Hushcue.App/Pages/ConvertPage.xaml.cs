@@ -41,6 +41,8 @@ public sealed partial class ConvertPage : UserControl, IRunPage
 
     public Controls.FileQueue Files => Queue;
 
+    public void Start() => Run.RequestStart();
+
     public bool IsRunning => _job is { IsCompleted: false };
 
     public void Load(AppSettings settings)

@@ -54,9 +54,9 @@ public sealed partial class CheckRow : Grid
         _icon.Visibility = state == CheckState.Checking ? Visibility.Collapsed : Visibility.Visible;
         (_icon.Glyph, _icon.Foreground) = state switch
         {
-            CheckState.Ok => ("", ThemeBrushes.Get(ThemeBrushes.Success)),
-            CheckState.Warning => ("", ThemeBrushes.Get(ThemeBrushes.Caution)),
-            _ => ("", ThemeBrushes.Get(ThemeBrushes.Critical)),
+            CheckState.Ok => ("\uE930", ThemeBrushes.Get(ThemeBrushes.Success)),
+            CheckState.Warning => ("\uE7BA", ThemeBrushes.Get(ThemeBrushes.Caution)),
+            _ => ("\uE783", ThemeBrushes.Get(ThemeBrushes.Critical)),
         };
         _title.Text = title;
         _detail.Text = detail;

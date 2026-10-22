@@ -57,7 +57,7 @@
                             <TextBlock Text="Quality" Style="{StaticResource BodyStrongTextBlockStyle}"
                                        AutomationProperties.HeadingLevel="Level2" />
                             <!-- One card per preset, added from Presets.All -->
-                            <Grid x:Name="PresetChoices" ColumnSpacing="6" XYFocusKeyboardNavigation="Enabled"
+                            <Grid x:Name="PresetChoices" ColumnSpacing="6"
                                   TabFocusNavigation="Once" AutomationProperties.Name="Quality">
                                 <Grid.Resources>
                                     <Style TargetType="RadioButton" BasedOn="{StaticResource ChoiceCard}">
@@ -75,7 +75,7 @@
                         <StackPanel Spacing="8">
                             <TextBlock Text="Result" Style="{StaticResource BodyStrongTextBlockStyle}"
                                        AutomationProperties.HeadingLevel="Level2" />
-                            <StackPanel x:Name="ResultChoices" Spacing="6" XYFocusKeyboardNavigation="Enabled"
+                            <StackPanel x:Name="ResultChoices" Spacing="6"
                                         TabFocusNavigation="Once" AutomationProperties.Name="Result">
                                 <StackPanel.Resources>
                                     <Style TargetType="RadioButton" BasedOn="{StaticResource ChoiceCard}">

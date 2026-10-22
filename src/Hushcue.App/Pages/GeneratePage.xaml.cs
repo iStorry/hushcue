@@ -25,6 +25,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     private Task? _coreJob;
     private Batch? _batch;
     private bool _showingResult;
+    private bool _starting;
 
     /// <summary>One run over the queue, and what it did so far.</summary>
     private sealed class Batch(IReadOnlyList<QueuedFile> files, int skipped, string preset, bool burning)
@@ -63,6 +64,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             PresetChoices.ColumnDefinitions.Add(new ColumnDefinition());
             PresetChoices.Children.Add(card);
         }
+        ChoiceGroup.Attach(PresetChoices);
+        ChoiceGroup.Attach(ResultChoices);
         foreach (var (name, _) in Presets.Languages)
             LanguageBox.Items.Add(name);
         Run.StartRequested += async (_, _) => await StartAsync();
@@ -77,6 +80,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     public event EventHandler<string>? DeviceChanged;
 
     public Controls.FileQueue Files => Queue;
+
+    public void Start() => Run.RequestStart();
 
     public bool IsRunning => _batch is not null;
 
@@ -276,8 +281,21 @@ public sealed partial class GeneratePage : UserControl, IRunPage
 
     private async Task StartAsync()
     {
-        if (IsRunning)
-            return;
+        if (IsRunning || _starting)
+            return; // a second Ctrl+Enter while the files are read or the confirmation is open
+        _starting = true;
+        try
+        {
+            await StartBatchAsync();
+        }
+        finally
+        {
+            _starting = false;
+        }
+    }
+
+    private async Task StartBatchAsync()
+    {
         ShowSummary(null);
         Queue.RequeueFailed();
         var pending = Queue.Pending;

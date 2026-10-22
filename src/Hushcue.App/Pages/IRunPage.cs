@@ -10,6 +10,9 @@ public interface IRunPage
 {
     bool IsRunning { get; }
 
+    /// <summary>Ctrl+Enter: start, as the page's start button does.</summary>
+    void Start();
+
     event EventHandler<RunProgress>? ProgressChanged;
 
     /// <summary>A batch ended (done, failed or cancelled).</summary>

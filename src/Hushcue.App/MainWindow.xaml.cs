@@ -5,10 +5,14 @@ using Hushcue.Services;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.Storage;
+using Windows.System;
+using Windows.UI.Core;
 using Windows.UI;
 
 namespace Hushcue;
@@ -134,6 +138,19 @@ public sealed partial class MainWindow : Window
             return;
         ShowSetup(true);
         await Setup.CheckAsync();
+    }
+
+    /// <summary>
+    /// Ctrl+Enter starts from anywhere, also from the file list and text boxes, which take plain Enter for themselves
+    /// (as a keyboard accelerator it never reached the start button from there).
+    /// </summary>
+    private void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        var ctrl = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+        if (e.Key != VirtualKey.Enter || !ctrl || Setup.Visibility == Visibility.Visible)
+            return;
+        (Convert.Visibility == Visibility.Visible ? (IRunPage)Convert : Generate).Start();
+        e.Handled = true;
     }
 
     private void OnDragOver(object sender, DragEventArgs e)
