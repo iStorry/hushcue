@@ -153,9 +153,10 @@ Port `run_job` / `transcribe_file`. It is in `Pipeline/SubtitleJob.cs`, `Pipelin
 
 ## Phase 6 — WinUI 3 app (first version in place)
 
-Built ahead of Phase 4/5. "Generate subtitles" runs the job in `Pipeline/SubtitleJob.cs` (no loop recovery yet).
-Tested by UI Automation before VAD, embed overlap and the model download: a clip went through Generate (soft
-track + .srt) end to end. MKV to MP4 page still to be tested by hand.
+"Generate subtitles" runs the job in `Pipeline/SubtitleJob.cs` (with loop recovery). Run and checked on Windows by
+UI Automation after the redesign (Phase 6b): .srt only, subtitle track and burn-in end to end on a 3-minute clip and
+a batch of four, a non-media file, a file with no audio, an audio-only file while embedding, Cancel (button and Esc)
+mid-burn, and closing the window mid-run. MKV to MP4 page still to be tested by hand.
 
 - [x] Window shell, Mica, dark/light theme following Windows, app icon
 - [x] Mode switch: "Generate subtitles" / "MKV to MP4"
@@ -168,7 +169,14 @@ track + .srt) end to end. MKV to MP4 page still to be tested by hand.
 - [x] Remember the last options and output folder
 - [x] Cancel the job cleanly when the window closes
 - [ ] Test the MKV to MP4 page by hand
-- [ ] Keyboard navigation and screen reader labels (only a few controls are labelled so far)
+- [x] Keyboard navigation and screen reader labels: every control has a name (rows read as "name, status"), Tab
+      order follows the layout, Tab enters a card group on the checked card and arrows move and check
+      (`Pages/ChoiceGroup.cs`), the status line and setup checks are live regions. Checked by walking the Tab order
+      and the UI Automation tree. Not checked with Narrator itself, nor at 200% text size (a system setting); text
+      wraps or trims and the options scroll, so it should hold
+- [x] Single instance: later launches (one per file from Explorer's menu) hand their files to the running window
+      over a named pipe and bring it to the front; the app holds the mutex `Hushcue` (installer `AppMutex`). Checked
+      with three launches at once and one onto a minimised window
 
 ## Phase 6b — UI redesign
 
@@ -185,13 +193,19 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
 - [x] Preset as three cards in a row, result as three cards with the tradeoff on each (`ChoiceCard` style)
 - [x] Language, vocabulary, audio clean-up and skip silence under "More options", opened when any differ from the
       defaults
-- [ ] Build and run it on Windows: written on macOS, never compiled (check the `ChoiceCard` states and the queue
-      glyphs first)
-- [ ] Probe files when they are added: show the duration, and warn before the run (no audio, no video stream while
-      embedding)
-- [ ] Total time left for the whole batch in the bottom bar (needs the durations above)
-- [ ] "Offline · <GPU>" badge in the title bar; switch to "CPU" when the GPU fallback kicks in
-- [ ] Live speed hint under the preset from measured runs on this PC
+- [x] Build and run it on Windows. Fixed: the preset cards were clipped (RadioButton's default MinWidth of 120),
+      detail lines wrapped, the caption buttons ignored the app theme; added an accent fill on the checked card, a
+      tile behind each row's glyph, a remove button per row, and a title bar (WinUI `TitleBar`) with the tools.
+      Checked in light and dark, at 900x640 and maximised on a 3440 px screen (pages stop at 1640 px)
+- [x] Probe files when they are added (`Media/MediaProbe.cs`): length in the row and the header; warnings in the row
+      before the run. Unreadable files and files without audio are skipped; files without a picture get an .srt
+      only when embedding (run as their own group)
+- [x] Total time left for the whole batch in the bottom bar (`BatchEstimate`, weighted by length; reading audio and
+      loading the model don't count)
+- [x] "Offline · <GPU>" badge in the title bar (GPU name from the registry's display adapters); "CPU" without CUDA,
+      without the GPU libraries, or when the job falls back. It opens the system check
+- [x] Live speed hint under the preset ("~52× real time on your GPU"), measured per preset and device from
+      "Transcribing" to "Writing SRT" and kept in the settings (blended with the last run)
 
 **Idea 2: review and edit before embedding** ([mock](docs/mocks/2-review-editor.png))
 
@@ -204,17 +218,25 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
 
 **Idea 3: first run and the finished screen** ([mock](docs/mocks/3-first-run-and-done.png))
 
-- [ ] Setup screen: check for the GPU (CUDA), ffmpeg (NVENC), and download the model with progress and resume
-      (Phase 5), offering a smaller model without a GPU
-- [ ] Finished screen: video length, time taken, speed, coverage warnings, and Undo for originals moved to the
-      Recycle Bin
+- [x] Setup screen (`Controls/SetupView`), shown at start when ffmpeg or the model is missing (or the engine can't
+      load), and from the badge as "System check": GPU and CUDA, the GPU libraries (`RuntimeDownload`, only with a
+      CUDA device), ffmpeg and NVENC ("Check again" picks up a fresh PATH), the model with progress, speed, pause and
+      resume; "Continue on CPU" without a GPU. The real large-v3-turbo download was run through it: paused at
+      1.4 GB, resumed, finished with checksums, moved into place (then removed again). The GPU libraries download
+      itself was not run here (this PC has them). No smaller model to offer yet (only the large ones are pinned)
+- [x] Finished screen (`Controls/FinishedPanel`) in place of the options: video length, time taken, speed, coverage
+      warnings and failures by file, Open folder, and "Put them back" for originals moved to the Recycle Bin
+      (`Media/RecycleBinRestore.cs`, plus Open Recycle Bin). Restore checked on two recycled test files
 
 **Windows touches**
 
-- [ ] Progress on the taskbar button and a notification when a batch finishes
+- [x] Progress on the taskbar button (`ITaskbarList3`, seen on the taskbar during a burn) and the button flashes when
+      a batch ends with the window in the background (`FlashWindowEx`; not watched happening). No toast notification:
+      it needs the App Notifications package and registration for an unpackaged app
 - [ ] Compact mini window that stays on top while a batch runs
 - [ ] Explorer right-click "Generate subtitles with Hushcue", and drop files on the taskbar button
-- [ ] Shortcuts: Ctrl+O add files, Ctrl+Enter start, Delete remove selected
+- [x] Shortcuts: Ctrl+O add files, Ctrl+Enter start (from anywhere, also the list), Delete remove selected, Esc
+      cancel after asking; checked by sending the keys
 
 ## Phase 7 — Measure and compare
 

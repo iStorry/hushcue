@@ -9,6 +9,21 @@ It can save an `.srt` file, add a subtitle track to an `.mkv`, or burn the text 
 > Engine: CTranslate2, the engine SubGen uses, called natively through a small C++ bridge
 > ([Phase 1b](docs/phase1b-ctranslate2.md)). Whisper.net was tried first and dropped ([Phase 1](docs/phase1-engine-spike.md)).
 
+![A queue of four files: one done, one being transcribed, one waiting, and an audio file that will get an .srt only](docs/screenshots/2-queue-running.png)
+
+| Finished | First run |
+|---|---|
+| ![The finished screen: video length, time taken and speed](docs/screenshots/3-finished.png) | ![The setup screen checking the GPU and ffmpeg and downloading the speech model](docs/screenshots/4-setup.png) |
+
+Drop videos or audio files on the window (or use Add files), pick the quality and the result, and start. Each file
+shows its own progress; the bottom bar shows the whole batch and the time left, as does the taskbar button. Files
+that can't be done are flagged before the run (not media, no sound, or no picture to put subtitles on). The finished
+screen sums up the batch and can put originals moved to the Recycle Bin back.
+
+Keyboard: Ctrl+O add files, Ctrl+Enter start, Delete remove the selected files, Esc cancel (asks first), arrow keys
+within the quality and result choices. `HUSHCUE_THEME=Light` or `Dark` pins the theme and `HUSHCUE_SETUP=1` shows
+the setup screen as on a fresh PC (both for testing and screenshots).
+
 ## Layout
 
 | Project | What it is |
