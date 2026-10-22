@@ -18,6 +18,13 @@ public sealed record DeviceSelected(string Device, bool Fallback = false, string
 /// <param name="Finished">the download is complete; the run carries on</param>
 public sealed record ModelDownloading(string Model, long Done, long Total, bool Finished = false) : JobEvent;
 
+/// <summary>
+/// Subtitles heard so far in the file being transcribed, one decoded passage at a time, to show while the work goes
+/// on. Provisional: loop recovery and the clean-up of the whole file can still change them; <see cref="FileTranscribed"/>
+/// has the final ones.
+/// </summary>
+public sealed record CuesDecoded(string Path, IReadOnlyList<Cue> Cues) : JobEvent;
+
 /// <summary>A file's audio is transcribed and its subtitles are final.</summary>
 /// <param name="Cues">the finished subtitles</param>
 /// <param name="AudioSeconds">length of the audio transcribed</param>

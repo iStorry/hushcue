@@ -290,7 +290,8 @@ public static partial class Cleanup
 
     private static string WordKey(Word w) => NotKeyChar().Replace(w.Text.ToLowerInvariant(), "");
 
-    private static string Normalize(string text) =>
+    /// <summary>Lower case without punctuation, as DropJunk compares cues.</summary>
+    internal static string Normalize(string text) =>
         Py.Strip(NotNormChar().Replace(text.ToLowerInvariant().Replace(".", ""), ""));
 
     private static bool EndsSentence(string text) => Py.RStrip(text) is [.., '.' or '?' or '!'];

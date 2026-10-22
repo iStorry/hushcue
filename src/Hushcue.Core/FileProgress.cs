@@ -6,6 +6,8 @@ public enum FileState
     Working,
     Done,
     Failed,
+    /// <summary>Transcribed, with the .srt written; embedding waits until someone has reviewed the subtitles.</summary>
+    Review,
 }
 
 /// <summary>What is being done to a file while it is <see cref="FileState.Working"/>; None in the other states.</summary>
@@ -45,6 +47,9 @@ public sealed record FileProgress(string Path, FileState State, double Fraction,
         new(path, FileState.Done, 1, $"Saved {System.IO.Path.GetFileName(output)}", output);
 
     public static FileProgress Failed(string path, string reason) => new(path, FileState.Failed, 1, reason);
+
+    /// <param name="srt">the subtitles waiting for review</param>
+    public static FileProgress ReadyForReview(string path, string srt) => new(path, FileState.Review, 1, "Ready to review", srt);
 
     /// <summary>Reading the audio or loading the model: the file has started, but not the work that can be timed.</summary>
     public bool IsStarting => State == FileState.Working && Stage is FileStage.ReadingAudio or FileStage.LoadingModel;

@@ -64,4 +64,8 @@ public sealed record JobSettings
     public bool KeepSrt { get; init; } = true;
     /// <summary>When embedding: send the source video to the Recycle Bin afterwards.</summary>
     public bool DeleteOriginal { get; init; }
+    /// <summary>When embedding: stop after writing the .srt (kept, whatever <see cref="KeepSrt"/> says) so the
+    /// subtitles can be reviewed and edited first; the file ends as <see cref="FileState.Review"/> and is embedded
+    /// later with <see cref="SubtitleJob.EmbedAsync(string, IReadOnlyList{Subtitles.Cue}, string?, EmbedMode, bool, Action{double}, Action{string}, CancellationToken)"/>.</summary>
+    public bool ReviewBeforeEmbed { get; init; }
 }

@@ -108,13 +108,14 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         {
             var reading = rate.Measure(f);
             Report(0.08 + 0.9 * f, reading.Describe(), FileStage.Transcribing, reading);
-        }, cancel);
+        }, words => onEvent(new CuesDecoded(src, Cleanup.DropJunk(Cleanup.BuildCues(Cleanup.CollapseRepeats(words))))), cancel);
 
         Report(0.99, "Writing SRT...", FileStage.WritingSrt);
         var destDir = outDir ?? Path.GetDirectoryName(src) ?? "";
         Directory.CreateDirectory(destDir);
         var embedding = settings.Embed != EmbedMode.None && cues.Count > 0;
-        var tempSrt = embedding && !settings.KeepSrt;
+        var review = embedding && settings.ReviewBeforeEmbed;
+        var tempSrt = embedding && !settings.KeepSrt && !review;
         var srt = tempSrt
             ? Path.Combine(Path.GetTempPath(), $"hushcue_{Guid.NewGuid():N}.srt") // only fed to ffmpeg, deleted after
             : FileNames.Unique(Path.Combine(destDir, Path.GetFileNameWithoutExtension(src) + ".srt"));
@@ -128,6 +129,13 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
             log("No subtitles were found, so nothing was embedded in the video.");
         onEvent(new FileTranscribed(src, cues, seconds, took, _device, tempSrt ? null : srt, warnings));
 
+        if (review)
+        {
+            log($"{Path.GetFileName(src)} is ready to review; its subtitles will be added to the video after that.");
+            _outputs[index] = srt;
+            _progress.ReadyForReview(index, srt);
+            return null;
+        }
         if (embedding)
         {
             _progress.WaitingToEmbed(index, _share);
@@ -141,7 +149,8 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
     /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>
     /// <returns>the cues, and the time taken from the start of decoding</returns>
     private (List<Cue> Cues, TimeSpan Took) TranscribeWithFallback(
-        float[] audio, Action<double, string, FileStage, RateReading?> report, Action<double> onFraction, CancellationToken cancel)
+        float[] audio, Action<double, string, FileStage, RateReading?> report, Action<double> onFraction,
+        Action<IReadOnlyList<Word>> onWords, CancellationToken cancel)
     {
         for (var attempt = 0; ; attempt++)
         {
@@ -154,7 +163,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
                 });
                 report(0.08, "Transcribing...", FileStage.Transcribing, null);
                 var clock = Stopwatch.StartNew();
-                var cues = FileTranscription.Transcribe(model, audio, settings, _preset, onFraction, log, cancel);
+                var cues = FileTranscription.Transcribe(model, audio, settings, _preset, onFraction, log, cancel, onWords);
                 return (cues, clock.Elapsed);
             }
             catch (EngineException e) when (_device == "cuda" && attempt == 0 && IsGpuError(e))
@@ -167,7 +176,8 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         }
     }
 
-    private static bool IsGpuError(Exception e)
+    /// <summary>A CUDA failure (missing libraries, out of memory) that the CPU may not have.</summary>
+    internal static bool IsGpuError(Exception e)
     {
         var message = e.Message.ToLowerInvariant();
         return new[] { "cublas", "cudnn", "cuda", "dll", "out of memory" }.Any(message.Contains);
@@ -201,7 +211,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
             log($"Saved {video}");
             _outputs[work.Index] = video;
             if (settings.DeleteOriginal)
-                RecycleOriginal(work.Source, video);
+                onEvent(new OriginalRecycled(work.Source, SubtitleJob.RecycleOriginal(steps, work.Source, video, log)));
             _progress.Done(JobStage.Embedding, work.Index, video);
         }
         catch (MediaException e)
@@ -215,15 +225,6 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         {
             DeleteTempSrt(work);
         }
-    }
-
-    /// <summary>Send the source to the Recycle Bin, once the video made from it exists.</summary>
-    private void RecycleOriginal(string source, string video)
-    {
-        var name = Path.GetFileName(source);
-        var moved = new FileInfo(video).Length > 0 && steps.Recycle(source);
-        log(moved ? $"Moved the original {name} to the Recycle Bin" : $"Kept the original {name} (could not move it to the Recycle Bin)");
-        onEvent(new OriginalRecycled(source, moved));
     }
 
     /// <summary>Don't lose the transcript just because embedding failed: copy the temporary .srt next to the video.</summary>

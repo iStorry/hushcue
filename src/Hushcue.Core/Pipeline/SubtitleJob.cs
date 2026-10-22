@@ -1,4 +1,10 @@
+using Hushcue.Core.Media;
+using Hushcue.Core.Subtitles;
+
 namespace Hushcue.Core.Pipeline;
+
+/// <summary>A video made after review: where it went, and whether its original went to the Recycle Bin.</summary>
+public sealed record EmbedResult(string Video, bool Recycled);
 
 /// <summary>
 /// Subtitle a list of files: read the audio, transcribe (re-decoding looped passages), clean up, write the .srt and
@@ -38,6 +44,48 @@ public static class SubtitleJob
         var model = Presets.Get(settings.Preset).Model;
         var modelPath = steps.FindModel(model) ?? await DownloadModelAsync(model, steps, progress, log, onEvent, cancel);
         return await new JobRun(files, outDir, settings, modelPath, steps, progress, log, onFile, onEvent).RunAsync(cancel);
+    }
+
+    /// <summary>
+    /// The last step of a file that was reviewed (<see cref="JobSettings.ReviewBeforeEmbed"/>): put the (edited)
+    /// subtitles into the video, and move the original to the Recycle Bin if asked, as the job would have.
+    /// </summary>
+    /// <param name="onFraction">how far ffmpeg is, 0..1</param>
+    public static Task<EmbedResult> EmbedAsync(string video, IReadOnlyList<Cue> cues, string? outDir, EmbedMode mode,
+                                               bool deleteOriginal, Action<double> onFraction, Action<string> log,
+                                               CancellationToken cancel = default) =>
+        EmbedAsync(video, cues, outDir, mode, deleteOriginal, onFraction, log, JobSteps.Default, cancel);
+
+    internal static async Task<EmbedResult> EmbedAsync(string video, IReadOnlyList<Cue> cues, string? outDir, EmbedMode mode,
+                                                       bool deleteOriginal, Action<double> onFraction, Action<string> log,
+                                                       JobSteps steps, CancellationToken cancel)
+    {
+        if (mode == EmbedMode.None)
+            throw new ArgumentException("Choose a subtitle track or burning in.", nameof(mode));
+        if (cues.Count == 0)
+            throw new MediaException("There are no subtitles to add to the video.");
+        var srt = Path.Combine(Path.GetTempPath(), $"hushcue_{Guid.NewGuid():N}.srt"); // only fed to ffmpeg
+        try
+        {
+            await Srt.SaveAsync(srt, cues, cancel);
+            var output = await steps.Embed(video, srt, outDir, mode, onFraction, cancel);
+            log($"Saved {output}");
+            return new EmbedResult(output, deleteOriginal && RecycleOriginal(steps, video, output, log));
+        }
+        finally
+        {
+            File.Delete(srt);
+        }
+    }
+
+    /// <summary>Send <paramref name="source"/> to the Recycle Bin, once the video made from it exists.</summary>
+    /// <returns>whether it was moved</returns>
+    internal static bool RecycleOriginal(JobSteps steps, string source, string video, Action<string> log)
+    {
+        var name = Path.GetFileName(source);
+        var moved = new FileInfo(video).Length > 0 && steps.Recycle(source);
+        log(moved ? $"Moved the original {name} to the Recycle Bin" : $"Kept the original {name} (could not move it to the Recycle Bin)");
+        return moved;
     }
 
     private static async Task<string> DownloadModelAsync(string name, JobSteps steps, Action<double, string> progress,

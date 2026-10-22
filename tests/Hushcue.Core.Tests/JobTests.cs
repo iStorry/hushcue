@@ -376,6 +376,55 @@ public sealed class JobTests : IDisposable
         Assert.Equal("cpu", Assert.Single(run.Events.OfType<FileTranscribed>()).Device);
     }
 
+    // --- review before embedding
+
+    [FfmpegFact]
+    public async Task ReviewBeforeEmbeddingStopsAtTheSrt()
+    {
+        var clip = Clip();
+        var run = await RunAsync([clip], new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false, DeleteOriginal = true, ReviewBeforeEmbed = true },
+                                 Steps(new FakeTranscriber(Hello, duration: 4), FailingEmbed));
+        Assert.Equal(["clip.mp4", "clip.srt"], Names()); // the .srt is kept for the review, the video not touched yet
+        Assert.Equal(FileProgress.ReadyForReview(clip, Path.ChangeExtension(clip, ".srt")), run.Files[^1]);
+        Assert.Equal(run.Outputs, [Path.ChangeExtension(clip, ".srt")]);
+        Assert.Equal(Path.ChangeExtension(clip, ".srt"), Assert.Single(run.Events.OfType<FileTranscribed>()).Srt);
+        AssertMonotonic(run.Seen);
+    }
+
+    [FfmpegFact]
+    public async Task ReviewedSubtitlesAreEmbeddedAfterwards()
+    {
+        var clip = Clip();
+        var recycled = new List<string>();
+        var steps = Steps(new FakeTranscriber(Hello), recycle: path =>
+        {
+            recycled.Add(path);
+            return true;
+        });
+        var fractions = new List<double>();
+        var result = await SubtitleJob.EmbedAsync(clip, [new Cue(0.5, 2.0, "edited by hand")], null, EmbedMode.Soft, deleteOriginal: true,
+                                                  fractions.Add, _ => { }, steps, default);
+        Assert.Equal(new EmbedResult(Path.ChangeExtension(clip, ".mkv"), Recycled: true), result);
+        Assert.Equal([clip], recycled);
+        Assert.NotEmpty(fractions);
+        var (exitCode, srt, _) = await Tools.RunAsync([Tools.Ffmpeg, "-v", "error", "-i", result.Video, "-map", "0:s:0", "-f", "srt", "-"]);
+        Assert.Equal(0, exitCode);
+        Assert.Equal(["1", "00:00:00,500 --> 00:00:02,000", "edited by hand"], srt.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
+
+        await Assert.ThrowsAsync<MediaException>(() => SubtitleJob.EmbedAsync(clip, [], null, EmbedMode.Soft, false, _ => { }, _ => { }, steps, default));
+    }
+
+    [FfmpegFact]
+    public async Task CuesAreReportedAsTheyAreDecoded()
+    {
+        var clip = Clip();
+        var run = await RunAsync([clip], new JobSettings(), Steps(new FakeTranscriber(Hello, duration: 4)));
+        var live = Assert.Single(run.Events.OfType<CuesDecoded>()); // the fake decodes one segment
+        Assert.Equal(clip, live.Path);
+        Assert.Equal([new Cue(1.0, 2.0, "hello maybe")], live.Cues);
+        Assert.True(run.Events.IndexOf(live) < run.Events.FindIndex(e => e is FileTranscribed));
+    }
+
     // --- what the job reports as data (JobEvent, FileProgress.Stage), so front ends never read the log
 
     [FfmpegFact]
