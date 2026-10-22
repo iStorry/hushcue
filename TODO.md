@@ -60,7 +60,9 @@ Full results: [docs/phase1b-ctranslate2.md](docs/phase1b-ctranslate2.md).
 - [x] Removed the Whisper.net spike; `Hushcue.Cli transcribe` now runs the CTranslate2 engine
 - [x] Tests: features vs faster-whisper's (committed fixture), tokenizer vs faster-whisper's (skipped without the model)
 - [ ] Speed table on an idle GPU (Phase 7)
-- [ ] Non-ASCII model paths: CTranslate2 opens files with narrow strings; check or copy models to an ASCII path
+- [x] Non-ASCII model paths: no workaround needed. CTranslate2 4.8.2 converts the UTF-8 path to UTF-16 before opening
+      files (`src/filesystem.cc`), and the bridge passes UTF-8. `ModelPathTests` loads the model through junctions named
+      `modèle` and `日本語 モデル` (ANSI-encoded paths fail, 8.3 short paths work, checked by hand)
 
 ## Phase 2 — Port the subtitle cleanup (pure logic) ✅ done
 
@@ -98,38 +100,55 @@ Ported from `../subgen/burn.py` and `extract_audio` into `src/Hushcue.Core/Media
 - [x] Ported all 17 tests from `test_burn.py` (`MediaTests.cs`, real ffmpeg encodes; skipped if ffmpeg is missing),
       plus 2 audio-extraction tests
 
-## Phase 4 — Pipeline
+## Phase 4 — Pipeline ✅ done
 
-Port `run_job` / `transcribe_file`. It is in `Pipeline/SubtitleJob.cs` and `Pipeline/JobRun.cs`.
+Port `run_job` / `transcribe_file`. It is in `Pipeline/SubtitleJob.cs`, `Pipeline/JobRun.cs` and
+`Pipeline/FileTranscription.cs`. Full results: [docs/phase4-pipeline.md](docs/phase4-pipeline.md).
 
 - [x] Presets: Fast, Balanced (default), Thorough. **Best (Demucs) is dropped**
 - [x] Settings: language, enhance, vocabulary, skip silence, embed mode, keep .srt, delete original
 - [x] Silero VAD (ONNX Runtime, faster-whisper 1.2.1's `silero_vad_v6.onnx` and vad.py) when the preset or "skip
       silence" asks for it, plus restore_speech_timestamps (`Engine/SileroVad.cs`, `Engine/SpeechTimestamps.cs`).
       Matches faster-whisper's probabilities, speech timestamps and restored times on a fixture (`VadTests.cs`)
-- [ ] VAD end to end on the reference clips: `fw_reference.py --vad-threshold 0.1 --vad-min-silence 1000` against
-      `Hushcue.Cli transcribe` with the same options
-- [ ] Check "skip silence" against SubGen: it uses faster-whisper's default VAD options (threshold 0.5, 2 s minimum
-      silence), a guess, since SubGen's source was not at hand
+- [x] VAD end to end on the reference clips: `fw_reference.py --vad-threshold 0.1 --vad-min-silence 1000
+      --vad-speech-pad 500` against `Hushcue.Cli transcribe` with the same options: words and times identical on 4 / 4
+      clips with the same features (and the same VAD-kept audio, bit for bit)
+- [x] "Skip silence" checked against SubGen's `_decode_words`: every VAD run (Fast, or skip silence on any preset)
+      uses threshold = the preset's or 0.1, minimum silence = the preset's or 1000 ms, speech pad 500 ms. Hushcue had
+      guessed faster-whisper's defaults (0.5 / 2000 / 400) for skip silence and left the 500 ms pad out of Fast; fixed
+      (`Presets.Vad`), and the finished subtitles of Fast and skip silence are identical to SubGen's with the same
+      features
 - [x] Drop segments with no-speech prob > 0.6 and avg log-prob < -1.0
-- [ ] Loop recovery: re-decode looped passages in isolation with repetition penalty 1.3
-- [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`). Written (`Pipeline/JobRun.cs`,
-      `Pipeline/JobProgress.cs`), not tested yet; SubGen's run_job may differ in progress and failure handling, so
-      check it against `test_run_job.py`
+- [x] Loop recovery (`FileTranscription.RecoverLoops`, on by default as in SubGen): loops padded by 2 s, nearby ones
+      merged, re-decoded once with repetition penalty 1.3 from the in-memory audio sliced as `read_wav_slice` reads
+      the WAV, originals kept if the re-decode is empty, then `CollapseRepeats`
+- [x] Finished subtitles identical to SubGen's real `transcribe_file` on 4 / 4 clips given the same features
+      (Balanced with and without loop recovery, Fast, skip silence). With its own features: 97.7% of SubGen's raw
+      words, 76% of its finished words (the clean-up and loop recovery amplify timing differences), WER vs reference
+      49.1% against SubGen's 55.1%. `Hushcue.Cli job --features DIR` + `tools/bench/subgen_job.py`
+- [x] Overlap: embed file N while transcribing file N+1 (`Channel<T>`, `Pipeline/JobRun.cs`, `Pipeline/JobProgress.cs`).
+      Tested; same progress values as SubGen's run_job. Two deliberate differences: a failed transcription lets the
+      queued embeds finish (SubGen dropped them, losing their transcripts when "keep .srt" was off), and an unexpected
+      embed error is reported as itself (SubGen could report "cancelled")
 - [x] Finished files stay in the queue, ticked, and are skipped by the next run (re-adding one queues it again)
 - [x] One combined progress value + status line across both stages
 - [x] GPU → CPU fallback (int8 on CPU) on CUDA errors
 - [x] Error handling: an embed failure keeps the .srt; summary error at the end
 - [x] Write .srt files with CRLF line endings: SubGen's Python writes them in text mode on Windows
-- [ ] Port the 14 tests from `test_run_job.py`, and the 7 model tests left from `test_pipeline.py`
-      (6 loop-recovery / `transcribe_file`, 1 presets-are-deterministic)
+- [x] Ported the 14 tests from `test_run_job.py` (`JobTests.cs`; the 2 for the dropped Best preset adapted) and the
+      7 model tests left from `test_pipeline.py` (`TranscriptionTests.cs`), with a fake model through `JobSteps` (the
+      seam for the transcriber, audio, embed and Recycle Bin), plus cancel, GPU fallback, download-in-job and a failed
+      transcription finishing the queued embed
 
-## Phase 5 — Models
+## Phase 5 — Models ✅ done
 
 - [x] Store models in `%LOCALAPPDATA%\Hushcue\models` (CTranslate2 format, from Hugging Face); the Hugging Face
       cache SubGen fills is still used when present, which saves a download (`Pipeline/Models.cs`)
-- [ ] First-run download with progress, resume and checksum. Written (`Pipeline/ModelDownload.cs`): files pinned to a
-      Hugging Face commit with their SHA-256 in `Pipeline/Models.cs`, staged in `models\NAME.download`, not tested yet
+- [x] First-run download with progress, resume and checksum (`Pipeline/ModelDownload.cs`): files pinned to a Hugging
+      Face commit with their SHA-256 in `Pipeline/Models.cs`, staged in `models\NAME.download`. Tested against a fake
+      Hugging Face on `HttpListener` (`ModelDownloadTests.cs`: progress, resume through the redirect, range ignored,
+      checksum and size failures, cancel, stall, HTTP errors). Fixed: HttpClient's own timeout was reported as a
+      cancel. Not run against the real Hugging Face (multi-GB)
 - [x] Load the model once and keep it loaded between runs
 
 ## Phase 6 — WinUI 3 app (first version in place)
