@@ -39,8 +39,11 @@ public sealed partial class FileQueue : UserControl
     /// <summary>The files changed: added, removed, probed, or moved on in a run.</summary>
     public event EventHandler? Changed;
 
-    /// <summary>The files the next run should do: everything not done yet.</summary>
-    public List<QueuedFile> Pending => [.. Files.Where(f => f.State != FileState.Done)];
+    /// <summary>The review button of a file (or Enter / double-click on a file waiting for its review).</summary>
+    public event EventHandler<QueuedFile>? ReviewRequested;
+
+    /// <summary>The files the next run should do: everything not done yet (or waiting for its review).</summary>
+    public List<QueuedFile> Pending => [.. Files.Where(f => f.State is not (FileState.Done or FileState.Review))];
 
     public List<string> PendingPaths => [.. Pending.Select(f => f.Path)];
 
@@ -78,7 +81,7 @@ public sealed partial class FileQueue : UserControl
                 if (ProbeFiles)
                     file.Probing = ProbeAsync(file);
             }
-            else if (queued.State == FileState.Done)
+            else if (queued.State is FileState.Done or FileState.Review)
             {
                 queued.Requeue();
             }
@@ -178,11 +181,13 @@ public sealed partial class FileQueue : UserControl
         var count = Files.Count switch { 0 => "", 1 => "1 file", var n => $"{n} files" };
         var length = Files.Sum(f => f.Duration);
         var done = Files.Count(f => f.State == FileState.Done);
+        var review = Files.Count(f => f.State == FileState.Review);
         CountText.Text = string.Join(" · ", new[]
         {
             count,
             length > 0 ? BatchEstimate.Clock(TimeSpan.FromSeconds(length)) : "",
             done > 0 ? $"{done} done" : "",
+            review > 0 ? $"{review} to review" : "",
         }.Where(p => p.Length > 0));
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -227,6 +232,11 @@ public sealed partial class FileQueue : UserControl
             RemoveSelected();
             e.Handled = true;
         }
+        else if (e.Key == VirtualKey.Enter && List.SelectedItem is QueuedFile { State: FileState.Review, CanReview: true } review)
+        {
+            ReviewRequested?.Invoke(this, review);
+            e.Handled = true;
+        }
         else if (e.Key == VirtualKey.Enter && List.SelectedItem is QueuedFile { Output: { } output })
         {
             ShowInFolder(output);
@@ -236,8 +246,16 @@ public sealed partial class FileQueue : UserControl
 
     private void OnListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        if ((e.OriginalSource as FrameworkElement)?.DataContext is QueuedFile { Output: { } output })
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is QueuedFile { State: FileState.Review, CanReview: true } review)
+            ReviewRequested?.Invoke(this, review);
+        else if ((e.OriginalSource as FrameworkElement)?.DataContext is QueuedFile { Output: { } output })
             ShowInFolder(output);
+    }
+
+    private void OnReview(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: QueuedFile file })
+            ReviewRequested?.Invoke(this, file);
     }
 
     private void OnShowOutput(object sender, RoutedEventArgs e)

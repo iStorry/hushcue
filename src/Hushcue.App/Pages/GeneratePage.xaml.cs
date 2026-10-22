@@ -64,6 +64,11 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         Run.StartRequested += async (_, _) => await StartAsync();
         Run.CancelRequested += async (_, ask) => await CancelAsync(ask);
         Summary.Closed += (_, _) => ShowSummary(null);
+        Summary.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
+        Queue.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
+        Review.Closed += (_, _) => ShowReview(false);
+        Review.Embedded += (_, embedded) => Queue.Update(FileProgress.Done(embedded.File.Path, embedded.Result.Video));
+        Review.IsJobRunning = () => IsRunning;
         // in a short window the options scroll: show what just opened
         MoreOptions.Expanding += (_, _) => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
             () => MoreOptions.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true }));
@@ -77,9 +82,19 @@ public sealed partial class GeneratePage : UserControl, IRunPage
 
     public Controls.FileQueue Files => Queue;
 
-    public void Start() => Run.RequestStart();
+    public void Start()
+    {
+        if (!IsReviewing)
+            Run.RequestStart();
+    }
 
     public bool IsRunning => _batch is not null;
+
+    /// <summary>A file's subtitles are open for review (the page shows the review instead of the queue).</summary>
+    public bool IsReviewing => Review.Visibility == Visibility.Visible;
+
+    /// <summary>The review has edits that are not saved to the .srt.</summary>
+    public bool HasUnsavedEdits => IsReviewing && Review.HasUnsavedEdits;
 
     public void Load(AppSettings settings)
     {
@@ -91,6 +106,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         VocabularyBox.Text = settings.Vocabulary;
         KeepSrtBox.IsChecked = settings.KeepSrt;
         DeleteBox.IsChecked = settings.DeleteOriginal;
+        ReviewBox.IsChecked = settings.ReviewBeforeEmbed;
         EnhanceBox.IsChecked = settings.Enhance;
         SkipSilenceBox.IsChecked = settings.SkipSilence;
         Output.Folder = settings.OutputFolder;
@@ -107,6 +123,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         settings.Embed = SelectedEmbed;
         settings.KeepSrt = KeepSrtBox.IsChecked == true;
         settings.DeleteOriginal = DeleteBox.IsChecked == true;
+        settings.ReviewBeforeEmbed = ReviewBox.IsChecked == true;
         settings.Enhance = EnhanceBox.IsChecked == true;
         settings.SkipSilence = SkipSilenceBox.IsChecked == true;
         settings.OutputFolder = Output.Folder;
@@ -124,6 +141,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     /// <summary>Stop a running job (window closing); waits briefly for it to wind down.</summary>
     public void Stop()
     {
+        Review.Shutdown();
         _cancel?.Cancel();
         try
         {
@@ -204,6 +222,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var embedding = SelectedEmbed != EmbedMode.None;
         KeepSrtBox.IsEnabled = embedding;
         DeleteBox.IsEnabled = embedding;
+        ReviewBox.IsEnabled = embedding;
         if (!embedding)
             DeleteBox.IsChecked = false;
     }
@@ -252,7 +271,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var work = batch.Files.Select(f => (Duration: f.Duration > 0 ? f.Duration : known, Fraction: Fraction(f))).ToList();
         var total = work.Sum(w => w.Duration);
         var overall = total > 0 ? work.Sum(w => w.Duration * w.Fraction) / total : 0;
-        var finished = batch.Files.Count(f => f.State is FileState.Done or FileState.Failed);
+        var finished = batch.Files.Count(f => f.State is FileState.Done or FileState.Failed or FileState.Review);
         var left = batch.Estimate.TimeLeft(work, batch.Burning ? null : KnownSpeed(batch.Preset));
         var status = $"{finished} of {batch.Files.Count} done";
         if (_cancel?.IsCancellationRequested == true)
@@ -270,7 +289,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     /// first measured speed (and the time left) look far slower than the work itself.</summary>
     private static double Fraction(QueuedFile file) => file.State switch
     {
-        FileState.Done or FileState.Failed => 1,
+        FileState.Done or FileState.Failed or FileState.Review => 1,
         FileState.Working when !file.IsStarting => file.Percent / 100,
         _ => 0,
     };
@@ -327,6 +346,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             Embed = SelectedEmbed,
             KeepSrt = KeepSrtBox.IsChecked == true,
             DeleteOriginal = DeleteBox.IsChecked == true,
+            ReviewBeforeEmbed = ReviewBox.IsChecked == true,
         };
         var srtOnly = new Func<QueuedFile, bool>(f => settings.Embed != EmbedMode.None && f.Info is { HasVideo: false });
         var recycling = settings.DeleteOriginal ? files.Count(f => !srtOnly(f)) : 0;
@@ -354,6 +374,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         Run.SetRunning(true);
         Queue.SetLocked(true);
         SetOptionsEnabled(false);
+        Live.Show(null);
+        ShowCard(LiveCard);
         ShowRunStatus(batch);
         Exception? failure = null;
         try
@@ -371,6 +393,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             Queue.ResetUnfinished();
             Queue.SetLocked(false);
             SetOptionsEnabled(true);
+            ShowCard(OptionsCard);
             Run.SetRunning(false);
             _showingResult = true;
             RememberSpeed(batch);
@@ -388,11 +411,12 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         {
             cancel.ThrowIfCancellationRequested();
             var groupSettings = srtOnly ? settings with { Embed = EmbedMode.None, KeepSrt = true, DeleteOriginal = false } : settings;
-            _coreJob = SubtitleJob.RunAsync([.. files.Select(f => f.Path)], Output.FolderOrNull, groupSettings,
+            var outDir = Output.FolderOrNull;
+            _coreJob = SubtitleJob.RunAsync([.. files.Select(f => f.Path)], outDir, groupSettings,
                 (_, _) => { }, // the queue and the events say it all
                 line => ui.TryEnqueue(() => Run.AppendLog(line)),
-                file => ui.TryEnqueue(() => Queue.Update(file)),
-                e => ui.TryEnqueue(() => OnJobEvent(batch, e)),
+                file => ui.TryEnqueue(() => OnFileProgress(batch, file)),
+                e => ui.TryEnqueue(() => OnJobEvent(batch, e, groupSettings, outDir)),
                 cancel);
             try
             {
@@ -407,11 +431,23 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             throw new MediaException(string.Join("\n\n", problems));
     }
 
-    /// <summary>What the job did, as data: the model download, the device, finished transcripts, recycled originals.</summary>
-    private void OnJobEvent(Batch batch, JobEvent e)
+    private void OnFileProgress(Batch batch, FileProgress progress)
+    {
+        Queue.Update(progress);
+        // the live transcript follows the file being transcribed
+        if (progress.Stage == FileStage.ReadingAudio && batch.Files.FirstOrDefault(f => f.Path == progress.Path) is { } file)
+            Live.Show(file);
+    }
+
+    /// <summary>What the job did, as data: the model download, the device, the subtitles as they are heard and when
+    /// they are finished, recycled originals.</summary>
+    private void OnJobEvent(Batch batch, JobEvent e, JobSettings settings, string? outDir)
     {
         switch (e)
         {
+            case CuesDecoded decoded:
+                batch.Files.FirstOrDefault(f => f.Path == decoded.Path)?.AddLiveCues(decoded.Cues);
+                break;
             case ModelDownloading { Finished: false } download when _batch == batch:
                 batch.Download = download;
                 var fraction = download.Total > 0 ? download.Done / (double)download.Total : 0;
@@ -429,6 +465,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
                 break;
             case FileTranscribed file:
                 batch.Speed.Observe(file);
+                batch.Files.FirstOrDefault(f => f.Path == file.Path)
+                     ?.SetTranscript(new Transcript(file.Cues, file.Srt, settings, outDir, file.AudioSeconds));
                 var name = Path.GetFileName(file.Path);
                 batch.Notes.AddRange(file.Warnings.Select(warning => $"{name}: {warning}"));
                 break;
@@ -455,6 +493,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     private async Task ShowOutcomeAsync(Batch batch, Exception? failure)
     {
         var done = batch.Files.Where(f => f.State == FileState.Done).ToList();
+        var toReview = batch.Files.Where(f => f.State == FileState.Review).ToList();
         var failed = batch.Files.Count(f => f.State == FileState.Failed);
         if (failure is OperationCanceledException)
         {
@@ -466,14 +505,15 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         {
             Run.SetStatus("Stopped by an error", StatusKind.Error);
             await Dialogs.ErrorAsync(XamlRoot, failure.Message);
-            if (done.Count == 0)
+            if (done.Count + toReview.Count == 0)
                 return;
         }
         else
         {
             var parts = new[]
             {
-                $"{done.Count} saved", failed > 0 ? $"{failed} failed" : "", batch.Skipped > 0 ? $"{batch.Skipped} skipped" : "",
+                done.Count > 0 || toReview.Count == 0 ? $"{done.Count} saved" : "", toReview.Count > 0 ? $"{toReview.Count} ready to review" : "",
+                failed > 0 ? $"{failed} failed" : "", batch.Skipped > 0 ? $"{batch.Skipped} skipped" : "",
             };
             Run.SetStatus((failed > 0 ? "Finished · " : "Done · ") + string.Join(" · ", parts.Where(p => p.Length > 0)),
                           failed > 0 ? StatusKind.Warning : StatusKind.Done);
@@ -481,8 +521,10 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var notes = batch.Notes.ToList();
         notes.AddRange(Queue.Files.Where(f => f.State == FileState.Failed).Select(f => $"{f.Name}: {f.Detail}"));
         Run.SetProgress(1);
-        ShowSummary(new RunSummary(done.Count, failed, batch.Skipped, TimeSpan.FromSeconds(done.Sum(f => f.Duration)), batch.Clock.Elapsed,
-                                   notes, batch.Recycled, [.. done.Select(f => f.Output).OfType<string>()]));
+        var finished = done.Concat(toReview).ToList();
+        ShowSummary(new RunSummary(done.Count, failed, batch.Skipped, TimeSpan.FromSeconds(finished.Sum(f => f.Duration)), batch.Clock.Elapsed,
+                                   notes, batch.Recycled, [.. finished.Select(f => f.Output).OfType<string>()],
+                                   [.. batch.Files.Where(f => f.CanReview)], toReview.Count));
     }
 
     /// <param name="summary">null goes back to the options</param>
@@ -490,13 +532,37 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     {
         if (summary is not null)
             Summary.Show(summary);
-        FinishedCard.Visibility = summary is null ? Visibility.Collapsed : Visibility.Visible;
-        OptionsCard.Visibility = summary is null ? Visibility.Visible : Visibility.Collapsed;
+        ShowCard(summary is null ? OptionsCard : FinishedCard);
+    }
+
+    /// <summary>The right-hand column shows the options, the live transcript during a run, or the finished screen.</summary>
+    private void ShowCard(Border card)
+    {
+        foreach (var each in new[] { OptionsCard, LiveCard, FinishedCard })
+            each.Visibility = each == card ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async Task OpenReviewAsync(QueuedFile file)
+    {
+        if (!file.CanReview || ReferenceEquals(Review.Current, file) && IsReviewing)
+            return;
+        if (Review.Current is not null && !await Review.CloseAsync())
+            return;
+        ShowReview(true);
+        await Review.OpenAsync(file);
+    }
+
+    private void ShowReview(bool show)
+    {
+        Review.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        Main.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        if (!show)
+            OnQueueChanged();
     }
 
     private void SetOptionsEnabled(bool enabled)
     {
-        foreach (var control in new Control[] { MoreOptions, KeepSrtBox, DeleteBox, Output })
+        foreach (var control in new Control[] { MoreOptions, KeepSrtBox, DeleteBox, ReviewBox, Output })
             control.IsEnabled = enabled;
         foreach (var card in PresetChoices.Children.Concat(ResultChoices.Children).OfType<Control>())
             card.IsEnabled = enabled;

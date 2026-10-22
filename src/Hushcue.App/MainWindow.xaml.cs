@@ -176,6 +176,20 @@ public sealed partial class MainWindow : Window
 
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        if (!_closeConfirmed && Generate.HasUnsavedEdits)
+        {
+            args.Cancel = true;
+            if (!await Dialogs.ConfirmAsync(Root.XamlRoot, "Your edits to the subtitles are not saved. Close Hushcue without saving them?",
+                                            "Close without saving", "Keep editing"))
+                return;
+            _closeConfirmed = !(Generate.IsRunning || Convert.IsRunning); // a running batch still asks below
+            if (_closeConfirmed)
+            {
+                ShutDown();
+                Close();
+                return;
+            }
+        }
         if (!_closeConfirmed && (Generate.IsRunning || Convert.IsRunning))
         {
             args.Cancel = true;
