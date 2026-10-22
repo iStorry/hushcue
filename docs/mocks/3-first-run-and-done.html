@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hushcue mock 3: first run and done</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="mocks.css">
+<style>
+.w{border:0.5px solid var(--border-strong);border-radius:12px;background:var(--surface-1);padding:16px;font-size:13px;display:flex;flex-direction:column;gap:12px}
+.mut{color:var(--text-secondary);font-size:12px}
+.ck{display:flex;gap:8px;align-items:center}
+.bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--text-accent)}
+.m{background:var(--surface-0);border-radius:var(--radius);padding:8px 10px}
+.m b{display:block;font-size:18px;font-weight:500}
+</style>
+</head>
+<body>
+<main>
+<h1>Idea 3: first-run setup and the finished screen</h1>
+<p class="lead">Setup checks for the GPU and ffmpeg and downloads the model with resume; the finished screen shows totals and warnings, with Undo for files moved to the Recycle Bin.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+  <div class="w">
+    <div style="font-size:16px;font-weight:500">Set up Hushcue</div>
+    <div class="mut">Everything runs on this PC. Nothing is uploaded.</div>
+    <div class="ck"><i class="ti ti-circle-check" style="color:var(--text-success)" aria-hidden="true"></i>NVIDIA RTX 4070 found <span class="mut">· CUDA ready</span></div>
+    <div class="ck"><i class="ti ti-circle-check" style="color:var(--text-success)" aria-hidden="true"></i>ffmpeg found <span class="mut">· NVENC available</span></div>
+    <div class="ck"><i class="ti ti-loader-2" style="color:var(--text-accent)" aria-hidden="true"></i>Downloading speech model <span class="mut">· large-v3-turbo</span></div>
+    <div><div class="bar"><i style="width:58%"></i></div>
+      <div class="mut" style="display:flex;justify-content:space-between;margin-top:4px"><span>942 MB of 1.6 GB · 28 MB/s</span><span>resumes if closed</span></div></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button>Use a smaller model</button><span style="flex:1"></span><button style="background:var(--fill-accent);color:var(--on-accent);border:none">Continue</button></div>
+  </div>
+  <div class="w">
+    <div class="ck" style="font-size:16px;font-weight:500"><i class="ti ti-circle-check" style="color:var(--text-success);font-size:20px" aria-hidden="true"></i>4 files done</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <div class="m"><span class="mut">Video</span><b>1h 52m</b></div>
+      <div class="m"><span class="mut">Took</span><b>2m 18s</b></div>
+      <div class="m"><span class="mut">Speed</span><b>49×</b></div>
+    </div>
+    <div class="ck"><i class="ti ti-alert-triangle" style="color:var(--text-warning)" aria-hidden="true"></i><span>vlog_tokyo.mov has a 40 s gap with no subtitles</span></div>
+    <div class="mut">3 originals moved to the Recycle Bin · <span style="color:var(--text-accent)">Undo</span></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button>Review subtitles</button><span style="flex:1"></span><button style="background:var(--fill-accent);color:var(--on-accent);border:none"><i class="ti ti-folder-open" aria-hidden="true"></i> Open folder</button></div>
+  </div>
+</div>
+</main>
+</body>
+</html>
