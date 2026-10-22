@@ -203,7 +203,7 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
       only when embedding (run as their own group)
 - [x] Total time left for the whole batch in the bottom bar (`BatchEstimate`, weighted by length; reading audio and
       loading the model don't count)
-- [x] "Offline · <GPU>" badge in the title bar (GPU name from the registry's display adapters); "CPU" without CUDA,
+- [x] "Offline · <GPU>" status (now an entry at the bottom of the sidebar, was a badge in the title bar; GPU name from the registry's display adapters); "CPU" without CUDA,
       without the GPU libraries, or when the job falls back. It opens the system check
 - [x] Live speed hint under the preset ("~52× real time on your GPU"), measured per preset and device (Core times
       each file from the start of decoding until its subtitles are ready) and kept in the settings (blended with the
@@ -236,7 +236,7 @@ wording. App: Review page, live transcript, waveform timeline.
 **Idea 3: first run and the finished screen** ([mock](docs/mocks/3-first-run-and-done.png))
 
 - [x] Setup screen (`Controls/SetupView`), shown at start when ffmpeg or the model is missing (or the engine can't
-      load), and from the badge as "System check": GPU and CUDA, the GPU libraries (`RuntimeDownload`, only with a
+      load), and from the sidebar status entry as "System check": GPU and CUDA, the GPU libraries (`RuntimeDownload`, only with a
       CUDA device), ffmpeg and NVENC ("Check again" picks up a fresh PATH), the model with progress, speed, pause and
       resume; "Continue on CPU" without a GPU. The real large-v3-turbo download was run through it: paused at
       1.4 GB, resumed, finished with checksums, moved into place (then removed again). The GPU libraries download

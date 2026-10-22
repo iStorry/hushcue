@@ -16,30 +16,18 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Title bar: the app, and where the work runs -->
+        <!-- Title bar: the app's name; the tools are in the sidebar -->
         <TitleBar x:Name="AppTitleBar" Title="Hushcue" IsBackButtonVisible="False" IsPaneToggleButtonVisible="False">
             <TitleBar.IconSource>
                 <FontIconSource Glyph="&#xE7F0;" />
             </TitleBar.IconSource>
-            <TitleBar.RightHeader>
-                <!-- "Offline · RTX 4070": everything runs here; opens the system check -->
-                <Button x:Name="Badge" Click="OnBadgeClick" Padding="10,4" Margin="0,0,4,0" CornerRadius="12"
-                        BorderThickness="0" VerticalAlignment="Center" Visibility="Collapsed"
-                        Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon x:Name="BadgeIcon" Glyph="&#xE72E;" FontSize="12"
-                                  Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
-                        <TextBlock x:Name="BadgeText" Style="{StaticResource CaptionTextBlockStyle}"
-                                   Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
-                    </StackPanel>
-                </Button>
-            </TitleBar.RightHeader>
         </TitleBar>
 
         <!-- The app's three tools in a sidebar, with Settings and About at the bottom -->
         <NavigationView x:Name="Nav" Grid.Row="1" PaneDisplayMode="Auto" IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="True" OpenPaneLength="232" CompactModeThresholdWidth="760"
                         ExpandedModeThresholdWidth="1100" SelectionChanged="OnNavSelectionChanged"
+                        ItemInvoked="OnNavItemInvoked"
                         AutomationProperties.Name="Tools">
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="GenerateItem" Content="Generate subtitles"
@@ -62,6 +50,12 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
+                <!-- "Offline · RTX 4070": everything runs on this PC, and where; opens the system check -->
+                <NavigationViewItem x:Name="StatusItem" SelectsOnInvoked="False" Visibility="Collapsed">
+                    <NavigationViewItem.Icon>
+                        <FontIcon x:Name="StatusIcon" Glyph="&#xE72E;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem x:Name="AboutItem" Content="About">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE946;" />

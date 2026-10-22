@@ -62,7 +62,7 @@ public sealed partial class MainWindow : Window
             Generate.RefreshSettingsSummary();
             ApplyTheme();
         };
-        SettingsView.SystemCheckRequested += (_, _) => OnBadgeClick(this, new RoutedEventArgs());
+        SettingsView.SystemCheckRequested += async (_, _) => await RunSystemCheckAsync();
         ApplyTheme();
         Navigate(_settings.Page is >= 0 and <= (int)AppPage.Edit ? (AppPage)_settings.Page : AppPage.Generate);
         foreach (var page in new IRunPage[] { Generate, Convert })
@@ -74,7 +74,7 @@ public sealed partial class MainWindow : Window
                 _taskbar.FlashIfInBackground();
             };
         }
-        Generate.DeviceChanged += (_, device) => ShowBadge(device);
+        Generate.DeviceChanged += (_, device) => ShowStatus(device);
         Setup.GpuChecked += (_, gpu) => OnGpuChecked(gpu);
         Setup.Continued += (_, _) =>
         {
@@ -226,7 +226,7 @@ public sealed partial class MainWindow : Window
         _gpuName = gpu.Name;
         var device = gpu.Cuda ? "cuda" : "cpu";
         Generate.SetDevice(device);
-        ShowBadge(device);
+        ShowStatus(device);
         SettingsView.SetDevice(gpu.Cuda && gpu.Name is not null ? $"On your {gpu.Name}."
             : gpu.Name is not null ? $"On the CPU: {gpu.Name} is there, but CUDA or its libraries are not ready. Run the system check."
             : "On the CPU: no NVIDIA graphics card was found. It works, more slowly.");
@@ -234,24 +234,30 @@ public sealed partial class MainWindow : Window
             ShowSetup(true, firstRun: true); // the engine itself is missing
     }
 
-    /// <summary>"Offline · RTX 4070" while the GPU does the work, "Offline · CPU" without one or after a GPU failure.</summary>
-    private void ShowBadge(string device)
+    /// <summary>
+    /// The sidebar's status entry: "Offline · RTX 4070" while the GPU does the work, "Offline · CPU" without one or
+    /// after a GPU failure. The icon is green on the GPU; the text stays like the other entries.
+    /// </summary>
+    private void ShowStatus(string device)
     {
         var gpu = device == "cuda" && _gpuName is not null;
-        BadgeText.Text = gpu ? $"Offline · {SystemCheck.ShortGpuName(_gpuName!)}" : "Offline · CPU";
+        var text = gpu ? $"Offline · {SystemCheck.ShortGpuName(_gpuName!)}" : "Offline · CPU";
         var where = gpu ? $"on your {_gpuName}" : "on the CPU";
         var tip = $"Everything runs on this PC; nothing is uploaded. Transcribing {where}. Select for a system check.";
-        ToolTipService.SetToolTip(Badge, tip);
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(Badge, $"{BadgeText.Text}. {tip}");
-        var (fill, text) = gpu
-            ? ("SystemFillColorSuccessBackgroundBrush", ThemeBrushes.Success)
-            : ("SystemFillColorNeutralBackgroundBrush", ThemeBrushes.Secondary);
-        Badge.Background = ThemeBrushes.Get(fill);
-        BadgeText.Foreground = BadgeIcon.Foreground = ThemeBrushes.Get(text);
-        Badge.Visibility = Visibility.Visible;
+        StatusItem.Content = text;
+        ToolTipService.SetToolTip(StatusItem, tip);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(StatusItem, $"{text}. {tip}");
+        StatusIcon.Foreground = ThemeBrushes.Get(gpu ? ThemeBrushes.Success : ThemeBrushes.Secondary);
+        StatusItem.Visibility = Visibility.Visible;
     }
 
-    private async void OnBadgeClick(object sender, RoutedEventArgs e)
+    private async void OnNavItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
+    {
+        if (args.InvokedItemContainer == StatusItem)
+            await RunSystemCheckAsync();
+    }
+
+    private async Task RunSystemCheckAsync()
     {
         if (Setup.Visibility == Visibility.Visible || Generate.IsRunning || Convert.IsRunning)
             return;
