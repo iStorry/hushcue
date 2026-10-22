@@ -314,14 +314,17 @@ public sealed class MediaTests : IDisposable
         var bad = P("broken.mkv");
         File.WriteAllBytes(bad, "not a video"u8.ToArray());
         var recycled = new List<string>();
-        var done = new List<string>();
+        var finished = new List<FileProgress>();
         var error = await Assert.ThrowsAsync<MediaException>(() => Embed.ConvertFilesAsync(
             [bad, good], null, saveSrt: false, deleteOriginal: true, (_, _) => { }, _ => { }, CancellationToken.None,
-            onFileDone: done.Add, recycle: path => { recycled.Add(Path.GetFileName(path)); return true; }));
+            onFile: p => { if (p.State is FileState.Done or FileState.Failed) finished.Add(p); },
+            recycle: path => { recycled.Add(Path.GetFileName(path)); return true; }));
         Assert.Contains("broken.mkv", error.Message);
         Assert.Equal(["in.mkv"], recycled); // the bad one is left alone
-        Assert.Equal([good], done);
-        Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(good)!, "in.mp4")));
+        var mp4 = Path.Combine(Path.GetDirectoryName(good)!, "in.mp4");
+        Assert.Equal([(bad, FileState.Failed, null), (good, FileState.Done, mp4)],
+                     finished.Select(p => (p.Path, p.State, p.Output)));
+        Assert.True(File.Exists(mp4));
     }
 
     // ------------------------------------------------------------------------------------------- audio

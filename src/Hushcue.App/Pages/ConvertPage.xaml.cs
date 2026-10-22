@@ -53,7 +53,7 @@ public sealed partial class ConvertPage : UserControl
 
     private async Task StartAsync()
     {
-        var files = Queue.Paths;
+        var files = Queue.PendingPaths;
         if (files.Count == 0)
         {
             await Dialogs.InfoAsync(XamlRoot, "Add at least one .mkv file first.");
@@ -65,6 +65,7 @@ public sealed partial class ConvertPage : UserControl
                 + $"Continue with {files.Count} file(s)?", "Continue"))
             return;
 
+        Queue.RequeueFailed();
         Run.Reset();
         Run.SetStatus("Starting...");
         Run.SetRunning(true);
@@ -74,7 +75,7 @@ public sealed partial class ConvertPage : UserControl
             (fraction, text) => ui.TryEnqueue(() => Run.SetProgress(fraction, text)),
             line => ui.TryEnqueue(() => Run.AppendLog(line)),
             _cancel.Token,
-            onFileDone: src => ui.TryEnqueue(() => Queue.Remove(src))));
+            onFile: file => ui.TryEnqueue(() => Queue.Update(file))));
         _job = job;
         try
         {
@@ -93,6 +94,7 @@ public sealed partial class ConvertPage : UserControl
         }
         finally
         {
+            Queue.ResetUnfinished();
             Run.SetRunning(false);
         }
     }

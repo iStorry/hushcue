@@ -12,13 +12,13 @@ namespace Hushcue.Core.Pipeline;
 /// failed embed of one video is reported at the end; anything else stops both.
 /// </summary>
 internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSettings settings, string modelPath,
-                             Action<double, string> progress, Action<string> log, Action<string>? onFileDone)
+                             Action<double, string> progress, Action<string> log, Action<FileProgress>? onFile)
 {
     /// <summary>A transcribed file waiting to have its subtitles put into the video.</summary>
     private sealed record EmbedWork(int Index, string Source, string Srt, bool TempSrt, string DestDir);
 
     private readonly Preset _preset = Presets.Get(settings.Preset);
-    private readonly JobProgress _progress = new(files.Count, progress);
+    private readonly JobProgress _progress = new(files, progress, onFile);
     private readonly string?[] _outputs = new string?[files.Count];
     private readonly List<string> _embedFailures = [];
     // Share of each file's progress used by transcription; burning re-encodes the video and takes far longer.
@@ -58,7 +58,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
             for (var i = 0; i < files.Count; i++)
             {
                 cancel.ThrowIfCancellationRequested();
-                if (await TranscribeAsync(i, cancel) is { } work && !queue.TryWrite(work))
+                if (await TranscribeOrFailAsync(i, cancel) is { } work && !queue.TryWrite(work))
                     throw new InvalidOperationException("The embed queue was closed while files were still being transcribed.");
             }
         }
@@ -68,17 +68,31 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         }
     }
 
+    private async Task<EmbedWork?> TranscribeOrFailAsync(int index, CancellationToken cancel)
+    {
+        try
+        {
+            return await TranscribeAsync(index, cancel);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _progress.Failed(JobStage.Transcribing, index, e.Message);
+            throw;
+        }
+    }
+
     /// <returns>the work left for the embed stage, or null when the file is finished</returns>
     private async Task<EmbedWork?> TranscribeAsync(int index, CancellationToken cancel)
     {
         var src = files[index];
-        void Report(double fraction, string text) => _progress.Report(JobStage.Transcribing, index, _share * fraction, text);
+        void Report(double fraction, string text) => _progress.Working(JobStage.Transcribing, index, _share * fraction, text);
 
         log($"--- {Path.GetFileName(src)}");
         Report(0, "Extracting audio...");
         var audio = await Audio.ReadAsync(src, settings.Enhance || _preset.Enhance, cancel);
+        var rate = new TranscribeRate(audio.Length / (double)Audio.SampleRate, TimeProvider.System);
         var cues = SubtitleJob.TranscribeWithFallback(modelPath, _preset, ref _device, audio, settings, log,
-            f => Report(0.08 + 0.9 * f, $"Transcribing... {(int)(f * 100)}%"),
+            f => Report(0.08 + 0.9 * f, rate.Describe(f)),
             () => Report(0.05, "Loading model..."), cancel);
 
         Report(0.99, "Writing SRT...");
@@ -100,12 +114,11 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
 
         if (embedding)
         {
-            _progress.Report(JobStage.Transcribing, index, _share, "");
+            _progress.WaitingToEmbed(index, _share);
             return new EmbedWork(index, src, srt, tempSrt, destDir);
         }
         _outputs[index] = srt;
-        _progress.Report(JobStage.Transcribing, index, 1, "");
-        onFileDone?.Invoke(src);
+        _progress.Done(JobStage.Transcribing, index, srt);
         return null;
     }
 
@@ -128,7 +141,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         var name = Path.GetFileName(work.Source);
         var what = settings.Embed == EmbedMode.Soft ? "Adding subtitle track" : "Burning subtitles into video";
         void Report(double fraction, string text) =>
-            _progress.Report(JobStage.Embedding, work.Index, _share + (1 - _share) * fraction, text);
+            _progress.Working(JobStage.Embedding, work.Index, _share + (1 - _share) * fraction, text);
         try
         {
             Report(0, $"{what}...");
@@ -142,19 +155,19 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
                     ? $"Moved the original {name} to the Recycle Bin"
                     : $"Kept the original {name} (could not move it to the Recycle Bin)");
             }
-            onFileDone?.Invoke(work.Source);
+            _progress.Done(JobStage.Embedding, work.Index, video);
         }
         catch (MediaException e)
         {
             log($"ERROR: could not embed subtitles into {name}: {e.Message}");
             _embedFailures.Add(name);
             _outputs[work.Index] = work.TempSrt ? KeepSrt(work) : work.Srt;
+            _progress.Failed(JobStage.Embedding, work.Index, "Could not add the subtitles to the video; the .srt was kept");
         }
         finally
         {
             DeleteTempSrt(work);
         }
-        Report(1, "");
     }
 
     /// <summary>Don't lose the transcript just because embedding failed: copy the temporary .srt next to the video.</summary>

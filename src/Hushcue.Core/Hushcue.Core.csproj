@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Hushcue.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Engine\silero_vad_v6.onnx" LogicalName="silero_vad_v6.onnx" />
   </ItemGroup>
 

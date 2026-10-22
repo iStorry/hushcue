@@ -7,25 +7,41 @@ internal enum JobStage
 }
 
 /// <summary>
-/// One progress value and status line for a job whose two stages run at the same time: the overall fraction is the
-/// mean of every file's own fraction, and the status line shows what each stage is doing.
+/// Progress of a job whose two stages run at the same time, reported two ways: one overall value and status line
+/// (the mean of every file's own fraction, and what each stage is doing), and each file's own state.
 /// </summary>
-internal sealed class JobProgress(int files, Action<double, string> report)
+internal sealed class JobProgress(IReadOnlyList<string> files, Action<double, string> report, Action<FileProgress>? onFile)
 {
     private const string Separator = "  ·  ";
-    private readonly double[] _done = new double[files];
+    private readonly double[] _done = new double[files.Count];
     private readonly string[] _status = ["", ""];
     private readonly Lock _lock = new();
 
     /// <param name="fraction">how far file <paramref name="index"/> is through the whole job, 0..1</param>
-    /// <param name="text">what the stage is doing; empty when it has nothing to do</param>
-    public void Report(JobStage stage, int index, double fraction, string text)
+    /// <param name="text">what the stage is doing to the file</param>
+    public void Working(JobStage stage, int index, double fraction, string text) =>
+        Update(stage, index, fraction, text, FileProgress.Working(files[index], fraction, text));
+
+    /// <summary>The file is transcribed; the embed stage may still be busy with an earlier file.</summary>
+    public void WaitingToEmbed(int index, double fraction) =>
+        Update(JobStage.Transcribing, index, fraction, "",
+               FileProgress.Working(files[index], fraction, "Waiting to add the subtitles..."));
+
+    public void Done(JobStage stage, int index, string output) =>
+        Update(stage, index, 1, "", FileProgress.Done(files[index], output));
+
+    /// <summary>The file will not be worked on any more; it counts as finished in the overall value.</summary>
+    public void Failed(JobStage stage, int index, string reason) =>
+        Update(stage, index, 1, "", FileProgress.Failed(files[index], reason));
+
+    private void Update(JobStage stage, int index, double fraction, string text, FileProgress file)
     {
         lock (_lock)
         {
             _done[index] = fraction;
-            _status[(int)stage] = text.Length > 0 ? $"[{index + 1}/{files}] {text}" : "";
-            report(Math.Min(_done.Sum() / files, 1.0), string.Join(Separator, _status.Where(s => s.Length > 0)));
+            _status[(int)stage] = text.Length > 0 ? $"[{index + 1}/{files.Count}] {text}" : "";
+            report(Math.Min(_done.Sum() / files.Count, 1.0), string.Join(Separator, _status.Where(s => s.Length > 0)));
+            onFile?.Invoke(file);
         }
     }
 }
