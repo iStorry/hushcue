@@ -116,6 +116,15 @@ public class TranscriptionTests
         Assert.Null(options.Vad);
     }
 
+    [Fact]
+    public void PreviousTextIsOffUnlessAsked()
+    {
+        var model = new FakeTranscriber([W(" hi", 0, 1)]);
+        FileTranscription.DecodeWords(model, Silence, new JobSettings(), Balanced, default);
+        FileTranscription.DecodeWords(model, Silence, new JobSettings { PreviousText = true }, Balanced, default);
+        Assert.Equal([false, true], model.Calls.Select(c => c.Options.ConditionOnPreviousText));
+    }
+
     [Theory]
     [InlineData("Fast", false, 0.1)]
     [InlineData("Fast", true, 0.1)]
