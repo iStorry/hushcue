@@ -100,7 +100,7 @@ Ported from `../subgen/burn.py` and `extract_audio` into `src/Hushcue.Core/Media
 
 ## Phase 4 — Pipeline
 
-Port `run_job` / `transcribe_file`. A first version is in `Pipeline/SubtitleJob.cs`.
+Port `run_job` / `transcribe_file`. It is in `Pipeline/SubtitleJob.cs` and `Pipeline/JobRun.cs`.
 
 - [x] Presets: Fast, Balanced (default), Thorough. **Best (Demucs) is dropped**
 - [x] Settings: language, enhance, vocabulary, skip silence, embed mode, keep .srt, delete original
@@ -113,7 +113,9 @@ Port `run_job` / `transcribe_file`. A first version is in `Pipeline/SubtitleJob.
       silence), a guess, since SubGen's source was not at hand
 - [x] Drop segments with no-speech prob > 0.6 and avg log-prob < -1.0
 - [ ] Loop recovery: re-decode looped passages in isolation with repetition penalty 1.3
-- [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`)
+- [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`). Written (`Pipeline/JobRun.cs`,
+      `Pipeline/JobProgress.cs`), not tested yet; SubGen's run_job may differ in progress and failure handling, so
+      check it against `test_run_job.py`
 - [x] Finished files leave the queue
 - [x] One combined progress value + status line across both stages
 - [x] GPU → CPU fallback (int8 on CPU) on CUDA errors
@@ -125,15 +127,16 @@ Port `run_job` / `transcribe_file`. A first version is in `Pipeline/SubtitleJob.
 ## Phase 5 — Models
 
 - [x] Store models in `%LOCALAPPDATA%\Hushcue\models` (CTranslate2 format, from Hugging Face); the Hugging Face
-      cache SubGen fills is the fallback until the download below exists (`Pipeline/Models.cs`)
-- [ ] First-run download with progress, resume and checksum
+      cache SubGen fills is still used when present, which saves a download (`Pipeline/Models.cs`)
+- [ ] First-run download with progress, resume and checksum. Written (`Pipeline/ModelDownload.cs`): files pinned to a
+      Hugging Face commit with their SHA-256 in `Pipeline/Models.cs`, staged in `models\NAME.download`, not tested yet
 - [x] Load the model once and keep it loaded between runs
 
 ## Phase 6 — WinUI 3 app (first version in place)
 
-Built ahead of Phase 4/5. "Generate subtitles" runs a basic job (`Pipeline/SubtitleJob.cs`): no loop recovery,
-VAD or embed overlap yet, and models come from the Hugging Face cache until Phase 5. Tested by UI Automation: a clip
-went through Generate (soft track + .srt) end to end. MKV to MP4 page still to be tested by hand.
+Built ahead of Phase 4/5. "Generate subtitles" runs the job in `Pipeline/SubtitleJob.cs` (no loop recovery yet).
+Tested by UI Automation before VAD, embed overlap and the model download: a clip went through Generate (soft
+track + .srt) end to end. MKV to MP4 page still to be tested by hand.
 
 - [x] Window shell, Mica, dark/light theme following Windows, app icon
 - [x] Mode switch: "Generate subtitles" / "MKV to MP4"
@@ -159,8 +162,8 @@ went through Generate (soft track + .srt) end to end. MKV to MP4 page still to b
 - [ ] Installer: MSIX or unpackaged (e.g. Inno Setup / WiX), decide
 - [ ] ffmpeg bundling: GPL builds (with libx264) affect the licence; pick an LGPL build + NVENC, or keep ffmpeg as a user install
 - [ ] Ship `ctranslate2.dll`, cuBLAS and cuDNN (~1.7 GB), or download them on first run
-- [ ] GitHub Actions: build and test on `windows-2025` written (`.github/workflows/ci.yml`: CPU-only engine bridge,
-      ffmpeg from Chocolatey); waiting for its first run
+- [x] GitHub Actions: build and test on `windows-2025` (`.github/workflows/ci.yml`: CPU-only engine bridge, ffmpeg
+      from Chocolatey). The 4 model tests skip there: no model on the runner
 - [ ] GitHub Actions: release artifacts
 - [ ] Third-party notices (CTranslate2, faster-whisper and Silero VAD are MIT)
 - [ ] GitHub repo `hushcue`, README with screenshots, first release

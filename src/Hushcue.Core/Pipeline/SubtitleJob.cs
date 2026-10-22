@@ -1,13 +1,12 @@
 using Hushcue.Core.Engine;
-using Hushcue.Core.Media;
 using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Core.Pipeline;
 
 /// <summary>
 /// Subtitle a list of files: read the audio, transcribe, clean up, write the .srt and optionally put it inside the
-/// video. A first version of SubGen's run_job; Phase 4 adds loop recovery, voice activity detection and embedding
-/// file N while file N+1 is transcribed.
+/// video, embedding file N while file N+1 is transcribed (<see cref="JobRun"/>). SubGen's run_job; loop recovery is
+/// still to come. The model is downloaded on first use and kept loaded between runs.
 /// </summary>
 public static class SubtitleJob
 {
@@ -30,120 +29,39 @@ public static class SubtitleJob
     public static Task<List<string>> RunAsync(IReadOnlyList<string> files, string? outDir, JobSettings settings,
                                               Action<double, string> progress, Action<string> log,
                                               Action<string>? onFileDone = null, CancellationToken cancel = default) =>
-        Task.Run(() => Run(files, outDir, settings, progress, log, onFileDone, cancel), cancel);
+        Task.Run(() => RunJobAsync(files, outDir, settings, progress, log, onFileDone, cancel), cancel);
 
-    private static async Task<List<string>> Run(IReadOnlyList<string> files, string? outDir, JobSettings settings,
-                                                Action<double, string> progress, Action<string> log,
-                                                Action<string>? onFileDone, CancellationToken cancel)
+    private static async Task<List<string>> RunJobAsync(IReadOnlyList<string> files, string? outDir, JobSettings settings,
+                                                        Action<double, string> progress, Action<string> log,
+                                                        Action<string>? onFileDone, CancellationToken cancel)
     {
-        var preset = Presets.Get(settings.Preset);
-        var enhance = settings.Enhance || preset.Enhance;
-        var device = WhisperModel.CudaDeviceCount() > 0 ? "cuda" : "cpu";
-        if (device == "cpu")
-            log("No usable NVIDIA GPU found - running on CPU, this will be slow.");
+        var model = Presets.Get(settings.Preset).Model;
+        var modelPath = Models.Find(model) ?? await DownloadModelAsync(model, progress, log, cancel);
+        return await new JobRun(files, outDir, settings, modelPath, progress, log, onFileDone).RunAsync(cancel);
+    }
 
-        // Share of each file's progress used by transcription; burning re-encodes the video and takes far longer.
-        var share = settings.Embed switch { EmbedMode.Soft => 0.85, EmbedMode.Burn => 0.3, _ => 1.0 };
-        var n = files.Count;
-        var outputs = new List<string>();
-        var embedFailures = new List<string>();
-
-        for (var i = 0; i < n; i++)
-        {
-            cancel.ThrowIfCancellationRequested();
-            var src = files[i];
-            var name = Path.GetFileName(src);
-            void Report(double fraction, string text) =>
-                progress(Math.Min((i + fraction) / n, 1.0), text.Length > 0 ? $"[{i + 1}/{n}] {text}" : "");
-
-            log($"--- {name}");
-            Report(0, "Extracting audio...");
-            var audio = await Audio.ReadAsync(src, enhance, cancel);
-
-            var cues = TranscribeWithFallback(preset, ref device, audio, settings, log,
-                f => Report(share * (0.08 + 0.9 * f), $"Transcribing... {(int)(f * 100)}%"),
-                () => Report(share * 0.05, "Loading model..."), cancel);
-
-            Report(share * 0.99, "Writing SRT...");
-            var destDir = outDir ?? Path.GetDirectoryName(src) ?? "";
-            Directory.CreateDirectory(destDir);
-            var embedding = settings.Embed != EmbedMode.None && cues.Count > 0;
-            var tempSrt = embedding && !settings.KeepSrt;
-            var srt = tempSrt
-                ? Path.Combine(Path.GetTempPath(), $"hushcue_{Guid.NewGuid():N}.srt") // only fed to ffmpeg, deleted after
-                : FileNames.Unique(Path.Combine(destDir, Path.GetFileNameWithoutExtension(src) + ".srt"));
-            // CRLF, as SubGen's Python writes text files on Windows
-            await File.WriteAllTextAsync(srt, Srt.Write(cues).Replace("\n", "\r\n"), cancel);
-            if (!tempSrt)
-                log($"Saved {srt} ({cues.Count} subtitles)");
-            foreach (var warning in Cleanup.CoverageWarnings(cues, audio.Length / (double)Audio.SampleRate))
-                log("WARNING: " + warning);
-
-            if (settings.Embed != EmbedMode.None && cues.Count == 0)
-                log("No subtitles were found, so nothing was embedded in the video.");
-            if (!embedding)
-            {
-                outputs.Add(srt);
-                onFileDone?.Invoke(src);
-                continue;
-            }
-
-            var what = settings.Embed == EmbedMode.Soft ? "Adding subtitle track" : "Burning subtitles into video";
-            try
-            {
-                Report(share, $"{what}...");
-                var video = await Embed.SubtitlesAsync(src, srt, outDir, settings.Embed,
-                    f => Report(share + (1 - share) * f, $"{what}... {(int)(f * 100)}%"), cancel: cancel);
-                log($"Saved {video}");
-                outputs.Add(video);
-                if (settings.DeleteOriginal)
-                {
-                    log(new FileInfo(video).Length > 0 && RecycleBin.Send(src)
-                        ? $"Moved the original {name} to the Recycle Bin"
-                        : $"Kept the original {name} (could not move it to the Recycle Bin)");
-                }
-                onFileDone?.Invoke(src);
-            }
-            catch (MediaException e)
-            {
-                log($"ERROR: could not embed subtitles into {name}: {e.Message}");
-                embedFailures.Add(name);
-                if (tempSrt) // don't lose the transcript just because embedding failed
-                {
-                    var kept = FileNames.Unique(Path.Combine(destDir, Path.GetFileNameWithoutExtension(src) + ".srt"));
-                    File.Copy(srt, kept);
-                    log($"Saved {kept} instead");
-                    outputs.Add(kept);
-                }
-                else
-                {
-                    outputs.Add(srt);
-                }
-            }
-            finally
-            {
-                if (tempSrt)
-                    File.Delete(srt);
-            }
-        }
-
-        if (embedFailures.Count > 0)
-            throw new MediaException("Subtitles were generated, but could not be embedded into: "
-                                     + string.Join(", ", embedFailures) + ". See the log for details.");
-        progress(1.0, "Done");
-        return outputs;
+    private static async Task<string> DownloadModelAsync(string name, Action<double, string> progress, Action<string> log,
+                                                         CancellationToken cancel)
+    {
+        log($"The {name} model is not on this PC yet; downloading it (only needed once).");
+        var folder = await ModelDownload.DownloadAsync(name,
+            (done, total) => progress(done / (double)total,
+                                      $"Downloading the {name} model... {done * 100 / total}% of {total / 1e9:F1} GB"),
+            cancel);
+        log($"Saved the {name} model in {folder}");
+        return folder;
     }
 
     /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>
-    private static List<Cue> TranscribeWithFallback(Preset preset, ref string device, float[] audio, JobSettings settings,
-                                                    Action<string> log, Action<double> onFraction, Action onLoading,
-                                                    CancellationToken cancel)
+    internal static List<Cue> TranscribeWithFallback(string modelPath, Preset preset, ref string device, float[] audio,
+                                                     JobSettings settings, Action<string> log, Action<double> onFraction,
+                                                     Action onLoading, CancellationToken cancel)
     {
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                var transcriber = GetTranscriber(preset.Model, device, log, onLoading);
+                var transcriber = GetTranscriber(preset.Model, modelPath, device, log, onLoading);
                 return Transcribe(transcriber, audio, preset, settings, log, onFraction, cancel);
             }
             catch (EngineException e) when (device == "cuda" && attempt == 0 && IsGpuError(e))
@@ -155,13 +73,10 @@ public static class SubtitleJob
         }
     }
 
-    private static Transcriber GetTranscriber(string modelName, string device, Action<string> log, Action onLoading)
+    private static Transcriber GetTranscriber(string modelName, string path, string device, Action<string> log, Action onLoading)
     {
         lock (ModelLock)
         {
-            var path = Models.Find(modelName)
-                       ?? throw new EngineException($"The {modelName} model is not downloaded yet. "
-                                                    + $"Put it in {Path.Combine(Models.Folder, modelName)}.");
             if (_model is not null && _transcriber is not null && _model.Path == path && _model.Device == device)
                 return _transcriber;
             Unload();
