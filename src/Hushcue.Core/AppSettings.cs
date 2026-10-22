@@ -20,6 +20,12 @@ public sealed class AppSettings
     public string ConvertOutputFolder { get; set; } = "";
     public int Page { get; set; }
 
+    /// <summary>
+    /// How many times faster than real time transcription ran on this PC, by preset and device ("Balanced/cuda"):
+    /// the speed hint under the preset and the first guess of a batch's time left.
+    /// </summary>
+    public Dictionary<string, double> Speeds { get; set; } = new();
+
     public static string Path =>
         System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Hushcue", "settings.json");
 
