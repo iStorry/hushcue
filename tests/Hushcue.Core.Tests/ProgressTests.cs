@@ -19,13 +19,17 @@ public class ProgressTests
         var perFile = new List<FileProgress>();
         var progress = new JobProgress(["a.mp4", "b.mp4"], (f, t) => overall.Add((f, t)), perFile.Add);
 
-        progress.Working(JobStage.Transcribing, 0, 0.5, "Transcribing...");
+        progress.Working(JobStage.Transcribing, 0, 0.5, "Transcribing...", FileStage.Transcribing,
+                         new RateReading(0.4, 60, TimeSpan.FromSeconds(5)));
         Assert.Equal((0.25, "[1/2] Transcribing..."), overall[^1]);
-        Assert.Equal(FileProgress.Working("a.mp4", 0.5, "Transcribing..."), perFile[^1]);
+        Assert.Equal(FileProgress.Working("a.mp4", 0.5, "Transcribing...", FileStage.Transcribing)
+                     with { Speed = 60, TimeLeft = TimeSpan.FromSeconds(5) }, perFile[^1]);
 
         progress.WaitingToEmbed(0, 0.8);
-        progress.Working(JobStage.Transcribing, 1, 0.2, "Extracting audio...");
-        progress.Working(JobStage.Embedding, 0, 0.9, "Adding subtitle track...");
+        Assert.Equal(FileStage.WaitingToEmbed, perFile[^1].Stage);
+        progress.Working(JobStage.Transcribing, 1, 0.2, "Extracting audio...", FileStage.ReadingAudio);
+        Assert.True(perFile[^1].IsStarting);
+        progress.Working(JobStage.Embedding, 0, 0.9, "Adding subtitle track...", FileStage.Embedding);
         Assert.Equal((0.55, "[2/2] Extracting audio...  ·  [1/2] Adding subtitle track..."), overall[^1]);
         Assert.Equal(FileState.Working, perFile[1].State);
 
@@ -43,11 +47,15 @@ public class ProgressTests
         var rate = new TranscribeRate(audioSeconds: 600, clock);
 
         clock.Advance(30); // loading the model before the first report doesn't count
-        Assert.Equal("Transcribing... 10%", rate.Describe(0.1));
+        Assert.Equal(new RateReading(0.1, null, null), rate.Measure(0.1));
+        Assert.Equal("Transcribing · 10%", rate.Measure(0.1).Describe());
         clock.Advance(1);
-        Assert.Equal("Transcribing... 15%", rate.Describe(0.15));
+        Assert.Equal("Transcribing · 15%", rate.Measure(0.15).Describe());
         clock.Advance(3); // 4 s for 0.4 of 600 s of audio: 60x, 300 s of audio left takes 5 s
-        Assert.Equal("Transcribing... 60× real time, about 5 s left", rate.Describe(0.5));
+        var reading = rate.Measure(0.5);
+        Assert.Equal(60, reading.Speed!.Value, 6);
+        Assert.Equal(5, reading.TimeLeft!.Value.TotalSeconds, 6);
+        Assert.Equal("Transcribing · 60× real time · about 5 s left", reading.Describe());
     }
 
     [Theory]

@@ -41,7 +41,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     /// <summary>The line under the name: what is happening to the file, or what will.</summary>
     public string Detail => State switch
     {
-        FileState.Working => Tidy(_progress.Status),
+        FileState.Working => _progress.Status,
         FileState.Done => Join("Done", Lower(_progress.Status), Length),
         FileState.Failed => _progress.Status,
         _ when Check is not null => Check.Warning,
@@ -55,10 +55,8 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
         _ => ThemeBrushes.Secondary,
     });
 
-    /// <summary>Working, but only reading the audio or loading the model (Core's JobRun status texts).</summary>
-    public bool IsStarting => State == FileState.Working
-                              && (_progress.Status.StartsWith("Extracting audio", StringComparison.Ordinal)
-                                  || _progress.Status.StartsWith("Loading model", StringComparison.Ordinal));
+    /// <summary>Working, but only reading the audio or loading the model.</summary>
+    public bool IsStarting => _progress.IsStarting;
 
     public double Percent => _progress.Fraction * 100;
     public string PercentText => State == FileState.Working ? $"{Percent:F0}%" : "";
@@ -126,10 +124,6 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     private static string Join(params string[] parts) => string.Join(" · ", parts.Where(p => p.Length > 0));
 
     private static string Lower(string text) => text.Length > 0 ? char.ToLowerInvariant(text[0]) + text[1..] : text;
-
-    /// <summary>"Transcribing... 52× real time, about 40 s left" reads as "Transcribing · 52× real time · about 40 s left".</summary>
-    private static string Tidy(string status) =>
-        status.Replace("... ", " · ", StringComparison.Ordinal).Replace(", about ", " · about ", StringComparison.Ordinal);
 
     private static Visibility VisibleIf(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
 }

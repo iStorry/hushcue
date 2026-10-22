@@ -1,8 +1,20 @@
 namespace Hushcue.Core.Pipeline;
 
+/// <summary>How fast a file is being transcribed; Speed and TimeLeft are null until there is enough to measure.</summary>
+/// <param name="Fraction">how much of the audio is transcribed, 0..1</param>
+/// <param name="Speed">times faster than real time</param>
+internal sealed record RateReading(double Fraction, double? Speed, TimeSpan? TimeLeft)
+{
+    /// <summary>The status line: "Transcribing · 52× real time · about 40 s left", or the percentage until measured.</summary>
+    public string Describe() =>
+        Speed is { } speed && TimeLeft is { } left
+            ? $"Transcribing · {speed:F0}× real time · {TranscribeRate.TimeLeft(left)}"
+            : $"Transcribing · {(int)(Fraction * 100)}%";
+}
+
 /// <summary>
-/// The status line while a file is transcribed: how many times faster than real time it goes and how long is left.
-/// Measured from the first progress report, so loading the model and decoding the first window don't count.
+/// How many times faster than real time a file is transcribed and how long is left. Measured from the first progress
+/// report, so loading the model and decoding the first window don't count.
 /// </summary>
 internal sealed class TranscribeRate(double audioSeconds, TimeProvider clock)
 {
@@ -12,16 +24,16 @@ internal sealed class TranscribeRate(double audioSeconds, TimeProvider clock)
     private double? _startFraction;
 
     /// <param name="fraction">how much of the audio is transcribed, 0..1</param>
-    public string Describe(double fraction)
+    public RateReading Measure(double fraction)
     {
         if (_startFraction is null)
             (_start, _startFraction) = (clock.GetTimestamp(), fraction);
         var elapsed = clock.GetElapsedTime(_start);
         var audioDone = (fraction - _startFraction.Value) * audioSeconds;
         if (elapsed < MinMeasured || audioDone <= 0)
-            return $"Transcribing... {(int)(fraction * 100)}%";
+            return new RateReading(fraction, null, null);
         var speed = audioDone / elapsed.TotalSeconds;
-        return $"Transcribing... {speed:F0}× real time, {TimeLeft(TimeSpan.FromSeconds((1 - fraction) * audioSeconds / speed))}";
+        return new RateReading(fraction, speed, TimeSpan.FromSeconds((1 - fraction) * audioSeconds / speed));
     }
 
     internal static string TimeLeft(TimeSpan left) =>

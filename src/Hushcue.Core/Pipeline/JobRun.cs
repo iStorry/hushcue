@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using Hushcue.Core.Engine;
 using Hushcue.Core.Media;
@@ -19,7 +20,7 @@ namespace Hushcue.Core.Pipeline;
 /// </remarks>
 internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSettings settings, string modelPath,
                              JobSteps steps, Action<double, string> progress, Action<string> log,
-                             Action<FileProgress>? onFile)
+                             Action<FileProgress>? onFile, Action<JobEvent> onEvent)
 {
     /// <summary>A transcribed file waiting to have its subtitles put into the video.</summary>
     private sealed record EmbedWork(int Index, string Source, string Srt, bool TempSrt, string DestDir);
@@ -37,6 +38,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         _device = steps.CudaDeviceCount() > 0 ? "cuda" : "cpu";
         if (_device == "cpu")
             log("No usable NVIDIA GPU found - running on CPU, this will be slow.");
+        onEvent(new DeviceSelected(_device, Reason: _device == "cpu" ? "No usable NVIDIA GPU found" : null));
 
         var queue = Channel.CreateUnbounded<EmbedWork>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancel);
@@ -94,31 +96,46 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
     private async Task<EmbedWork?> TranscribeAsync(int index, CancellationToken cancel)
     {
         var src = files[index];
-        void Report(double fraction, string text) => _progress.Working(JobStage.Transcribing, index, _share * fraction, text);
+        void Report(double fraction, string text, FileStage stage, RateReading? rate = null) =>
+            _progress.Working(JobStage.Transcribing, index, _share * fraction, text, stage, rate);
 
         log($"--- {Path.GetFileName(src)}");
-        Report(0, "Extracting audio...");
+        Report(0, "Extracting audio...", FileStage.ReadingAudio);
         var audio = await steps.ReadAudio(src, settings.Enhance || _preset.Enhance, cancel);
-        var rate = new TranscribeRate(audio.Length / (double)Audio.SampleRate, TimeProvider.System);
-        var cues = TranscribeWithFallback(audio, Report, f => Report(0.08 + 0.9 * f, rate.Describe(f)), cancel);
+        var seconds = audio.Length / (double)Audio.SampleRate;
+        var rate = new TranscribeRate(seconds, TimeProvider.System);
+        var (cues, took) = TranscribeWithFallback(audio, Report, f =>
+        {
+            var reading = rate.Measure(f);
+            Report(0.08 + 0.9 * f, reading.Describe(), FileStage.Transcribing, reading);
+        }, words => onEvent(new CuesDecoded(src, Cleanup.DropJunk(Cleanup.BuildCues(Cleanup.CollapseRepeats(words))))), cancel);
 
-        Report(0.99, "Writing SRT...");
+        Report(0.99, "Writing SRT...", FileStage.WritingSrt);
         var destDir = outDir ?? Path.GetDirectoryName(src) ?? "";
         Directory.CreateDirectory(destDir);
         var embedding = settings.Embed != EmbedMode.None && cues.Count > 0;
-        var tempSrt = embedding && !settings.KeepSrt;
+        var review = embedding && settings.ReviewBeforeEmbed;
+        var tempSrt = embedding && !settings.KeepSrt && !review;
         var srt = tempSrt
             ? Path.Combine(Path.GetTempPath(), $"hushcue_{Guid.NewGuid():N}.srt") // only fed to ffmpeg, deleted after
             : FileNames.Unique(Path.Combine(destDir, Path.GetFileNameWithoutExtension(src) + ".srt"));
-        // CRLF, as SubGen's Python writes text files on Windows
-        await File.WriteAllTextAsync(srt, Srt.Write(cues).Replace("\n", "\r\n"), cancel);
+        await Srt.SaveAsync(srt, cues, cancel);
         if (!tempSrt)
             log($"Saved {srt} ({cues.Count} subtitles)");
-        foreach (var warning in Cleanup.CoverageWarnings(cues, audio.Length / (double)Audio.SampleRate))
+        var warnings = Cleanup.CoverageWarnings(cues, seconds);
+        foreach (var warning in warnings)
             log("WARNING: " + warning);
         if (settings.Embed != EmbedMode.None && cues.Count == 0)
             log("No subtitles were found, so nothing was embedded in the video.");
+        onEvent(new FileTranscribed(src, cues, seconds, took, _device, tempSrt ? null : srt, warnings));
 
+        if (review)
+        {
+            log($"{Path.GetFileName(src)} is ready to review; its subtitles will be added to the video after that.");
+            _outputs[index] = srt;
+            _progress.ReadyForReview(index, srt);
+            return null;
+        }
         if (embedding)
         {
             _progress.WaitingToEmbed(index, _share);
@@ -130,8 +147,10 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
     }
 
     /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>
-    private List<Cue> TranscribeWithFallback(float[] audio, Action<double, string> report, Action<double> onFraction,
-                                             CancellationToken cancel)
+    /// <returns>the cues, and the time taken from the start of decoding</returns>
+    private (List<Cue> Cues, TimeSpan Took) TranscribeWithFallback(
+        float[] audio, Action<double, string, FileStage, RateReading?> report, Action<double> onFraction,
+        Action<IReadOnlyList<Word>> onWords, CancellationToken cancel)
     {
         for (var attempt = 0; ; attempt++)
         {
@@ -139,22 +158,26 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
             {
                 var model = steps.Cache.Get(modelPath, _device, steps.LoadModel, () =>
                 {
-                    report(0.05, "Loading model...");
+                    report(0.05, "Loading model...", FileStage.LoadingModel, null);
                     log(_device == "cuda" ? $"Loading '{_preset.Model}' on GPU..." : $"Loading '{_preset.Model}' on CPU (slow)...");
                 });
-                report(0.08, "Transcribing...");
-                return FileTranscription.Transcribe(model, audio, settings, _preset, onFraction, log, cancel);
+                report(0.08, "Transcribing...", FileStage.Transcribing, null);
+                var clock = Stopwatch.StartNew();
+                var cues = FileTranscription.Transcribe(model, audio, settings, _preset, onFraction, log, cancel, onWords);
+                return (cues, clock.Elapsed);
             }
             catch (EngineException e) when (_device == "cuda" && attempt == 0 && IsGpuError(e))
             {
                 log($"GPU failed ({e.Message}). Falling back to CPU.");
                 _device = "cpu";
+                onEvent(new DeviceSelected(_device, Fallback: true, Reason: e.Message));
                 steps.Cache.Unload();
             }
         }
     }
 
-    private static bool IsGpuError(Exception e)
+    /// <summary>A CUDA failure (missing libraries, out of memory) that the CPU may not have.</summary>
+    internal static bool IsGpuError(Exception e)
     {
         var message = e.Message.ToLowerInvariant();
         return new[] { "cublas", "cudnn", "cuda", "dll", "out of memory" }.Any(message.Contains);
@@ -179,20 +202,16 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         var name = Path.GetFileName(work.Source);
         var what = settings.Embed == EmbedMode.Soft ? "Adding subtitle track" : "Burning subtitles into video";
         void Report(double fraction, string text) =>
-            _progress.Working(JobStage.Embedding, work.Index, _share + (1 - _share) * fraction, text);
+            _progress.Working(JobStage.Embedding, work.Index, _share + (1 - _share) * fraction, text, FileStage.Embedding);
         try
         {
             Report(0, $"{what}...");
             var video = await steps.Embed(work.Source, work.Srt, outDir, settings.Embed,
-                f => Report(f, $"{what}... {(int)(f * 100)}%"), cancel);
+                f => Report(f, $"{what} · {(int)(f * 100)}%"), cancel);
             log($"Saved {video}");
             _outputs[work.Index] = video;
             if (settings.DeleteOriginal)
-            {
-                log(new FileInfo(video).Length > 0 && steps.Recycle(work.Source)
-                    ? $"Moved the original {name} to the Recycle Bin"
-                    : $"Kept the original {name} (could not move it to the Recycle Bin)");
-            }
+                onEvent(new OriginalRecycled(work.Source, SubtitleJob.RecycleOriginal(steps, work.Source, video, log)));
             _progress.Done(JobStage.Embedding, work.Index, video);
         }
         catch (MediaException e)

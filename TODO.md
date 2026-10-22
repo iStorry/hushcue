@@ -205,8 +205,13 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
       loading the model don't count)
 - [x] "Offline · <GPU>" badge in the title bar (GPU name from the registry's display adapters); "CPU" without CUDA,
       without the GPU libraries, or when the job falls back. It opens the system check
-- [x] Live speed hint under the preset ("~52× real time on your GPU"), measured per preset and device from
-      "Transcribing" to "Writing SRT" and kept in the settings (blended with the last run)
+- [x] Live speed hint under the preset ("~52× real time on your GPU"), measured per preset and device (Core times
+      each file from the start of decoding until its subtitles are ready) and kept in the settings (blended with the
+      last run)
+- [x] The app never reads Core's log or status wording: Core reports each file's stage (`FileProgress.Stage`, speed and
+      time left) and what the job did as data (`Pipeline/JobEvent.cs`: device and GPU → CPU fallback, model download,
+      finished transcripts with their cues, measured speed, .srt and coverage warnings, recycled originals). The log
+      is only shown in the log view
 
 **Idea 2: review and edit before embedding** ([mock](docs/mocks/2-review-editor.png))
 

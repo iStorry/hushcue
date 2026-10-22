@@ -21,10 +21,12 @@ internal static class FileTranscription
     /// build the cues.
     /// </summary>
     /// <param name="onFraction">how far the first decode is through the audio, 0..1</param>
+    /// <param name="onWords">each decoded segment's words as they come, before loop recovery and the clean-up</param>
     public static List<Cue> Transcribe(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
-                                       Action<double> onFraction, Action<string> log, CancellationToken cancel)
+                                       Action<double> onFraction, Action<string> log, CancellationToken cancel,
+                                       Action<IReadOnlyList<Word>>? onWords = null)
     {
-        var words = DecodeWords(model, audio, settings, preset, cancel, onFraction, log: log);
+        var words = DecodeWords(model, audio, settings, preset, cancel, onFraction, log: log, onWords: onWords);
         if (settings.RecoverLoops)
             words = RecoverLoops(model, audio, words, settings, preset, log, cancel);
         return Cleanup.ToCues(words); // collapse_repeats, then the cues
@@ -32,9 +34,11 @@ internal static class FileTranscription
 
     /// <summary>Run Whisper on 16 kHz audio and return its words without non-speech markers or stretched letters.</summary>
     /// <param name="log">where to say how much speech voice activity detection kept; null says nothing</param>
+    /// <param name="onWords">each kept segment's words, as soon as it is decoded</param>
     public static List<Word> DecodeWords(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
                                          CancellationToken cancel, Action<double>? onFraction = null,
-                                         float repetitionPenalty = 1, Action<string>? log = null)
+                                         float repetitionPenalty = 1, Action<string>? log = null,
+                                         Action<IReadOnlyList<Word>>? onWords = null)
     {
         var options = new TranscribeOptions
         {
@@ -66,7 +70,10 @@ internal static class FileTranscription
             var segmentWords = segment.Words is { Count: > 0 }
                 ? segment.Words.Select(w => new Word(w.Text, w.Start, w.End))
                 : [new Word(segment.Text, segment.Start, segment.End)];
-            words.AddRange(Cleanup.StripMarkers(segmentWords));
+            var kept = Cleanup.StripMarkers(segmentWords);
+            words.AddRange(kept);
+            if (onWords is not null && kept.Count > 0)
+                onWords(Cleanup.SquashStretched(kept));
         }
         return Cleanup.SquashStretched(words);
     }

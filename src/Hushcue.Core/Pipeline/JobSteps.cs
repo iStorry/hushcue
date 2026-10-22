@@ -76,6 +76,13 @@ internal sealed class ModelCache
         }
     }
 
+    /// <summary>The device the model in <paramref name="path"/> is loaded on, or null when it is not loaded.</summary>
+    public string? DeviceOf(string path)
+    {
+        lock (_lock)
+            return _loaded is { } loaded && loaded.Path == path ? loaded.Device : null;
+    }
+
     /// <summary>Release the loaded model, if any.</summary>
     public void Unload()
     {

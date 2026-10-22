@@ -178,7 +178,7 @@ public static class Embed
                 output = await StripSubtitlesAsync(src, outDir, f =>
                 {
                     progress((index + f) / files.Count, $"[{index + 1}/{files.Count}] Converting {name}... {(int)(f * 100)}%");
-                    onFile?.Invoke(FileProgress.Working(src, f, $"Converting... {(int)(f * 100)}%"));
+                    onFile?.Invoke(FileProgress.Working(src, f, $"Converting · {(int)(f * 100)}%", FileStage.Converting));
                 }, saveSrt, cancel);
             }
             catch (MediaException e)

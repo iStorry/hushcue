@@ -55,7 +55,7 @@ internal static class JobCommand
                 featuresDir is null ? null : FeatureFiles.Source(featuresDir, WhisperModel.FeatureSize(path))),
         };
         var clock = Stopwatch.StartNew();
-        var outputs = await SubtitleJob.RunAsync(files, outDir, settings, (_, _) => { }, Console.WriteLine, null, steps,
+        var outputs = await SubtitleJob.RunAsync(files, outDir, settings, (_, _) => { }, Console.WriteLine, null, null, steps,
                                                  CancellationToken.None);
         Console.WriteLine($"{outputs.Count} file(s) in {clock.Elapsed.TotalSeconds:F1} s");
         steps.Cache.Unload();

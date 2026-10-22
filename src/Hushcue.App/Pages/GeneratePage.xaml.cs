@@ -12,13 +12,6 @@ namespace Hushcue.Pages;
 /// <summary>Pick videos, get subtitles: an .srt, a subtitle track, or text burned into the picture.</summary>
 public sealed partial class GeneratePage : UserControl, IRunPage
 {
-    // Log lines from Core's JobRun that the page follows: the file being transcribed, its warnings, recycled
-    // originals, and the switch to the CPU.
-    private const string FileLogPrefix = "--- ";
-    private const string WarningLogPrefix = "WARNING: ";
-    private const string RecycledLogPrefix = "Moved the original ";
-    private static readonly string[] CpuLogMarkers = ["Falling back to CPU", "running on CPU"];
-
     private AppSettings _settings = new();
     private string _device = "cuda";
     private CancellationTokenSource? _cancel;
@@ -40,8 +33,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         public SpeedMeter Speed { get; } = new();
         public List<string> Notes { get; } = [];
         public List<string> Recycled { get; } = [];
-        public string? LogFile { get; set; }
-        public string? Download { get; set; }
+        /// <summary>The model download, while one is running: the bar and status line show it instead of the files.</summary>
+        public ModelDownloading? Download { get; set; }
     }
 
     public GeneratePage()
@@ -395,15 +388,11 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         {
             cancel.ThrowIfCancellationRequested();
             var groupSettings = srtOnly ? settings with { Embed = EmbedMode.None, KeepSrt = true, DeleteOriginal = false } : settings;
-            var durations = files.ToDictionary(f => f.Path, f => f.Duration, StringComparer.OrdinalIgnoreCase);
             _coreJob = SubtitleJob.RunAsync([.. files.Select(f => f.Path)], Output.FolderOrNull, groupSettings,
-                (fraction, text) => ui.TryEnqueue(() => OnJobProgress(batch, fraction, text)),
-                line => ui.TryEnqueue(() => OnLog(batch, line)),
-                file => ui.TryEnqueue(() =>
-                {
-                    batch.Speed.Observe(file, durations.GetValueOrDefault(file.Path));
-                    Queue.Update(file);
-                }),
+                (_, _) => { }, // the queue and the events say it all
+                line => ui.TryEnqueue(() => Run.AppendLog(line)),
+                file => ui.TryEnqueue(() => Queue.Update(file)),
+                e => ui.TryEnqueue(() => OnJobEvent(batch, e)),
                 cancel);
             try
             {
@@ -418,45 +407,34 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             throw new MediaException(string.Join("\n\n", problems));
     }
 
-    /// <summary>The job's overall status line: only the model download is shown from it; the queue says the rest.</summary>
-    private void OnJobProgress(Batch batch, double fraction, string text)
+    /// <summary>What the job did, as data: the model download, the device, finished transcripts, recycled originals.</summary>
+    private void OnJobEvent(Batch batch, JobEvent e)
     {
-        if (_batch != batch)
-            return;
-        if (text.StartsWith("Downloading", StringComparison.Ordinal))
+        switch (e)
         {
-            batch.Download = text;
-            Run.SetStatus(text);
-            Run.SetProgress(fraction);
-            ProgressChanged?.Invoke(this, new RunProgress(fraction, Taskbar.State.Normal));
-        }
-        else if (batch.Download is not null)
-        {
-            batch.Download = null;
-            ShowRunStatus(batch);
-        }
-    }
-
-    private void OnLog(Batch batch, string line)
-    {
-        Run.AppendLog(line);
-        if (line.StartsWith(FileLogPrefix, StringComparison.Ordinal))
-        {
-            batch.LogFile = line[FileLogPrefix.Length..];
-        }
-        else if (line.StartsWith(WarningLogPrefix, StringComparison.Ordinal))
-        {
-            batch.Notes.Add($"{batch.LogFile}: {line[WarningLogPrefix.Length..]}");
-        }
-        else if (line.StartsWith(RecycledLogPrefix, StringComparison.Ordinal)
-                 && batch.Files.FirstOrDefault(f => line.StartsWith(RecycledLogPrefix + f.Name + " ", StringComparison.Ordinal)) is { } file)
-        {
-            batch.Recycled.Add(file.Path);
-        }
-        else if (CpuLogMarkers.Any(line.Contains) && _device != "cpu")
-        {
-            _device = "cpu";
-            DeviceChanged?.Invoke(this, _device);
+            case ModelDownloading { Finished: false } download when _batch == batch:
+                batch.Download = download;
+                var fraction = download.Total > 0 ? download.Done / (double)download.Total : 0;
+                Run.SetStatus($"Downloading the {download.Model} model... {(int)(fraction * 100)}% of {download.Total / 1e9:F1} GB");
+                Run.SetProgress(fraction);
+                ProgressChanged?.Invoke(this, new RunProgress(fraction, Taskbar.State.Normal));
+                break;
+            case ModelDownloading when _batch == batch:
+                batch.Download = null;
+                ShowRunStatus(batch);
+                break;
+            case DeviceSelected { Device: "cpu" } when _device != "cpu":
+                _device = "cpu";
+                DeviceChanged?.Invoke(this, _device);
+                break;
+            case FileTranscribed file:
+                batch.Speed.Observe(file);
+                var name = Path.GetFileName(file.Path);
+                batch.Notes.AddRange(file.Warnings.Select(warning => $"{name}: {warning}"));
+                break;
+            case OriginalRecycled { Moved: true } recycled:
+                batch.Recycled.Add(recycled.Path);
+                break;
         }
     }
 
