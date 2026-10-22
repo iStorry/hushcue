@@ -57,8 +57,13 @@ src/Hushcue.Cli/bin/Release/net10.0/win-x64/Hushcue.Cli.exe transcribe --model M
 
 # decoder identity: same features on both sides
 ../subgen/.venv/Scripts/python tools/bench/fw_reference.py bench-out/fw-full --language auto --prompt "..." --hallucination-silence 2.0
-Hushcue.Cli.exe transcribe --model MODEL_DIR --out bench-out/cs-full --features bench-out/features-0 --language auto --prompt "..." --hallucination-silence 2.0 ../subgen/reference/*.mp4
+Hushcue.Cli.exe transcribe --model MODEL_DIR --out bench-out/cs-full --features bench-out/features --language auto --prompt "..." --hallucination-silence 2.0 ../subgen/reference/*.mp4
+../subgen/.venv/Scripts/python tools/bench/compare_words.py bench-out/fw-full bench-out/cs-full
 ```
+
+`fw_reference.py` records faster-whisper's features under a hash of the audio they were computed from
+(`tools/bench/fw_features.py`), which is how `--features` finds them, with or without VAD. The job-level checks are in
+[Phase 4](phase4-pipeline.md).
 
 `MODEL_DIR` is the CTranslate2 model SubGen downloaded, e.g.
 `%USERPROFILE%\.cache\huggingface\hub\models--mobiuslabsgmbh--faster-whisper-large-v3-turbo\snapshots\<id>`.
