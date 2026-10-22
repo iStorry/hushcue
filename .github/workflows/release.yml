@@ -1,0 +1,117 @@
+name: Release
+
+# Builds the installer and a portable zip and attaches them to a draft GitHub Release, to check and publish by hand.
+# On a v* tag the version comes from the tag (v1.2.3 -> 1.2.3); a manual run takes it as an input.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, e.g. 0.2.0 (the draft release gets the tag v<version>)"
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CT2_VERSION: 4.8.2
+  SITE_PACKAGES: ${{ github.workspace }}\native\deps\site-packages
+  # Inno Setup 6, unpacked as a portable copy (nothing installed on the runner); the installer is signed by its authors
+  INNO_VERSION: 6.7.3
+  INNO_SHA256: 9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732
+
+jobs:
+  release:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME -replace '^v', '' } else { $env:INPUT_VERSION }
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "'$version' is not a version like 1.2.3 or 1.2.3-beta.1" }
+          Add-Content $env:GITHUB_ENV "VERSION=$version"
+          Add-Content $env:GITHUB_ENV "TAG=v$version"
+
+      # Same as CI. The bridge is the same for CPU and GPU builds: GPU support is inside ctranslate2.dll, and -CpuOnly
+      # only skips gathering cuBLAS on the build machine, which the app downloads on first run instead.
+      - name: Fetch the CTranslate2 wheel
+        run: python -m pip install --no-deps --target "$env:SITE_PACKAGES" "ctranslate2==$env:CT2_VERSION"
+
+      - name: Build the engine bridge
+        run: ./native/build.ps1 -SitePackages "$env:SITE_PACKAGES" -Ct2Version "$env:CT2_VERSION" -CpuOnly
+
+      # Media tests skip here (no ffmpeg); CI runs them on every push to main
+      - name: Build and test
+        run: |
+          dotnet build Hushcue.slnx -c Release
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
+          dotnet test Hushcue.slnx -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { throw "tests failed" }
+
+      - name: Publish
+        run: ./tools/publish.ps1 -SitePackages "$env:SITE_PACKAGES" -Ct2Version "$env:CT2_VERSION" -Version "$env:VERSION" -Output artifacts/publish/Hushcue
+
+      - name: Get Inno Setup
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP "innosetup-$env:INNO_VERSION.exe"
+          $tag = "is-" + ($env:INNO_VERSION -replace '\.', '_')
+          Invoke-WebRequest "https://github.com/jrsoftware/issrc/releases/download/$tag/innosetup-$env:INNO_VERSION.exe" -OutFile $setup
+          if ((Get-FileHash $setup -Algorithm SHA256).Hash -ne $env:INNO_SHA256) { throw "Inno Setup $env:INNO_VERSION has the wrong checksum" }
+          $dir = Join-Path $env:RUNNER_TEMP "inno"
+          $process = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/PORTABLE=1", "/CURRENTUSER", "/DIR=`"$dir`"" -PassThru -Wait
+          if ($process.ExitCode -ne 0 -or -not (Test-Path "$dir\ISCC.exe")) { throw "Inno Setup did not unpack" }
+          Add-Content $env:GITHUB_ENV "ISCC=$dir\ISCC.exe"
+
+      - name: Build the installer and the portable zip
+        run: |
+          ./installer/build.ps1 -Version "$env:VERSION" -PublishDir artifacts/publish/Hushcue -OutputDir artifacts/release -Iscc "$env:ISCC"
+          Compress-Archive -Path artifacts/publish/Hushcue -DestinationPath "artifacts/release/Hushcue-$env:VERSION-win-x64.zip"
+          Push-Location artifacts/release
+          Get-ChildItem -File | Where-Object Name -ne "SHA256SUMS.txt" | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          } | Set-Content SHA256SUMS.txt -Encoding ascii
+          Get-Content SHA256SUMS.txt
+          Pop-Location
+
+      - name: Attach to a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem artifacts/release -File | ForEach-Object FullName
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG @files --clobber
+          }
+          else {
+            $notes = @"
+          Hushcue $env:VERSION for Windows 10 (1809) and 11, x64.
+
+          - **Hushcue-$env:VERSION-setup.exe**: installer. Installs for the current user (no admin needed) and can add
+            "Generate subtitles with Hushcue" to the right-click menu of video and audio files.
+          - **Hushcue-$env:VERSION-win-x64.zip**: portable copy; unzip anywhere and run Hushcue.exe.
+
+          Hushcue needs ffmpeg on PATH (``winget install Gyan.FFmpeg``). On first run it downloads the speech model
+          (about 1.6 GB) and, with an NVIDIA GPU, NVIDIA's cuBLAS (about 630 MB); without a GPU it runs on the CPU.
+          "@
+            gh release create $env:TAG @files --draft --title "Hushcue $env:VERSION" --notes $notes --target $env:GITHUB_SHA
+          }
+          if ($LASTEXITCODE -ne 0) { throw "gh release failed" }
