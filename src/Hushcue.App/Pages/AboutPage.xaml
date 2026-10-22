@@ -14,7 +14,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Image x:Name="AppIcon" Width="72" Height="72" VerticalAlignment="Top" AutomationProperties.AccessibilityView="Raw" />
+                    <Image x:Name="IconImage" Width="72" Height="72" VerticalAlignment="Top" AutomationProperties.AccessibilityView="Raw" />
                     <StackPanel Grid.Column="1" Spacing="4">
                         <TextBlock x:Name="NameText" Style="{StaticResource SubtitleTextBlockStyle}" />
                         <TextBlock x:Name="VersionText" Style="{StaticResource CaptionTextBlockStyle}"

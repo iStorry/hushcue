@@ -67,7 +67,7 @@ $publishArgs = @(
 if ($Version) { $publishArgs += "-p:Version=$Version" }
 & $dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
-foreach ($required in @("Hushcue.exe", "Hushcue.pri", "hushcue_ct2.dll", "Assets\Hushcue.ico")) {
+foreach ($required in @("Hushcue.exe", "Hushcue.pri", "hushcue_ct2.dll", "Assets\Hushcue.ico", "Assets\Hushcue.svg")) {
     if (-not (Test-Path (Join-Path $Output $required))) { throw "The publish output has no $required" }
 }
 # debug symbols and import libraries are not needed to run

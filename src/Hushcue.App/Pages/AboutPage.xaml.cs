@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Hushcue.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace Hushcue.Pages;
 
@@ -18,9 +17,7 @@ public sealed partial class AboutPage : UserControl
         TaglineText.Text = Product.Tagline;
         var version = typeof(Product).Assembly.GetName().Version?.ToString(3) ?? "";
         VersionText.Text = $"Version {version}";
-        var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "Hushcue.ico");
-        if (File.Exists(icon))
-            AppIcon.Source = new BitmapImage(new Uri(icon));
+        Loaded += async (_, _) => IconImage.Source ??= await AppIcon.LoadAsync();
         NoticesButton.Visibility = File.Exists(NoticesPath) ? Visibility.Visible : Visibility.Collapsed;
     }
 

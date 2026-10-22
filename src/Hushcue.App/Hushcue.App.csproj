@@ -30,6 +30,8 @@
   <ItemGroup>
     <!-- Made by tools/make-icon.ps1; also loaded at runtime for the window's title bar -->
     <Content Include="Assets\Hushcue.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The same icon as a vector, for the title bar and About (AppIcon.cs) -->
+    <Content Include="Assets\Hushcue.svg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

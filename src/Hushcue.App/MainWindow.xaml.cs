@@ -85,6 +85,11 @@ public sealed partial class MainWindow : Window
         AppWindow.Closing += OnClosing;
         Root.ActualThemeChanged += (_, _) => ColorCaptionButtons();
         Root.Loaded += (_, _) => ColorCaptionButtons();
+        Root.Loaded += async (_, _) =>
+        {
+            if (await AppIcon.LoadAsync() is { } icon)
+                AppTitleBar.IconSource = new ImageIconSource { ImageSource = icon }; // instead of the glyph
+        };
 
         ShowSetup(SetupView.IsNeeded(), firstRun: true);
         _ = Setup.CheckAsync();
