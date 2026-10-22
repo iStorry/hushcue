@@ -100,27 +100,30 @@ Ported from `../subgen/burn.py` and `extract_audio` into `src/Hushcue.Core/Media
 
 ## Phase 4 — Pipeline
 
-Port `run_job` / `transcribe_file`.
+Port `run_job` / `transcribe_file`. A first version is in `Pipeline/SubtitleJob.cs`.
 
-- [ ] Presets: Fast, Balanced (default), Thorough. **Best (Demucs) is dropped**
-- [ ] Settings: language, enhance, vocabulary, skip silence, embed mode, keep .srt, delete original
+- [x] Presets: Fast, Balanced (default), Thorough. **Best (Demucs) is dropped**
+- [x] Settings: language, enhance, vocabulary, skip silence, embed mode, keep .srt, delete original
 - [ ] Silero VAD (ONNX Runtime, same model and parameters as faster-whisper) when the preset or "skip silence" asks
-      for it, plus faster-whisper's restore_speech_timestamps
-- [ ] Drop segments with no-speech prob > 0.6 and avg log-prob < -1.0
+      for it, plus faster-whisper's restore_speech_timestamps. Until then the Fast preset and "skip silence" log
+      that it is not available and transcribe the whole file
+- [x] Drop segments with no-speech prob > 0.6 and avg log-prob < -1.0
 - [ ] Loop recovery: re-decode looped passages in isolation with repetition penalty 1.3
-- [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`), finished files leave the queue
-- [ ] One combined progress value + status line across both stages
-- [ ] GPU → CPU fallback (int8 on CPU) on CUDA errors
-- [ ] Error handling: an embed failure keeps the .srt; summary error at the end
-- [ ] Write .srt files with CRLF line endings: SubGen's Python writes them in text mode on Windows
+- [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`)
+- [x] Finished files leave the queue
+- [x] One combined progress value + status line across both stages
+- [x] GPU → CPU fallback (int8 on CPU) on CUDA errors
+- [x] Error handling: an embed failure keeps the .srt; summary error at the end
+- [x] Write .srt files with CRLF line endings: SubGen's Python writes them in text mode on Windows
 - [ ] Port the 14 tests from `test_run_job.py`, and the 7 model tests left from `test_pipeline.py`
       (6 loop-recovery / `transcribe_file`, 1 presets-are-deterministic)
 
 ## Phase 5 — Models
 
-- [ ] Store models in `%LOCALAPPDATA%\Hushcue\models` (CTranslate2 format, from Hugging Face)
+- [x] Store models in `%LOCALAPPDATA%\Hushcue\models` (CTranslate2 format, from Hugging Face); the Hugging Face
+      cache SubGen fills is the fallback until the download below exists (`Pipeline/Models.cs`)
 - [ ] First-run download with progress, resume and checksum
-- [ ] Load the model once and keep it loaded between runs
+- [x] Load the model once and keep it loaded between runs
 
 ## Phase 6 — WinUI 3 app (first version in place)
 
@@ -128,17 +131,18 @@ Built ahead of Phase 4/5. "Generate subtitles" runs a basic job (`Pipeline/Subti
 VAD or embed overlap yet, and models come from the Hugging Face cache until Phase 5. Tested by UI Automation: a clip
 went through Generate (soft track + .srt) end to end. MKV to MP4 page still to be tested by hand.
 
-- [ ] Window shell, Mica, dark/light theme following Windows, app icon
-- [ ] Mode switch: "Generate subtitles" / "MKV to MP4"
-- [ ] Drop zone with empty state, file list (multi-select, remove, clear, count), duplicate skip
-- [ ] File pickers (`InitializeWithWindow` with the window handle), output folder picker
-- [ ] Options: preset with hint, language, vocabulary, result (srt / burn / track), keep .srt, delete original, clean up audio, skip silence
-- [ ] Progress bar, status line, collapsible log (last 500 lines), Generate / Cancel
-- [ ] Confirm dialog before moving originals to the Recycle Bin; error dialog on failure
-- [ ] UI updates from the worker through `DispatcherQueue`
-- [ ] Remember the last options and output folder
-- [ ] Cancel the job cleanly when the window closes
-- [ ] Keyboard navigation and screen reader labels
+- [x] Window shell, Mica, dark/light theme following Windows, app icon
+- [x] Mode switch: "Generate subtitles" / "MKV to MP4"
+- [x] Drop zone with empty state, file list (multi-select, remove, clear, count), duplicate skip
+- [x] File pickers (`InitializeWithWindow` with the window handle), output folder picker
+- [x] Options: preset with hint, language, vocabulary, result (srt / burn / track), keep .srt, delete original, clean up audio, skip silence
+- [x] Progress bar, status line, collapsible log (last 500 lines), Generate / Cancel
+- [x] Confirm dialog before moving originals to the Recycle Bin; error dialog on failure
+- [x] UI updates from the worker through `DispatcherQueue`
+- [x] Remember the last options and output folder
+- [x] Cancel the job cleanly when the window closes
+- [ ] Test the MKV to MP4 page by hand
+- [ ] Keyboard navigation and screen reader labels (only a few controls are labelled so far)
 
 ## Phase 7 — Measure and compare
 
