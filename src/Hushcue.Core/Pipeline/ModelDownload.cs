@@ -17,16 +17,24 @@ public static class ModelDownload
     private const long ReportEveryBytes = 8 << 20;
     private const string StagingSuffix = ".download";
     private const string PartialSuffix = ".part";
-    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan DefaultStallTimeout = TimeSpan.FromSeconds(30);
+    private static readonly Uri HuggingFace = new("https://huggingface.co/");
     private static readonly HttpClient Http = CreateClient();
 
     /// <param name="progress">bytes downloaded so far, and the model's total</param>
     /// <returns>the model's folder</returns>
-    public static async Task<string> DownloadAsync(string name, Action<long, long> progress, CancellationToken cancel = default)
+    public static Task<string> DownloadAsync(string name, Action<long, long> progress, CancellationToken cancel = default) =>
+        Models.Sources.TryGetValue(name, out var source)
+            ? DownloadAsync(source, Path.Combine(Models.Folder, name), HuggingFace, progress, cancel)
+            : throw new ModelDownloadException($"There is no model called '{name}'.");
+
+    /// <summary>Download <paramref name="source"/> from <paramref name="server"/> (Hugging Face, or a test server) into
+    /// <paramref name="target"/>.</summary>
+    /// <param name="stallTimeout">give up when no data arrives for this long (default 30 s)</param>
+    internal static async Task<string> DownloadAsync(ModelSource source, string target, Uri server, Action<long, long> progress,
+                                                     CancellationToken cancel, TimeSpan? stallTimeout = null)
     {
-        if (!Models.Sources.TryGetValue(name, out var source))
-            throw new ModelDownloadException($"There is no model called '{name}'.");
-        var target = Path.Combine(Models.Folder, name);
+        var name = Path.GetFileName(target);
         if (Directory.Exists(target))
             throw new ModelDownloadException($"{target} exists but does not hold a complete model. Remove it and try again.");
         var staging = target + StagingSuffix;
@@ -38,22 +46,26 @@ public static class ModelDownload
             {
                 var path = Path.Combine(staging, file.Name);
                 if (!File.Exists(path))
-                    await DownloadFileAsync(source, file, path, written => progress(done + written, source.Size), cancel);
+                    await DownloadFileAsync(new Uri(server, $"{source.Repository}/resolve/{source.Revision}/{file.Name}"), file,
+                                            path, written => progress(done + written, source.Size),
+                                            stallTimeout ?? DefaultStallTimeout, cancel);
                 done += file.Size;
                 progress(done, source.Size);
             }
             Directory.Move(staging, target);
             return target;
         }
-        catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException
+                                   // HttpClient's own timeout, not the caller cancelling
+                                   or OperationCanceledException && !cancel.IsCancellationRequested)
         {
             throw new ModelDownloadException(
                 $"Could not download the {name} model: {e.Message} Try again; the download continues where it stopped.", e);
         }
     }
 
-    private static async Task DownloadFileAsync(ModelSource source, ModelFile file, string path, Action<long> progress,
-                                                CancellationToken cancel)
+    private static async Task DownloadFileAsync(Uri url, ModelFile file, string path, Action<long> progress,
+                                                TimeSpan stallTimeout, CancellationToken cancel)
     {
         var partial = path + PartialSuffix;
         var have = File.Exists(partial) ? new FileInfo(partial).Length : 0;
@@ -63,14 +75,14 @@ public static class ModelDownload
             have = 0;
         }
         if (have < file.Size)
-            await FetchAsync(new Uri($"https://huggingface.co/{source.Repository}/resolve/{source.Revision}/{file.Name}"),
-                             partial, have, progress, cancel);
+            await FetchAsync(url, partial, have, progress, stallTimeout, cancel);
         await VerifyAsync(file, partial, cancel);
         File.Move(partial, path);
     }
 
     /// <summary>Append the rest of the file to <paramref name="partial"/>, which already holds its first <paramref name="have"/> bytes.</summary>
-    private static async Task FetchAsync(Uri url, string partial, long have, Action<long> progress, CancellationToken cancel)
+    private static async Task FetchAsync(Uri url, string partial, long have, Action<long> progress, TimeSpan stallTimeout,
+                                         CancellationToken cancel)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         if (have > 0)
@@ -90,7 +102,7 @@ public static class ModelDownload
         {
             while (true)
             {
-                stall.CancelAfter(StallTimeout);
+                stall.CancelAfter(stallTimeout);
                 var read = await input.ReadAsync(buffer, stall.Token);
                 if (read == 0)
                     break;
@@ -106,7 +118,7 @@ public static class ModelDownload
         catch (OperationCanceledException) when (!cancel.IsCancellationRequested)
         {
             throw new ModelDownloadException(
-                $"The download stopped receiving data for {StallTimeout.TotalSeconds:F0} s. Try again; it continues where it stopped.");
+                $"The download stopped receiving data for {stallTimeout.TotalSeconds:F0} s. Try again; it continues where it stopped.");
         }
         progress(written);
     }

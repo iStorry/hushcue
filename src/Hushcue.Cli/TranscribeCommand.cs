@@ -9,9 +9,10 @@ namespace Hushcue.Cli;
 
 /// <summary>
 /// Transcribe files with the CTranslate2 engine, decoding the way SubGen's Balanced preset does (beam 5, temperature 0,
-/// no previous-text context, English, word timestamps, no VAD unless --vad options are given), and record the speed. Writes NAME.raw.srt (one cue per
-/// segment, no clean-up), NAME.words.json and metrics.json into the output folder, the files tools/bench/compare.py
-/// reads.
+/// no previous-text context, English, word timestamps, no VAD unless --vad options are given), and record the speed.
+/// Writes NAME.raw.srt (one cue per segment, no clean-up), NAME.words.json and metrics.json into the output folder,
+/// the files tools/bench/compare.py reads. --features DIR decodes faster-whisper's recorded features
+/// (<see cref="FeatureFiles"/>) instead of the engine's own, with or without VAD.
 /// </summary>
 internal static class TranscribeCommand
 {
@@ -20,7 +21,7 @@ internal static class TranscribeCommand
         usage: Hushcue.Cli transcribe --model DIR --out DIR [--device cuda|cpu] [--compute-type TYPE] [--features DIR]
                                       [--language CODE|auto] [--prompt TEXT] [--repetition-penalty P]
                                       [--hallucination-silence SECONDS]
-                                      [--vad] [--vad-threshold T] [--vad-min-silence MS] FILE...
+                                      [--vad] [--vad-threshold T] [--vad-min-silence MS] [--vad-speech-pad MS] FILE...
         """;
 
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
@@ -49,6 +50,7 @@ internal static class TranscribeCommand
                 case "--vad": vad ??= new VadOptions(); break;
                 case "--vad-threshold" when i + 1 < args.Length: vad = (vad ?? new VadOptions()) with { Threshold = double.Parse(args[++i], CultureInfo.InvariantCulture) }; break;
                 case "--vad-min-silence" when i + 1 < args.Length: vad = (vad ?? new VadOptions()) with { MinSilenceDurationMs = int.Parse(args[++i], CultureInfo.InvariantCulture) }; break;
+                case "--vad-speech-pad" when i + 1 < args.Length: vad = (vad ?? new VadOptions()) with { SpeechPadMs = int.Parse(args[++i], CultureInfo.InvariantCulture) }; break;
                 default: files.Add(args[i]); break;
             }
         }
@@ -57,18 +59,16 @@ internal static class TranscribeCommand
             Console.Error.WriteLine(Usage);
             return 2;
         }
-        if (vad is not null && featuresDir is not null)
-        {
-            Console.Error.WriteLine("--features holds the whole clip's features, so it cannot be combined with --vad");
-            return 2;
-        }
         device ??= WhisperModel.CudaDeviceCount() > 0 ? "cuda" : "cpu";
         computeType ??= device == "cuda" ? "float16" : "int8";
         Directory.CreateDirectory(outDir);
 
         var load = Stopwatch.StartNew();
         using var whisper = WhisperModel.Load(model, device, computeType);
-        var transcriber = new Transcriber(whisper);
+        var transcriber = new Transcriber(whisper)
+        {
+            FeatureSource = featuresDir is null ? null : FeatureFiles.Source(featuresDir, whisper.NMels),
+        };
         load.Stop();
         Console.WriteLine($"Loaded {Path.GetFileName(model.TrimEnd('\\', '/'))} on {device} ({computeType}) in {load.Elapsed.TotalSeconds:F1} s");
 
@@ -93,11 +93,7 @@ internal static class TranscribeCommand
             var audio = await Audio.ReadAsync(file);
             var audioSeconds = audio.Length / 16000.0;
             var run = Stopwatch.StartNew();
-            // --features DIR: use DIR/NAME.f32 (raw float32 features from faster-whisper) instead of computing them
-            var (segments, info) = featuresDir is null
-                ? transcriber.Transcribe(audio, options)
-                : transcriber.TranscribeFeatures(ReadFeatures(Path.Combine(featuresDir, name + ".f32"), whisper.NMels, out var frames),
-                                                 frames, audioSeconds, options);
+            var (segments, info) = transcriber.Transcribe(audio, options);
             var list = segments.ToList();
             run.Stop();
             if (language is null)
@@ -132,13 +128,6 @@ internal static class TranscribeCommand
         await File.WriteAllTextAsync(Path.Combine(outDir, "metrics.json"),
             JsonSerializer.Serialize(metrics, new JsonSerializerOptions { WriteIndented = true }));
         return 0;
-    }
-
-    private static float[] ReadFeatures(string path, int nMels, out int frames)
-    {
-        var data = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(File.ReadAllBytes(path)).ToArray();
-        frames = data.Length / nMels;
-        return data;
     }
 
     /// <summary>One cue per segment, written the way SubGen writes SRTs.</summary>

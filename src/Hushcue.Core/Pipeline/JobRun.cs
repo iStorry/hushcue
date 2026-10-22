@@ -11,8 +11,15 @@ namespace Hushcue.Core.Pipeline;
 /// model transcribes file N+1. A failed transcription stops the transcribing but lets the queued embeds finish; a
 /// failed embed of one video is reported at the end; anything else stops both.
 /// </summary>
+/// <remarks>
+/// SubGen's run_job, with two deliberate differences. When a transcription fails, SubGen skips the embeds still
+/// queued (their transcripts were in its temporary folder and were lost when "keep .srt" was off); Hushcue finishes
+/// them first. When an embed fails with an unexpected error, SubGen stops and could report "cancelled" instead of
+/// the error; Hushcue reports the error.
+/// </remarks>
 internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSettings settings, string modelPath,
-                             Action<double, string> progress, Action<string> log, Action<FileProgress>? onFile)
+                             JobSteps steps, Action<double, string> progress, Action<string> log,
+                             Action<FileProgress>? onFile)
 {
     /// <summary>A transcribed file waiting to have its subtitles put into the video.</summary>
     private sealed record EmbedWork(int Index, string Source, string Srt, bool TempSrt, string DestDir);
@@ -27,7 +34,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
 
     public async Task<List<string>> RunAsync(CancellationToken cancel)
     {
-        _device = WhisperModel.CudaDeviceCount() > 0 ? "cuda" : "cpu";
+        _device = steps.CudaDeviceCount() > 0 ? "cuda" : "cpu";
         if (_device == "cpu")
             log("No usable NVIDIA GPU found - running on CPU, this will be slow.");
 
@@ -35,7 +42,9 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancel);
         try
         {
-            await Task.WhenAll(TranscribeAllAsync(queue.Writer, stop.Token), EmbedAllAsync(queue.Reader, stop));
+            // transcription blocks its thread while the model runs, so it gets one of its own
+            await Task.WhenAll(Task.Run(() => TranscribeAllAsync(queue.Writer, stop.Token), CancellationToken.None),
+                               EmbedAllAsync(queue.Reader, stop));
         }
         finally
         {
@@ -89,11 +98,9 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
 
         log($"--- {Path.GetFileName(src)}");
         Report(0, "Extracting audio...");
-        var audio = await Audio.ReadAsync(src, settings.Enhance || _preset.Enhance, cancel);
+        var audio = await steps.ReadAudio(src, settings.Enhance || _preset.Enhance, cancel);
         var rate = new TranscribeRate(audio.Length / (double)Audio.SampleRate, TimeProvider.System);
-        var cues = SubtitleJob.TranscribeWithFallback(modelPath, _preset, ref _device, audio, settings, log,
-            f => Report(0.08 + 0.9 * f, rate.Describe(f)),
-            () => Report(0.05, "Loading model..."), cancel);
+        var cues = TranscribeWithFallback(audio, Report, f => Report(0.08 + 0.9 * f, rate.Describe(f)), cancel);
 
         Report(0.99, "Writing SRT...");
         var destDir = outDir ?? Path.GetDirectoryName(src) ?? "";
@@ -122,6 +129,37 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         return null;
     }
 
+    /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>
+    private List<Cue> TranscribeWithFallback(float[] audio, Action<double, string> report, Action<double> onFraction,
+                                             CancellationToken cancel)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                var model = steps.Cache.Get(modelPath, _device, steps.LoadModel, () =>
+                {
+                    report(0.05, "Loading model...");
+                    log(_device == "cuda" ? $"Loading '{_preset.Model}' on GPU..." : $"Loading '{_preset.Model}' on CPU (slow)...");
+                });
+                report(0.08, "Transcribing...");
+                return FileTranscription.Transcribe(model, audio, settings, _preset, onFraction, log, cancel);
+            }
+            catch (EngineException e) when (_device == "cuda" && attempt == 0 && IsGpuError(e))
+            {
+                log($"GPU failed ({e.Message}). Falling back to CPU.");
+                _device = "cpu";
+                steps.Cache.Unload();
+            }
+        }
+    }
+
+    private static bool IsGpuError(Exception e)
+    {
+        var message = e.Message.ToLowerInvariant();
+        return new[] { "cublas", "cudnn", "cuda", "dll", "out of memory" }.Any(message.Contains);
+    }
+
     private async Task EmbedAllAsync(ChannelReader<EmbedWork> queue, CancellationTokenSource stop)
     {
         try
@@ -145,13 +183,13 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         try
         {
             Report(0, $"{what}...");
-            var video = await Embed.SubtitlesAsync(work.Source, work.Srt, outDir, settings.Embed,
-                f => Report(f, $"{what}... {(int)(f * 100)}%"), cancel: cancel);
+            var video = await steps.Embed(work.Source, work.Srt, outDir, settings.Embed,
+                f => Report(f, $"{what}... {(int)(f * 100)}%"), cancel);
             log($"Saved {video}");
             _outputs[work.Index] = video;
             if (settings.DeleteOriginal)
             {
-                log(new FileInfo(video).Length > 0 && RecycleBin.Send(work.Source)
+                log(new FileInfo(video).Length > 0 && steps.Recycle(work.Source)
                     ? $"Moved the original {name} to the Recycle Bin"
                     : $"Kept the original {name} (could not move it to the Recycle Bin)");
             }

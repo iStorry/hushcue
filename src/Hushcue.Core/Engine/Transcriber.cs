@@ -60,13 +60,21 @@ public sealed record Segment(int Id, int Seek, double Start, double End, string 
 /// <param name="DurationAfterVad">seconds of it transcribed: all of it, or the speech voice activity detection kept</param>
 public sealed record TranscriptionInfo(string Language, double LanguageProbability, double Duration, double DurationAfterVad);
 
+/// <summary>What the subtitle job needs from Whisper: faster-whisper's WhisperModel.transcribe.</summary>
+public interface ITranscriber
+{
+    /// <summary>Transcribe 16 kHz mono audio; segments may be produced lazily.</summary>
+    (IEnumerable<Segment> Segments, TranscriptionInfo Info) Transcribe(float[] audio, TranscribeOptions options,
+                                                                       CancellationToken cancel = default);
+}
+
 /// <summary>
 /// faster-whisper's transcription loop (WhisperModel.transcribe / generate_segments) on top of CTranslate2: 30 s
 /// windows, temperature fallback, segment splitting on timestamp tokens, word timestamps from cross-attention
 /// alignment, and skipping silence before likely hallucinations. A port of faster-whisper 1.2.1, kept line for line
 /// so the output matches SubGen's.
 /// </summary>
-public sealed class Transcriber
+public sealed class Transcriber : ITranscriber
 {
     private const int InputStride = 2;
     private const int FramesPerSecond = MelSpectrogram.SampleRate / MelSpectrogram.HopLength; // 100
@@ -87,6 +95,13 @@ public sealed class Transcriber
     }
 
     /// <summary>
+    /// Computes the log-mel features of the audio that is decoded (after voice activity detection): NMels rows and the
+    /// number of frames. Null uses <see cref="MelSpectrogram"/>; benchmarks substitute faster-whisper's own features to
+    /// compare decoding bit for bit.
+    /// </summary>
+    public Func<float[], (float[] Features, int Frames)>? FeatureSource { get; init; }
+
+    /// <summary>
     /// Transcribe 16 kHz mono audio. Voice activity detection, when asked for, runs first; segments are then produced
     /// lazily, one decoding window at a time, like faster-whisper's generator. <paramref name="cancel"/> is checked
     /// before every window.
@@ -96,7 +111,7 @@ public sealed class Transcriber
     {
         var speech = options.Vad is { } vad && options.ClipTimestamps is null ? SileroVad.SpeechChunks(audio, vad, cancel) : null;
         var kept = speech is null ? audio : SpeechTimestamps.Collect(audio, speech);
-        var (features, frames) = _mel.Compute(kept);
+        var (features, frames) = FeatureSource is { } source ? source(kept) : _mel.Compute(kept);
         var (segments, info) = TranscribeFeatures(features, frames, Seconds(audio), options, cancel);
         info = info with { DurationAfterVad = Seconds(kept) };
         return (speech is { Count: > 0 } ? SpeechTimestamps.Restore(segments, speech) : segments, info);
