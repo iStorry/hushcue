@@ -33,7 +33,7 @@
                 </Border>
             </Grid>
 
-            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0">
+            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
                     <StackPanel Spacing="14">
                         <TextBlock Text="MKV to MP4" Style="{StaticResource BodyStrongTextBlockStyle}"

@@ -68,6 +68,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         Summary.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
         Queue.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
         Queue.CanEdit = true;
+        SizeChanged += OnPageSizeChanged;
         Queue.EditRequested += async (_, _) => await PickAndEditAsync();
         Review.Closed += (_, _) => ShowReview(false);
         Review.Embedded += (_, embedded) => Queue.Update(FileProgress.Done(embedded.File.Path, embedded.Result.Video));
@@ -527,11 +528,42 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         ShowCard(summary is null ? OptionsCard : FinishedCard);
     }
 
-    /// <summary>The right-hand column shows the options, the live transcript during a run, or the finished screen.</summary>
+    /// <summary>Page width (effective pixels) from which the live transcript and summary get a column of their own.</summary>
+    private const double WideLayoutWidth = 1400;
+
+    private Border? _card;
+    private bool _wide;
+
+    /// <summary>
+    /// The right-hand side shows the options, the live transcript during a run, or the finished screen. A narrow
+    /// window shows one of them in the options' place; a wide one keeps the options and adds a column for the other.
+    /// </summary>
     private void ShowCard(Border card)
     {
-        foreach (var each in new[] { OptionsCard, LiveCard, FinishedCard })
+        _card = card;
+        ApplyLayout();
+    }
+
+    private void OnPageSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var wide = e.NewSize.Width >= WideLayoutWidth;
+        if (wide == _wide)
+            return;
+        _wide = wide;
+        ApplyLayout();
+    }
+
+    private void ApplyLayout()
+    {
+        var card = _card ?? OptionsCard;
+        var beside = _wide && card != OptionsCard;
+        OptionsCard.Visibility = card == OptionsCard || beside ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var each in new[] { LiveCard, FinishedCard })
+        {
             each.Visibility = each == card ? Visibility.Visible : Visibility.Collapsed;
+            Grid.SetColumn(each, beside ? 2 : 1);
+        }
+        ActivityColumn.Width = beside ? new GridLength(2, GridUnitType.Star) : new GridLength(0);
     }
 
     private JobSettings CurrentSettings() => new()

@@ -53,7 +53,7 @@
         </TitleBar>
 
         <!-- On very wide screens the pages stop growing and stay centred -->
-        <Grid Grid.Row="1" Padding="20,2,20,16" MaxWidth="1640">
+        <Grid Grid.Row="1" Padding="20,2,20,16" MaxWidth="1880">
             <pages:GeneratePage x:Name="Generate" />
             <pages:ConvertPage x:Name="Convert" Visibility="Collapsed" />
             <controls:SetupView x:Name="Setup" Visibility="Collapsed" />
