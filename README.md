@@ -22,7 +22,8 @@ screen sums up the batch and can put originals moved to the Recycle Bin back.
 
 Keyboard: Ctrl+O add files, Ctrl+Enter start, Delete remove the selected files, Esc cancel (asks first), arrow keys
 within the quality and result choices. `HUSHCUE_THEME=Light` or `Dark` pins the theme and `HUSHCUE_SETUP=1` shows
-the setup screen as on a fresh PC (both for testing and screenshots).
+the setup screen as on a fresh PC, and `HUSHCUE_NEW_INSTANCE=1` opens a separate window even when Hushcue is already
+running (all for testing and screenshots).
 
 ## How it compares with SubGen
 

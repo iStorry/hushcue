@@ -16,7 +16,9 @@ public static class Program
     private static int Main(string[] args)
     {
         using var instance = SingleInstance.Claim();
-        if (!instance.IsFirst && SingleInstance.Forward(Files(args)))
+        // HUSHCUE_NEW_INSTANCE=1 starts a separate window even when Hushcue is open (for testing builds side by side)
+        if (!instance.IsFirst && Environment.GetEnvironmentVariable("HUSHCUE_NEW_INSTANCE") != "1"
+            && SingleInstance.Forward(Files(args)))
             return 0;
         Instance = instance;
         WinRT.ComWrappersSupport.InitializeComWrappers();

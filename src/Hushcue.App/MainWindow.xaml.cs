@@ -41,7 +41,9 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+        // Standard height: the caption buttons are exactly as tall as the title bar. Tall ones (48 px) hung below it,
+        // so their hover boxes (and Close's red one) stuck out into the page.
+        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Standard;
         AppWindow.Resize(new SizeInt32(1040, 740));
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Hushcue.ico"));
         if (AppWindow.Presenter is OverlappedPresenter presenter)
