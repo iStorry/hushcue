@@ -55,6 +55,11 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
         _ => ThemeBrushes.Secondary,
     });
 
+    /// <summary>Working, but only reading the audio or loading the model (Core's JobRun status texts).</summary>
+    public bool IsStarting => State == FileState.Working
+                              && (_progress.Status.StartsWith("Extracting audio", StringComparison.Ordinal)
+                                  || _progress.Status.StartsWith("Loading model", StringComparison.Ordinal));
+
     public double Percent => _progress.Fraction * 100;
     public string PercentText => State == FileState.Working ? $"{Percent:F0}%" : "";
     public Visibility ProgressVisibility => VisibleIf(State == FileState.Working);

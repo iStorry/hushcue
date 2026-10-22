@@ -167,9 +167,16 @@ public sealed partial class MainWindow : Window
                                             "Stop and close", "Keep working"))
                 return;
             _closeConfirmed = true;
+            ShutDown(); // Close() doesn't raise Closing again, and the job must stop before its ffmpeg outlives the app
             Close();
             return;
         }
+        ShutDown();
+    }
+
+    /// <summary>Remember the choices and stop everything that is running.</summary>
+    private void ShutDown()
+    {
         Generate.Save(_settings);
         Convert.Save(_settings);
         _settings.Page = Modes.SelectedItem == ConvertItem ? 1 : 0;

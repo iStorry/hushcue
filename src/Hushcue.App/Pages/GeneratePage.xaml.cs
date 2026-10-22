@@ -27,11 +27,13 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     private bool _showingResult;
 
     /// <summary>One run over the queue, and what it did so far.</summary>
-    private sealed class Batch(IReadOnlyList<QueuedFile> files, int skipped, string preset)
+    private sealed class Batch(IReadOnlyList<QueuedFile> files, int skipped, string preset, bool burning)
     {
         public IReadOnlyList<QueuedFile> Files { get; } = files;
         public int Skipped { get; } = skipped;
         public string Preset { get; } = preset;
+        /// <summary>Re-encoding takes longer than transcribing: the measured transcribing speed is no guide then.</summary>
+        public bool Burning { get; } = burning;
         public Stopwatch Clock { get; } = Stopwatch.StartNew();
         public BatchEstimate Estimate { get; } = new();
         public SpeedMeter Speed { get; } = new();
@@ -250,7 +252,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var total = work.Sum(w => w.Duration);
         var overall = total > 0 ? work.Sum(w => w.Duration * w.Fraction) / total : 0;
         var finished = batch.Files.Count(f => f.State is FileState.Done or FileState.Failed);
-        var left = batch.Estimate.TimeLeft(work, KnownSpeed(batch.Preset));
+        var left = batch.Estimate.TimeLeft(work, batch.Burning ? null : KnownSpeed(batch.Preset));
         var status = $"{finished} of {batch.Files.Count} done";
         if (_cancel?.IsCancellationRequested == true)
             status = "Cancelling...";
@@ -263,10 +265,12 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         ProgressChanged?.Invoke(this, new RunProgress(overall > 0 ? overall : null, Taskbar.State.Normal));
     }
 
+    /// <summary>How far a file is; reading its audio and loading the model count as not started, so they don't make the
+    /// first measured speed (and the time left) look far slower than the work itself.</summary>
     private static double Fraction(QueuedFile file) => file.State switch
     {
         FileState.Done or FileState.Failed => 1,
-        FileState.Working => file.Percent / 100,
+        FileState.Working when !file.IsStarting => file.Percent / 100,
         _ => 0,
     };
 
@@ -329,7 +333,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             groups[^1].Files.Add(file);
         }
 
-        var batch = new Batch(files, skipped.Count, settings.Preset);
+        var batch = new Batch(files, skipped.Count, settings.Preset, settings.Embed == EmbedMode.Burn);
         _batch = batch;
         _cancel = new CancellationTokenSource();
         Run.Reset();
@@ -440,7 +444,10 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     {
         if (batch.Speed.Speed is not { } speed)
             return;
-        _settings.Speeds[SpeedMeter.Key(batch.Preset, _device)] = Math.Round(speed, 1);
+        // half the old value: one run on a busy GPU shouldn't swing the hint too far
+        var key = SpeedMeter.Key(batch.Preset, _device);
+        var blended = _settings.Speeds.TryGetValue(key, out var old) && old > 0 ? (old + speed) / 2 : speed;
+        _settings.Speeds[key] = Math.Round(blended, 1);
         Save(_settings);
         _settings.Save();
         UpdatePresetHint();
