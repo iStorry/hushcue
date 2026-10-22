@@ -48,6 +48,12 @@
                         <TextBlock Text="Report a problem" />
                     </StackPanel>
                 </Button>
+                <Button Click="OnCheckForUpdates" Style="{ThemeResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE895;" FontSize="14" />
+                        <TextBlock Text="Check for updates" />
+                    </StackPanel>
+                </Button>
                 <Button x:Name="NoticesButton" Click="OnNotices">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE8A5;" FontSize="14" />

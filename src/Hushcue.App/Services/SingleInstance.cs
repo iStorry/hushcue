@@ -82,8 +82,14 @@ internal sealed class SingleInstance : IDisposable
         });
     }
 
+    private bool _released;
+
+    /// <summary>Let go of the mutex (early, before an update's installer starts, and again on exit: safe to repeat).</summary>
     public void Dispose()
     {
+        if (_released)
+            return;
+        _released = true;
         if (IsFirst)
             _mutex.ReleaseMutex();
         _mutex.Dispose();

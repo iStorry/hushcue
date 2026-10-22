@@ -111,8 +111,15 @@ Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.srt\shell\Hushcue.E
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; After an update the app started itself (silent, /RELAUNCH=1, see src\Hushcue.Core\Updates\Updates.cs): open it again
+Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: RelaunchAfterUpdate
 
 [Code]
+function RelaunchAfterUpdate: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
+end;
+
 // Models (about 1.6 GB each), the GPU libraries (about 0.9 GB) and settings live in %LOCALAPPDATA%\Hushcue, outside
 // the install folder. Offer to remove them on an interactive uninstall; a silent uninstall always keeps them.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

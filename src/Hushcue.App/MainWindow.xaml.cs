@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
     private readonly AppSettings _settings = AppSettings.Load();
     private AppPage _page;
     private readonly Taskbar _taskbar;
+    private readonly Updater _updater;
     private string? _gpuName;
     private bool _closeConfirmed;
 
@@ -52,6 +53,7 @@ public sealed partial class MainWindow : Window
             presenter.PreferredMinimumHeight = 640;
         }
         _taskbar = new Taskbar(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        _updater = new Updater(_settings, PrepareToExitAsync);
 
         Generate.Load(_settings);
         Convert.Load(_settings);
@@ -65,6 +67,13 @@ public sealed partial class MainWindow : Window
             ApplyTheme();
         };
         SettingsView.SystemCheckRequested += async (_, _) => await RunSystemCheckAsync();
+        About.UpdateCheckRequested += async (_, _) => await _updater.CheckNowAsync(Root.XamlRoot);
+        Root.Loaded += async (_, _) =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(4)); // let the window settle; never in the way of the setup screen
+            if (Setup.Visibility != Visibility.Visible)
+                await _updater.CheckOnStartAsync(Root.XamlRoot);
+        };
         ApplyTheme();
         Navigate(_settings.Page is >= 0 and <= (int)AppPage.Edit ? (AppPage)_settings.Page : AppPage.Generate);
         foreach (var page in new IRunPage[] { Generate, Convert })
@@ -339,6 +348,30 @@ public sealed partial class MainWindow : Window
             return;
         }
         ShutDown();
+    }
+
+    /// <summary>
+    /// Before an update's installer takes over: ask about unsaved edits and a running batch like closing does, then stop
+    /// everything. False when the user wants to keep working.
+    /// </summary>
+    private async Task<bool> PrepareToExitAsync()
+    {
+        if (Generate.HasUnsavedEdits || Edit.HasUnsavedEdits)
+        {
+            if (!await Dialogs.ConfirmAsync(Root.XamlRoot, "Your edits to the subtitles are not saved. Update without saving them?",
+                                            "Update without saving", "Keep editing"))
+                return false;
+        }
+        if (Generate.IsRunning || Convert.IsRunning)
+        {
+            if (!await Dialogs.ConfirmAsync(Root.XamlRoot, "Files are still being processed. Stop them and update?\n\n"
+                                                           + "Finished files are kept; the file in progress is not saved.",
+                                            "Stop and update", "Keep working"))
+                return false;
+        }
+        _closeConfirmed = true;
+        ShutDown();
+        return true;
     }
 
     /// <summary>Remember the choices and stop everything that is running.</summary>

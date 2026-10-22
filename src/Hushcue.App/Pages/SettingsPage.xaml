@@ -175,6 +175,25 @@
                 </Grid>
             </Border>
 
+            <!-- Updates -->
+            <TextBlock Text="Updates" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2" />
+            <Border Style="{StaticResource SettingCard}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE895;" FontSize="18" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Check for updates automatically" Style="{StaticResource SettingTitle}" />
+                        <TextBlock Text="Once a day when Hushcue starts, look for a new version on GitHub and offer to install it. Nothing else is sent." Style="{StaticResource SettingDetail}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="UpdatesToggle" Grid.Column="2" MinWidth="0" OnContent="" OffContent=""
+                                  Toggled="OnChanged" AutomationProperties.Name="Check for updates automatically" />
+                </Grid>
+            </Border>
+
             <!-- This PC -->
             <TextBlock Text="This PC" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2" />
             <Border Style="{StaticResource SettingCard}">

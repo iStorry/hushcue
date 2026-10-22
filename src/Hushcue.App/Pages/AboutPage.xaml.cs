@@ -15,11 +15,15 @@ public sealed partial class AboutPage : UserControl
         InitializeComponent();
         NameText.Text = Product.Name;
         TaglineText.Text = Product.Tagline;
-        var version = typeof(Product).Assembly.GetName().Version?.ToString(3) ?? "";
+        var version = Core.Updates.Updates.Current.ToString(3);
         VersionText.Text = $"Version {version}";
         Loaded += async (_, _) => IconImage.Source ??= await AppIcon.LoadAsync();
         NoticesButton.Visibility = File.Exists(NoticesPath) ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    public event EventHandler? UpdateCheckRequested;
+
+    private void OnCheckForUpdates(object sender, RoutedEventArgs e) => UpdateCheckRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Shipped next to the exe by tools/publish.ps1 (a development build has none).</summary>
     private static string NoticesPath => Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md");

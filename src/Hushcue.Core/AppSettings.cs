@@ -23,6 +23,15 @@ public sealed class AppSettings
     public string ConvertOutputFolder { get; set; } = "";
     public int Page { get; set; }
 
+    /// <summary>Look for a new release on start (at most once a day) and offer to install it.</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>When updates were last looked for.</summary>
+    public DateTimeOffset? LastUpdateCheck { get; set; }
+
+    /// <summary>A release tag the user chose to skip: not offered again automatically.</summary>
+    public string SkippedVersion { get; set; } = "";
+
     /// <summary>"System" follows Windows; "Light" or "Dark" pins the app's theme.</summary>
     public string Theme { get; set; } = "System";
 
