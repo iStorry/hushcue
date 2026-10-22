@@ -223,12 +223,30 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
 
 ## Phase 8 — Ship
 
-- [ ] Self-contained publish; try trimming / Native AOT
-- [ ] Installer: MSIX or unpackaged (e.g. Inno Setup / WiX), decide
-- [ ] ffmpeg bundling: GPL builds (with libx264) affect the licence; pick an LGPL build + NVENC, or keep ffmpeg as a user install
-- [ ] Ship `ctranslate2.dll`, cuBLAS and cuDNN (~1.7 GB), or download them on first run
-- [x] GitHub Actions: build and test on `windows-2025` (`.github/workflows/ci.yml`: CPU-only engine bridge, ffmpeg
-      from Chocolatey). The 4 model tests skip there: no model on the runner
-- [ ] GitHub Actions: release artifacts
-- [ ] Third-party notices (CTranslate2, faster-whisper and Silero VAD are MIT)
+Full notes and measurements: [docs/shipping.md](docs/shipping.md).
+
+- [x] Self-contained publish (`tools/publish.ps1`): ReadyToRun (window 25% sooner, +44 MB), app-local VC++ runtime,
+      `EnableMsixTooling` (without it the published app has no resources.pri and crashes at start). 290 MB folder,
+      66 MB installer, 102 MB zip. Published app checked: starts, and loads its libraries from its own folder
+- [ ] Trimming / Native AOT: not usable yet. Trimmed builds crash in XAML at start; needs a `JsonSerializerContext`
+      for `AppSettings` and CsWinRT trimming support first (would save about 90 MB)
+- [x] Installer: Inno Setup (`installer/hushcue.iss`), per-user without admin, Start menu, uninstaller, optional
+      Explorer "Generate subtitles with Hushcue" for the 18 media types. Built, installed, launched (shortcut and
+      Explorer verb) and uninstalled cleanly here
+- [ ] Installer follow-ups in the app: single instance, so multi-select in Explorer queues into one window (now one
+      window per file); a named mutex so uninstall can tell the app is running
+- [ ] Code signing (SmartScreen warns on unsigned installers): certificate or Azure Trusted Signing
+- [ ] ffmpeg: decide whether to bundle (`publish.ps1 -BundleFfmpeg`, off by default). Gyan's builds are GPL (libx264);
+      an LGPL build needs NVENC or another encoder for burn-in. Options and obligations in docs/shipping.md
+- [x] GPU libraries downloaded on first run, not shipped (`Pipeline/RuntimeDownload.cs`): cuBLAS + NVRTC wheels from
+      PyPI, pinned by SHA-256, 630 MB. cuDNN is not needed at all (CTranslate2's Windows build doesn't use it), which
+      saves 1.1 GB. Tested with fake wheels; the real download checked once (pins match SubGen's DLLs)
+- [ ] Setup screen uses `RuntimeDownload.Check()` / `DownloadAsync` (Phase 6b, UI)
+- [x] GitHub Actions: build and test on `windows-2025` (`.github/workflows/ci.yml`: CPU-only engine bridge, Gyan's
+      ffmpeg pinned by SHA-256). The model tests skip there: no model on the runner
+- [ ] GitHub Actions: release artifacts (`.github/workflows/release.yml`: on a `v*` tag, installer + zip + checksums
+      on a draft release). Written, not run yet: the first tag will tell
+- [x] Third-party notices (`THIRD-PARTY-NOTICES.md`, upstream notice files in `licenses\` of the package)
+- [ ] Choose the LICENSE (Phase 0): the bundled Microsoft and Intel binaries need terms that forbid reverse engineering
+      them and rule out copyleft for them; see docs/shipping.md
 - [ ] GitHub repo `hushcue`, README with screenshots, first release
