@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hushcue mock 1: main window</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="mocks.css">
+<style>
+.w{border:0.5px solid var(--border-strong);border-radius:12px;background:var(--surface-1);overflow:hidden;font-size:13px}
+.tb{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:0.5px solid var(--border)}
+.pill{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bg-success);color:var(--text-success)}
+.row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 12px;border-bottom:0.5px solid var(--border)}
+.th{width:44px;height:28px;border-radius:4px;background:var(--surface-0);display:flex;align-items:center;justify-content:center;color:var(--text-muted)}
+.bar{height:4px;border-radius:2px;background:var(--border);margin-top:5px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--text-accent)}
+.mut{color:var(--text-secondary);font-size:12px}
+.seg{display:flex;border:0.5px solid var(--border-strong);border-radius:var(--radius);overflow:hidden}
+.seg span{flex:1;text-align:center;padding:6px 0;font-size:12px}
+.seg .on{background:var(--bg-accent);color:var(--text-accent)}
+.card{border:0.5px solid var(--border);border-radius:var(--radius);padding:8px 10px;background:var(--surface-2)}
+.card.on{border:2px solid var(--border-accent)}
+.lbl{font-size:11px;color:var(--text-muted);margin:0 0 6px}
+</style>
+</head>
+<body>
+<main>
+<h1>Idea 1: a queue that shows progress for each file</h1>
+<p class="lead">Each file shows its stage, speed and time left; the preset is a three-button switch; the result is three cards; advanced options fold away.</p>
+<div class="w">
+  <div class="tb">
+    <i class="ti ti-badge-cc" style="font-size:18px" aria-hidden="true"></i>
+    <span style="font-weight:500">Hushcue</span>
+    <span class="mut">Generate subtitles · MKV to MP4</span>
+    <span style="flex:1"></span>
+    <span class="pill"><i class="ti ti-lock" aria-hidden="true"></i> Offline · RTX 4070</span>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)">
+    <div style="border-right:0.5px solid var(--border)">
+      <div class="row">
+        <div class="th" style="color:var(--text-success)"><i class="ti ti-check" aria-hidden="true"></i></div>
+        <div style="min-width:0"><div>interview_part1.mp4</div><div class="mut">Done · 412 cues · 0:48 of 38:10</div></div>
+        <i class="ti ti-folder-open mut" aria-hidden="true"></i>
+      </div>
+      <div class="row" style="background:var(--bg-accent-muted)">
+        <div class="th"><i class="ti ti-player-play" aria-hidden="true"></i></div>
+        <div style="min-width:0"><div>lecture_week3.mkv</div>
+          <div class="mut">Transcribing · 52× real time · about 40 s left</div>
+          <div class="bar"><i style="width:62%"></i></div></div>
+        <span class="mut">62%</span>
+      </div>
+      <div class="row">
+        <div class="th"><i class="ti ti-clock" aria-hidden="true"></i></div>
+        <div style="min-width:0"><div>vlog_tokyo.mov</div><div class="mut">Waiting · 12:04 · Japanese detected</div></div>
+        <i class="ti ti-x mut" aria-hidden="true"></i>
+      </div>
+      <div class="row" style="border-bottom:none">
+        <div class="th" style="color:var(--text-warning)"><i class="ti ti-alert-triangle" aria-hidden="true"></i></div>
+        <div style="min-width:0"><div>podcast_ep12.mp3</div><div class="mut" style="color:var(--text-warning)">No video stream · will save .srt only</div></div>
+        <i class="ti ti-x mut" aria-hidden="true"></i>
+      </div>
+      <div style="padding:10px 12px;border-top:0.5px dashed var(--border-strong);text-align:center" class="mut"><i class="ti ti-plus" aria-hidden="true"></i> Drop more files anywhere</div>
+    </div>
+    <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+      <div><p class="lbl">Quality</p>
+        <div class="seg"><span>Fast</span><span class="on">Balanced</span><span>Thorough</span></div>
+        <div class="mut" style="margin-top:4px">~50× real time on your GPU</div></div>
+      <div><p class="lbl">Result</p>
+        <div style="display:grid;gap:6px">
+          <div class="card"><i class="ti ti-file-text" aria-hidden="true"></i> .srt file <span class="mut">· sidecar</span></div>
+          <div class="card on"><i class="ti ti-stack-2" aria-hidden="true"></i> Subtitle track <span class="mut">· instant, lossless</span></div>
+          <div class="card"><i class="ti ti-flame" aria-hidden="true"></i> Burn in <span class="mut">· re-encodes</span></div>
+        </div></div>
+      <div class="mut"><i class="ti ti-adjustments" aria-hidden="true"></i> Language, vocabulary, cleanup…</div>
+    </div>
+  </div>
+  <div class="tb" style="border-top:0.5px solid var(--border);border-bottom:none">
+    <span class="mut">1 of 4 done · about 9 min total</span><span style="flex:1"></span>
+    <button>Pause</button><button style="background:var(--fill-accent);color:var(--on-accent);border:none">Cancel all</button>
+  </div>
+</div>
+</main>
+</body>
+</html>

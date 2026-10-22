@@ -18,6 +18,9 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CT2_VERSION: 4.8.2
   SITE_PACKAGES: ${{ github.workspace }}\native\deps\site-packages
+  FFMPEG_VERSION: 9.0.2
+  FFMPEG_SHA256: 60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba
+  FFMPEG_DIR: ${{ github.workspace }}\.ffmpeg
 
 jobs:
   build-and-test:
@@ -45,8 +48,31 @@ jobs:
       - name: Build the engine bridge
         run: ./native/build.ps1 -SitePackages "$env:SITE_PACKAGES" -Ct2Version "$env:CT2_VERSION" -CpuOnly
 
-      - name: Install ffmpeg
-        run: choco install ffmpeg --no-progress -y
+      # Gyan's essentials build (libx264, libass), pinned and checked, so the media tests never skip silently
+      - uses: actions/cache@v6
+        id: ffmpeg-cache
+        with:
+          path: ${{ env.FFMPEG_DIR }}
+          key: ffmpeg-${{ env.FFMPEG_VERSION }}
+
+      - name: Download ffmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "ffmpeg.zip"
+          $unpacked = Join-Path $env:RUNNER_TEMP "ffmpeg-zip"
+          Invoke-WebRequest "https://github.com/GyanD/codexffmpeg/releases/download/$env:FFMPEG_VERSION/ffmpeg-$env:FFMPEG_VERSION-essentials_build.zip" -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $env:FFMPEG_SHA256) { throw "ffmpeg $env:FFMPEG_VERSION has the wrong checksum" }
+          Expand-Archive $zip $unpacked
+          New-Item -ItemType Directory -Force $env:FFMPEG_DIR | Out-Null
+          Copy-Item (Join-Path $unpacked "*\bin\*.exe") $env:FFMPEG_DIR
+
+      - name: Put ffmpeg on PATH
+        run: Add-Content $env:GITHUB_PATH $env:FFMPEG_DIR
+
+      - name: Check ffmpeg
+        run: |
+          ffmpeg -hide_banner -version
+          ffprobe -hide_banner -version
 
       - name: Build
         run: dotnet build Hushcue.slnx -c Release

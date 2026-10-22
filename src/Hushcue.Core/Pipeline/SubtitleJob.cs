@@ -25,19 +25,20 @@ public static class SubtitleJob
     }
 
     /// <param name="progress">overall fraction 0..1 and a status line</param>
-    /// <param name="onFileDone">a file is completely finished (SRT written, or video embedded); never fires twice</param>
+    /// <param name="onFile">each file's own state as it changes; a file reaches Done (SRT written, or video embedded)
+    /// or Failed at most once</param>
     public static Task<List<string>> RunAsync(IReadOnlyList<string> files, string? outDir, JobSettings settings,
                                               Action<double, string> progress, Action<string> log,
-                                              Action<string>? onFileDone = null, CancellationToken cancel = default) =>
-        Task.Run(() => RunJobAsync(files, outDir, settings, progress, log, onFileDone, cancel), cancel);
+                                              Action<FileProgress>? onFile = null, CancellationToken cancel = default) =>
+        Task.Run(() => RunJobAsync(files, outDir, settings, progress, log, onFile, cancel), cancel);
 
     private static async Task<List<string>> RunJobAsync(IReadOnlyList<string> files, string? outDir, JobSettings settings,
                                                         Action<double, string> progress, Action<string> log,
-                                                        Action<string>? onFileDone, CancellationToken cancel)
+                                                        Action<FileProgress>? onFile, CancellationToken cancel)
     {
         var model = Presets.Get(settings.Preset).Model;
         var modelPath = Models.Find(model) ?? await DownloadModelAsync(model, progress, log, cancel);
-        return await new JobRun(files, outDir, settings, modelPath, progress, log, onFileDone).RunAsync(cancel);
+        return await new JobRun(files, outDir, settings, modelPath, progress, log, onFile).RunAsync(cancel);
     }
 
     private static async Task<string> DownloadModelAsync(string name, Action<double, string> progress, Action<string> log,

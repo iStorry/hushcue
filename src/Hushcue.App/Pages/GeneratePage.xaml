@@ -3,7 +3,24 @@
     x:Class="Hushcue.Pages.GeneratePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:Hushcue.Controls">
+    xmlns:controls="using:Hushcue.Controls"
+    xmlns:pages="using:Hushcue.Pages">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="ResultCard" x:DataType="pages:ResultChoice">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <FontIcon Glyph="{x:Bind Glyph}" FontSize="18" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{x:Bind Title}" />
+                    <TextBlock Text="{x:Bind Detail}" Style="{StaticResource Hint}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
 
     <Grid RowSpacing="18">
         <Grid.RowDefinitions>
@@ -42,32 +59,62 @@
 
             <Border Grid.Column="1" Style="{StaticResource Card}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="14">
+                    <StackPanel Spacing="18">
                         <TextBlock Text="OPTIONS" Style="{StaticResource CardTitle}" Margin="0" />
-                        <StackPanel Spacing="6">
-                            <ComboBox x:Name="PresetBox" Header="Quality preset" HorizontalAlignment="Stretch"
-                                      SelectionChanged="OnPresetChanged" />
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Quality" />
+                            <!-- One card per preset, added from Presets.All -->
+                            <Grid x:Name="PresetChoices" ColumnSpacing="6" XYFocusKeyboardNavigation="Enabled"
+                                  TabFocusNavigation="Once" AutomationProperties.Name="Quality">
+                                <Grid.Resources>
+                                    <Style TargetType="RadioButton" BasedOn="{StaticResource ChoiceCard}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                    </Style>
+                                </Grid.Resources>
+                            </Grid>
                             <TextBlock x:Name="PresetHint" Style="{StaticResource Hint}" />
                         </StackPanel>
-                        <ComboBox x:Name="LanguageBox" Header="Language" HorizontalAlignment="Stretch" />
-                        <TextBox x:Name="VocabularyBox" Header="Vocabulary"
-                                 PlaceholderText="Names or words to spell correctly, comma separated" />
-                        <ComboBox x:Name="ResultBox" Header="Result" HorizontalAlignment="Stretch"
-                                  SelectionChanged="OnResultChanged">
-                            <ToolTipService.ToolTip>
-                                <TextBlock TextWrapping="Wrap" MaxWidth="360">Burn: works in every player but cannot be switched off and re-encodes the video. Track: instant and lossless, but the player must support subtitle tracks. Your original video is never changed; a new file is written next to it (named '.subbed' if the name is taken).</TextBlock>
-                            </ToolTipService.ToolTip>
-                            <ComboBoxItem Content="Subtitle file only (.srt)" Tag="None" />
-                            <ComboBoxItem Content="Burn into the video (permanent, re-encodes, .mp4)" Tag="Burn" />
-                            <ComboBoxItem Content="Add as a subtitle track (lossless, .mkv)" Tag="Soft" />
-                        </ComboBox>
-                        <StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Result" />
+                            <StackPanel x:Name="ResultChoices" Spacing="6" XYFocusKeyboardNavigation="Enabled"
+                                        TabFocusNavigation="Once" AutomationProperties.Name="Result">
+                                <StackPanel.Resources>
+                                    <Style TargetType="RadioButton" BasedOn="{StaticResource ChoiceCard}">
+                                        <Setter Property="ContentTemplate" Value="{StaticResource ResultCard}" />
+                                    </Style>
+                                </StackPanel.Resources>
+                                <RadioButton Checked="OnResultChanged" AutomationProperties.Name="Subtitle file">
+                                    <pages:ResultChoice Mode="None" Glyph="&#xE8A5;" Title="Subtitle file (.srt)"
+                                                        Detail="A separate file that most players pick up" />
+                                </RadioButton>
+                                <RadioButton Checked="OnResultChanged" AutomationProperties.Name="Subtitle track">
+                                    <pages:ResultChoice Mode="Soft" Glyph="&#xE714;" Title="Subtitle track (.mkv)"
+                                                        Detail="Instant and lossless; can be switched off in the player" />
+                                </RadioButton>
+                                <RadioButton Checked="OnResultChanged" AutomationProperties.Name="Burn into the picture">
+                                    <pages:ResultChoice Mode="Burn" Glyph="&#xE8B9;" Title="Burn into the picture (.mp4)"
+                                                        Detail="Works in every player; permanent, re-encodes the video" />
+                                </RadioButton>
+                            </StackPanel>
                             <CheckBox x:Name="KeepSrtBox" Content="Also keep the .srt file" />
                             <CheckBox x:Name="DeleteBox" Content="Move the original video to the Recycle Bin when done"
                                       ToolTipService.ToolTip="Only after the new video has been written successfully. Recoverable from the Recycle Bin." />
-                            <CheckBox x:Name="EnhanceBox" Content="Clean up audio first (denoise + normalize)" />
-                            <CheckBox x:Name="SkipSilenceBox" Content="Skip silent parts (faster, may drop quiet speech)" />
                         </StackPanel>
+
+                        <Expander x:Name="MoreOptions" Header="More options" HorizontalAlignment="Stretch"
+                                  HorizontalContentAlignment="Stretch">
+                            <StackPanel Spacing="14">
+                                <ComboBox x:Name="LanguageBox" Header="Language" HorizontalAlignment="Stretch" />
+                                <TextBox x:Name="VocabularyBox" Header="Vocabulary"
+                                         PlaceholderText="Names or words to spell correctly, comma separated" />
+                                <StackPanel>
+                                    <CheckBox x:Name="EnhanceBox" Content="Clean up audio first (denoise + normalize)" />
+                                    <CheckBox x:Name="SkipSilenceBox" Content="Skip silent parts (faster, may drop quiet speech)" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

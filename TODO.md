@@ -116,7 +116,7 @@ Port `run_job` / `transcribe_file`. It is in `Pipeline/SubtitleJob.cs` and `Pipe
 - [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`). Written (`Pipeline/JobRun.cs`,
       `Pipeline/JobProgress.cs`), not tested yet; SubGen's run_job may differ in progress and failure handling, so
       check it against `test_run_job.py`
-- [x] Finished files leave the queue
+- [x] Finished files stay in the queue, ticked, and are skipped by the next run (re-adding one queues it again)
 - [x] One combined progress value + status line across both stages
 - [x] GPU → CPU fallback (int8 on CPU) on CUDA errors
 - [x] Error handling: an embed failure keeps the .srt; summary error at the end
@@ -150,6 +150,52 @@ track + .srt) end to end. MKV to MP4 page still to be tested by hand.
 - [x] Cancel the job cleanly when the window closes
 - [ ] Test the MKV to MP4 page by hand
 - [ ] Keyboard navigation and screen reader labels (only a few controls are labelled so far)
+
+## Phase 6b — UI redesign
+
+Mockups in [docs/mocks/](docs/mocks/) (HTML to open in a browser, PNG to view anywhere). Work through them in order:
+idea 1 rearranges controls that mostly exist already; idea 2 is the feature that would set Hushcue apart.
+
+**Idea 1: a queue that shows progress for each file** ([mock](docs/mocks/1-main-window-queue.png))
+
+- [x] Core reports each file's state (`FileProgress`: waiting, working, done, failed) from `SubtitleJob` and the
+      MKV to MP4 converter, alongside the overall value
+- [x] Each row shows its own icon, status, progress bar and percentage; speed and time left while transcribing
+      (`TranscribeRate`, measured from the first progress report so model loading doesn't count)
+- [x] Finished files stay ticked with "Show in folder"; failed files show the reason and are retried next run
+- [x] Preset as three cards in a row, result as three cards with the tradeoff on each (`ChoiceCard` style)
+- [x] Language, vocabulary, audio clean-up and skip silence under "More options", opened when any differ from the
+      defaults
+- [ ] Build and run it on Windows: written on macOS, never compiled (check the `ChoiceCard` states and the queue
+      glyphs first)
+- [ ] Probe files when they are added: show the duration, and warn before the run (no audio, no video stream while
+      embedding)
+- [ ] Total time left for the whole batch in the bottom bar (needs the durations above)
+- [ ] "Offline · <GPU>" badge in the title bar; switch to "CPU" when the GPU fallback kicks in
+- [ ] Live speed hint under the preset from measured runs on this PC
+
+**Idea 2: review and edit before embedding** ([mock](docs/mocks/2-review-editor.png))
+
+- [ ] Show cues as they are transcribed in a side panel
+- [ ] Review page: video preview with the subtitles drawn live, editable and searchable cue list
+- [ ] Flag likely hallucinations (`DropJunk` list) and gaps (`CoverageWarnings`); "Re-run this part" re-decodes
+      just that stretch (ties in with loop recovery, Phase 4)
+- [ ] Waveform timeline with cue blocks whose edges can be dragged to fix timing
+- [ ] "Embed into video" as the last step, after review; export the edited .srt
+
+**Idea 3: first run and the finished screen** ([mock](docs/mocks/3-first-run-and-done.png))
+
+- [ ] Setup screen: check for the GPU (CUDA), ffmpeg (NVENC), and download the model with progress and resume
+      (Phase 5), offering a smaller model without a GPU
+- [ ] Finished screen: video length, time taken, speed, coverage warnings, and Undo for originals moved to the
+      Recycle Bin
+
+**Windows touches**
+
+- [ ] Progress on the taskbar button and a notification when a batch finishes
+- [ ] Compact mini window that stays on top while a batch runs
+- [ ] Explorer right-click "Generate subtitles with Hushcue", and drop files on the taskbar button
+- [ ] Shortcuts: Ctrl+O add files, Ctrl+Enter start, Delete remove selected
 
 ## Phase 7 — Measure and compare
 

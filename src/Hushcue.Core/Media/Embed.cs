@@ -160,7 +160,7 @@ public static class Embed
     public static async Task<List<string>> ConvertFilesAsync(
         IReadOnlyList<string> files, string? outDir, bool saveSrt, bool deleteOriginal,
         Action<double, string> progress, Action<string> log, CancellationToken cancel,
-        Action<string>? onFileDone = null, Func<string, bool>? recycle = null)
+        Action<FileProgress>? onFile = null, Func<string, bool>? recycle = null)
     {
         recycle ??= RecycleBin.Send;
         var outputs = new List<string>();
@@ -175,14 +175,17 @@ public static class Embed
             try
             {
                 var index = i;
-                output = await StripSubtitlesAsync(src, outDir,
-                    f => progress((index + f) / files.Count, $"[{index + 1}/{files.Count}] Converting {name}... {(int)(f * 100)}%"),
-                    saveSrt, cancel);
+                output = await StripSubtitlesAsync(src, outDir, f =>
+                {
+                    progress((index + f) / files.Count, $"[{index + 1}/{files.Count}] Converting {name}... {(int)(f * 100)}%");
+                    onFile?.Invoke(FileProgress.Working(src, f, $"Converting... {(int)(f * 100)}%"));
+                }, saveSrt, cancel);
             }
             catch (MediaException e)
             {
                 log($"ERROR: could not convert {name}: {e.Message}");
                 failed.Add(name);
+                onFile?.Invoke(FileProgress.Failed(src, e.Message));
                 continue;
             }
             log($"Saved {output}");
@@ -193,7 +196,7 @@ public static class Embed
                     ? $"Moved the original {name} to the Recycle Bin"
                     : $"Kept the original {name} (could not move it to the Recycle Bin)");
             }
-            onFileDone?.Invoke(src);
+            onFile?.Invoke(FileProgress.Done(src, output));
         }
         if (failed.Count > 0)
             throw new MediaException("Could not convert: " + string.Join(", ", failed) + ". See the log for details.");

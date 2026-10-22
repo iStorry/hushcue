@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hushcue mock 2: review editor</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="mocks.css">
+<style>
+.w{border:0.5px solid var(--border-strong);border-radius:12px;background:var(--surface-1);overflow:hidden;font-size:13px}
+.mut{color:var(--text-secondary);font-size:12px}
+.cue{display:grid;grid-template-columns:78px minmax(0,1fr) 20px;gap:8px;padding:8px 12px;border-bottom:0.5px solid var(--border);align-items:start}
+.tc{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);padding-top:2px}
+.flag{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--bg-warning);color:var(--text-warning);margin-left:4px}
+.wf{display:flex;align-items:center;gap:2px;height:34px}
+.wf i{display:block;width:3px;border-radius:1px;background:var(--border-stronger)}
+</style>
+</head>
+<body>
+<main>
+<h1>Idea 2: review and edit before embedding</h1>
+<p class="lead">Video preview with the subtitles shown live, a waveform with cue blocks you can drag, an editable cue list with flagged hallucinations and gaps, and embedding as the last step.</p>
+<div class="w">
+  <div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)">
+    <div style="padding:12px;border-right:0.5px solid var(--border)">
+      <div style="aspect-ratio:16/9;border-radius:var(--radius);background:var(--surface-0);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:14px;position:relative">
+        <i class="ti ti-player-play" style="font-size:24px;color:var(--text-muted);position:absolute;top:42%" aria-hidden="true"></i>
+        <span style="background:var(--text-primary);color:var(--surface-1);padding:3px 8px;border-radius:4px;font-size:12px">So the key idea behind attention is</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+        <i class="ti ti-player-pause" aria-hidden="true"></i><span class="tc" style="padding:0">04:12 / 38:10</span>
+        <span style="flex:1"></span><span class="mut">Burn-in preview</span><i class="ti ti-toggle-right" style="color:var(--text-accent);font-size:18px" aria-hidden="true"></i>
+      </div>
+      <div style="margin-top:10px;position:relative">
+        <div class="wf" id="wf"></div>
+        <div style="display:flex;gap:3px;margin-top:4px">
+          <span style="flex:3;height:12px;border-radius:3px;background:var(--bg-accent)"></span>
+          <span style="flex:4;height:12px;border-radius:3px;background:var(--fill-accent)"></span>
+          <span style="flex:2;height:12px;border-radius:3px;background:var(--bg-accent)"></span>
+          <span style="flex:1"></span>
+          <span style="flex:3;height:12px;border-radius:3px;background:var(--bg-warning)"></span>
+        </div>
+        <div class="mut" style="margin-top:4px">Drag cue edges to fix timing</div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:0.5px solid var(--border)">
+        <i class="ti ti-search mut" aria-hidden="true"></i><span class="mut" style="flex:1">Find in transcript</span>
+        <span class="flag">2 to review</span>
+      </div>
+      <div class="cue"><span class="tc">04:08.2</span><span>Right, let's pick up where we left off.</span><i class="ti ti-pencil mut" aria-hidden="true"></i></div>
+      <div class="cue" style="background:var(--bg-accent-muted)"><span class="tc">04:11.9</span><span>So the key idea behind attention is</span><i class="ti ti-pencil mut" aria-hidden="true"></i></div>
+      <div class="cue"><span class="tc">04:14.6</span><span>that every token looks at every other token.</span><i class="ti ti-pencil mut" aria-hidden="true"></i></div>
+      <div class="cue"><span class="tc">04:19.0</span><span>Thanks for watching!<span class="flag">likely hallucination</span></span><i class="ti ti-trash mut" aria-hidden="true"></i></div>
+      <div class="cue" style="border-bottom:none"><span class="tc">04:19–04:51</span><span class="mut">No speech for 32 s<span class="flag">gap</span> · Re-run this part</span><i class="ti ti-refresh mut" aria-hidden="true"></i></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;padding:10px 12px;border-top:0.5px solid var(--border);align-items:center">
+    <span class="mut">Edits save to lecture_week3.srt</span><span style="flex:1"></span>
+    <button>Export .srt</button><button style="background:var(--fill-accent);color:var(--on-accent);border:none">Embed into video</button>
+  </div>
+</div>
+</main>
+<script>
+const wf = document.getElementById('wf');
+let s = 7;
+for (let k = 0; k < 70; k++) {
+  s = (s * 9301 + 49297) % 233280;
+  const bar = document.createElement('i');
+  bar.style.height = (k > 56 && k < 64 ? 3 : 6 + Math.round(s / 233280 * 26)) + 'px';
+  wf.appendChild(bar);
+}
+</script>
+</body>
+</html>

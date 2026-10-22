@@ -26,13 +26,34 @@
                       AutomationProperties.Name="Files to process">
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="local:QueuedFile">
-                        <StackPanel Padding="0,6" ToolTipService.ToolTip="{x:Bind Path}"
-                                    AutomationProperties.Name="{x:Bind Name}">
-                            <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{x:Bind Folder}" TextTrimming="CharacterEllipsis"
+                        <Grid Padding="0,8" ColumnSpacing="12" ToolTipService.ToolTip="{x:Bind Path}"
+                              AutomationProperties.Name="{x:Bind Name}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="{x:Bind Glyph, Mode=OneWay}" Foreground="{x:Bind GlyphBrush, Mode=OneWay}"
+                                      FontSize="16" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{x:Bind Detail, Mode=OneWay}" TextTrimming="CharacterEllipsis"
+                                           ToolTipService.ToolTip="{x:Bind Detail, Mode=OneWay}"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <ProgressBar Value="{x:Bind Percent, Mode=OneWay}"
+                                             Visibility="{x:Bind ProgressVisibility, Mode=OneWay}" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{x:Bind PercentText, Mode=OneWay}" VerticalAlignment="Center"
                                        Style="{StaticResource CaptionTextBlockStyle}"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
+                            <Button Grid.Column="2" Visibility="{x:Bind OutputVisibility, Mode=OneWay}"
+                                    Style="{ThemeResource SubtleButtonStyle}" Padding="6" VerticalAlignment="Center"
+                                    Click="OnShowOutput" ToolTipService.ToolTip="Show in folder"
+                                    AutomationProperties.Name="Show in folder">
+                                <FontIcon Glyph="&#xE838;" FontSize="14" />
+                            </Button>
+                        </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>

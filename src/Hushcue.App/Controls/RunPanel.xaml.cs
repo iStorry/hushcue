@@ -1,6 +1,5 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 
 namespace Hushcue.Controls;
 
@@ -38,12 +37,12 @@ public sealed partial class RunPanel : UserControl
     {
         if (text.Length > 0)
             StatusText.Text = text;
-        StatusText.Foreground = (Brush)Application.Current.Resources[state switch
+        StatusText.Foreground = ThemeBrushes.Get(state switch
         {
-            "done" => "SystemFillColorSuccessBrush",
-            "error" => "SystemFillColorCriticalBrush",
-            _ => "TextFillColorPrimaryBrush",
-        }];
+            "done" => ThemeBrushes.Success,
+            "error" => ThemeBrushes.Critical,
+            _ => ThemeBrushes.Primary,
+        });
     }
 
     public void Reset()
