@@ -4,8 +4,7 @@ namespace Hushcue.Core.Subtitles;
 
 /// <summary>
 /// Turns raw Whisper words into readable subtitles: drops non-speech markers and hallucinations, caps repetition
-/// loops, groups words into cues and fixes their timing. A port of SubGen's pipeline.py; it must produce the same
-/// SRT byte for byte (see the golden tests).
+/// loops, groups words into cues and fixes their timing. The golden tests pin its output byte for byte.
 /// </summary>
 public static partial class Cleanup
 {

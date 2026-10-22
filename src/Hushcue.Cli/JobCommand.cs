@@ -7,7 +7,7 @@ namespace Hushcue.Cli;
 /// <summary>
 /// Run the app's subtitle job (<see cref="SubtitleJob"/>: decode, loop recovery, clean-up) on files and write
 /// OUT/NAME.srt, overwriting it. With --features DIR the engine decodes faster-whisper's recorded features
-/// (tools/bench/subgen_job.py) instead of its own, so the result can be compared with SubGen's byte for byte.
+/// (tools/bench/fw_features.py) instead of its own, so decoding can be checked against faster-whisper's.
 /// </summary>
 internal static class JobCommand
 {

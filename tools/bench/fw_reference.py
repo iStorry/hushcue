@@ -1,14 +1,13 @@
-"""faster-whisper's output for the reference clips with chosen options, to check the C# engine against.
+"""faster-whisper's output for some clips with chosen options, to check the C# engine against (needs faster-whisper 1.2.1).
 
-    ..\\subgen\\.venv\\Scripts\\python tools\\bench\\fw_reference.py OUT_DIR [--language auto|CODE] [--prompt TEXT]
+    python tools\\bench\\fw_reference.py OUT_DIR CLIP [CLIP ...] [--language auto|CODE] [--prompt TEXT]
         [--repetition-penalty P] [--hallucination-silence SECONDS] [--seconds N]
         [--vad] [--vad-threshold T] [--vad-min-silence MS] [--vad-speech-pad MS] [--features DIR]
 
 Writes OUT_DIR/CLIP.words.json and, so Hushcue.Cli can decode the very same input, the log-mel features faster-whisper
 computed (fw_features.py; default folder bench-out/features). --seconds N uses only the first N seconds of each clip.
 Run Hushcue.Cli transcribe with the same options and --features DIR, then compare the words (compare_words.py).
-SubGen's VAD options are --vad-threshold 0.1 --vad-min-silence 1000 --vad-speech-pad 500.
-Set SUBGEN_DIR if SubGen is not checked out next to this repository.
+Hushcue's VAD options are --vad-threshold 0.1 --vad-min-silence 1000 --vad-speech-pad 500.
 """
 from __future__ import annotations
 
@@ -22,19 +21,18 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-SUBGEN = Path(os.environ.get("SUBGEN_DIR") or ROOT.parent / "subgen")
-CLIPS = sorted((SUBGEN / "reference").glob("*.mp4"))
-sys.path.insert(0, str(SUBGEN))
-import pipeline  # noqa: E402  (for its CUDA DLL setup)
-
-pipeline.setup_cuda_paths()
+# CTranslate2 finds cuBLAS in the nvidia-cublas-cu12 wheel only when its folder is on the DLL search path
+for site in sys.path:
+    for dll_dir in Path(site).glob("nvidia/*/bin"):
+        os.add_dll_directory(str(dll_dir))
+        os.environ["PATH"] = f"{dll_dir}{os.pathsep}{os.environ['PATH']}"
 from faster_whisper import WhisperModel  # noqa: E402
 
 from fw_features import record_features  # noqa: E402
 
 
 def audio_of(path: Path, seconds: float | None) -> np.ndarray:
-    """16 kHz mono through 16-bit, as SubGen's WAV + faster-whisper's decoder give it."""
+    """16 kHz mono through 16-bit, as faster-whisper's decoder gives it."""
     cmd = ["ffmpeg", "-v", "error", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000"]
     if seconds:
         cmd += ["-t", str(seconds)]
@@ -45,6 +43,7 @@ def audio_of(path: Path, seconds: float | None) -> np.ndarray:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("out")
+    parser.add_argument("clips", nargs="+", type=Path)
     parser.add_argument("--language", default="en")
     parser.add_argument("--prompt")
     parser.add_argument("--repetition-penalty", type=float, default=1.0)
@@ -65,7 +64,7 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     model = WhisperModel("large-v3-turbo", device="cuda", compute_type="float16")
     record_features(model, Path(args.features))
-    for clip in CLIPS:
+    for clip in args.clips:
         audio = audio_of(clip, args.seconds)
         segments, info = model.transcribe(
             audio, language=None if args.language == "auto" else args.language, beam_size=5, temperature=[0.0],

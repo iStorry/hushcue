@@ -72,7 +72,7 @@ public interface ITranscriber
 /// faster-whisper's transcription loop (WhisperModel.transcribe / generate_segments) on top of CTranslate2: 30 s
 /// windows, temperature fallback, segment splitting on timestamp tokens, word timestamps from cross-attention
 /// alignment, and skipping silence before likely hallucinations. A port of faster-whisper 1.2.1, kept line for line
-/// so the output matches SubGen's.
+/// so its output can be checked against faster-whisper's.
 /// </summary>
 public sealed class Transcriber : ITranscriber
 {

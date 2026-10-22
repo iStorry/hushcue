@@ -5,8 +5,7 @@ using Hushcue.Core.Subtitles;
 namespace Hushcue.Core.Pipeline;
 
 /// <summary>
-/// One file's audio to finished cues: SubGen's transcribe_file, _decode_words and recover_loops, with the same
-/// decoding options and order of clean-up steps.
+/// One file's audio to finished cues: decode the words, re-decode passages where Whisper looped, clean up.
 /// </summary>
 internal static class FileTranscription
 {
@@ -79,7 +78,7 @@ internal static class FileTranscription
     }
 
     /// <summary>
-    /// The samples of [start, end) seconds, as SubGen's read_wav_slice reads them from its 16-bit WAV: from
+    /// The samples of [start, end) seconds: from
     /// int(start * rate), int((end - start) * rate) of them, cut short at the end of the audio.
     /// </summary>
     public static float[] Slice(float[] audio, double start, double end)

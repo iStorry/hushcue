@@ -5,11 +5,11 @@ namespace Hushcue.Core.Pipeline;
 
 /// <summary>
 /// A quality preset. All presets decode at temperature 0 only: Whisper's default fallback re-decodes hard segments
-/// with random sampling, which made identical runs disagree on ~38% of the words in SubGen's measurements.
+/// with random sampling, which made identical runs disagree on ~38% of the words when measured.
 /// </summary>
 /// <param name="Temperatures">always [0]: see above</param>
 /// <param name="VadThreshold">null: no voice activity detection (Silero VAD drops breathy or quiet speech)</param>
-/// <param name="MinSilenceMs">the VAD's minimum silence; 0 means SubGen's 1000 ms</param>
+/// <param name="MinSilenceMs">the VAD's minimum silence; 0 means 1000 ms</param>
 public sealed record Preset(string Name, string Model, int BeamSize, IReadOnlyList<float> Temperatures,
                             double? VadThreshold, int MinSilenceMs, bool Enhance, string Description);
 
@@ -24,11 +24,11 @@ public static class Presets
 
     public const string Default = "Balanced";
 
-    /// <summary>The preset called <paramref name="name"/>; an unknown name (SubGen's dropped "Best") gets the default.</summary>
+    /// <summary>The preset called <paramref name="name"/>; an unknown name (such as the dropped "Best") gets the default.</summary>
     public static Preset Get(string name) => All.FirstOrDefault(p => p.Name == name) ?? All.First(p => p.Name == Default);
 
     /// <summary>
-    /// SubGen's _decode_words: voice activity detection runs when the preset has it or "skip silence" is on, always
+    /// Voice activity detection runs when the preset has it or "skip silence" is on, always
     /// with threshold = the preset's or 0.1, minimum silence = the preset's or 1000 ms and speech padding 500 ms
     /// (faster-whisper's defaults for everything else). Null: no VAD.
     /// </summary>
@@ -57,7 +57,7 @@ public sealed record JobSettings
     /// <summary>Force voice activity detection on: faster, but can drop quiet or breathy speech.</summary>
     public bool SkipSilence { get; init; }
     /// <summary>Re-decode passages where Whisper looped, each on its own (<see cref="FileTranscription.RecoverLoops"/>);
-    /// on by default, as in SubGen.</summary>
+    /// on by default.</summary>
     public bool RecoverLoops { get; init; } = true;
     public EmbedMode Embed { get; init; } = EmbedMode.None;
     /// <summary>When embedding: also leave the .srt next to the video.</summary>

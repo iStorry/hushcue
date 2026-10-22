@@ -16,7 +16,7 @@ public enum EmbedMode
     Burn,
 }
 
-/// <summary>Put subtitles inside the video file so there is no separate .srt to keep track of. A port of burn.py.</summary>
+/// <summary>Put subtitles inside the video file so there is no separate .srt to keep track of.</summary>
 public static class Embed
 {
     /// <summary>Audio codecs that can be stream-copied into an .mp4 untouched; anything else is re-encoded to AAC.</summary>

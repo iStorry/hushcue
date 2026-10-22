@@ -4,7 +4,7 @@ namespace Hushcue.Core.Pipeline;
 public sealed record ModelFile(string Name, long Size, string Sha256);
 
 /// <summary>A model on Hugging Face, pinned to a commit so the files and their checksums never change.</summary>
-/// <param name="CacheRepository">the repository name faster-whisper (and so SubGen) caches the model under</param>
+/// <param name="CacheRepository">the repository name faster-whisper caches the model under</param>
 public sealed record ModelSource(string Repository, string Revision, string CacheRepository, IReadOnlyList<ModelFile> Files)
 {
     public long Size => Files.Sum(f => f.Size);
@@ -42,7 +42,7 @@ public static class Models
 
     /// <summary>
     /// The folder holding <paramref name="name"/>: Hushcue's own models folder first, then the Hugging Face cache
-    /// that faster-whisper (and so SubGen) fills, which saves a download. Null when the model is not downloaded.
+    /// that faster-whisper fills, which saves a download. Null when the model is not downloaded.
     /// </summary>
     public static string? Find(string name)
     {

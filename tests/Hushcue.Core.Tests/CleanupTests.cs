@@ -2,7 +2,7 @@ using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Core.Tests;
 
-/// <summary>Ported from SubGen's test_pipeline.py (the clean-up tests; the ones that need a model come with Phase 4).</summary>
+/// <summary>The clean-up steps one by one; the ones that need a model are in <see cref="TranscriptionTests"/>.</summary>
 public class CleanupTests
 {
     private static Word W(string text, double start, double end) => new(text, start, end);

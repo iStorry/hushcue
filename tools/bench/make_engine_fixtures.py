@@ -1,6 +1,6 @@
-"""Write test fixtures for the C# engine from faster-whisper itself (run with SubGen's venv).
+"""Write test fixtures for the C# engine from faster-whisper itself (needs faster-whisper 1.2.1).
 
-    ..\\subgen\\.venv\\Scripts\\python tools\\bench\\make_engine_fixtures.py
+    python tools\\bench\\make_engine_fixtures.py
 
   tests/Hushcue.Core.Tests/Golden/mel-input.s16   3 s of synthetic 16 kHz audio (a chirp in noise, fixed seed)
   tests/Hushcue.Core.Tests/Golden/mel-128.f32     faster-whisper's 128-band log-mel features of it

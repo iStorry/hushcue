@@ -4,12 +4,12 @@ Builds native\bin\hushcue_ct2.dll and gathers the runtime DLLs it needs into %LO
     powershell -ExecutionPolicy Bypass -File native\build.ps1 [-SitePackages <python site-packages>] [-CpuOnly]
 
 Needs Visual Studio 2022 or later Build Tools (C++ workload), CMake and git. The CTranslate2 binaries come from a
-Python environment with the ctranslate2 4.8.2 wheel installed (by default SubGen's venv), together with the
+pip target folder with the ctranslate2 4.8.2 wheel (by default native\deps\site-packages), together with the
 nvidia-cublas-cu12 wheel (cuDNN is not needed: CTranslate2's Windows build does not use it). -CpuOnly skips the
 nvidia wheels (CI has no GPU; release builds don't need them either, the app downloads cuBLAS on first run).
 #>
 param(
-    [string]$SitePackages = (Join-Path $PSScriptRoot "..\..\subgen\.venv\Lib\site-packages"),
+    [string]$SitePackages = (Join-Path $PSScriptRoot "deps\site-packages"),
     [string]$Ct2Version = "4.8.2",
     [switch]$CpuOnly
 )

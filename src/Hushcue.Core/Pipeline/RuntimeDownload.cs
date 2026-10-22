@@ -44,7 +44,7 @@ public static class RuntimeDownload
 
     /// <summary>
     /// The wheels the CTranslate2 4.8.2 Windows build needs on the GPU. It is built without cuDNN and loads cuBLAS at
-    /// runtime; cuBLASLt can load NVRTC. Versions are the ones SubGen runs with (pip's choice for ctranslate2 4.8.2).
+    /// runtime; cuBLASLt can load NVRTC. Versions are pip's choice for ctranslate2 4.8.2.
     /// </summary>
     public static readonly IReadOnlyList<RuntimePackage> GpuPackages =
     [

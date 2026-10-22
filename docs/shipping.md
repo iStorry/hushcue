@@ -28,7 +28,7 @@ powershell -ExecutionPolicy Bypass -File tools\publish.ps1 -Version 0.2.0 -Smoke
 powershell -ExecutionPolicy Bypass -File installer\build.ps1 -Version 0.2.0 -Iscc <path to ISCC.exe>   # -> artifacts\installer
 ```
 
-`publish.ps1` takes `-SitePackages` (where the `ctranslate2==4.8.2` wheel is installed, SubGen's venv by default),
+`publish.ps1` takes `-SitePackages` (where the `ctranslate2==4.8.2` wheel is installed, `native\deps\site-packages` by default),
 `-Output`, `-BundleFfmpeg <folder>` and `-NoReadyToRun`; `-SmokeTest` starts the published `Hushcue.exe`, waits for
 its window and closes it. Inno Setup does not need installing: `innosetup-6.7.3.exe /VERYSILENT /PORTABLE=1
 /CURRENTUSER /DIR=<folder>` unpacks a portable copy with no registry entries.
@@ -108,8 +108,7 @@ The installer used to be expected to carry cuBLAS and cuDNN (about 1.8 GB). Meas
   declares a dependency on NVRTC. It was not loaded on the RTX 4070, but it is downloaded too (76 MB) so other GPUs
   don't fail.
 
-So the app downloads two wheels from PyPI, the ones pip picks for SubGen's environment and the exact DLLs SubGen runs
-with (same SHA-256 as `subgen\.venv`):
+So the app downloads two wheels from PyPI, the ones pip picks alongside `ctranslate2==4.8.2`:
 
 | Wheel | Size | Files taken | Unpacked |
 |---|---|---|---|

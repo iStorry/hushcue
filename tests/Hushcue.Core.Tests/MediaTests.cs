@@ -21,7 +21,7 @@ public sealed class FfmpegFactAttribute : FactAttribute
     }
 }
 
-/// <summary>Ported from SubGen's test_burn.py, plus audio extraction.</summary>
+/// <summary>Embedding, recycling and audio extraction, with real ffmpeg.</summary>
 public sealed class MediaTests : IDisposable
 {
     private readonly string _tmp = Directory.CreateTempSubdirectory("hushcue_media_").FullName;

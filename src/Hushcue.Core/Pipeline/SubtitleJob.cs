@@ -8,8 +8,8 @@ public sealed record EmbedResult(string Video, bool Recycled);
 
 /// <summary>
 /// Subtitle a list of files: read the audio, transcribe (re-decoding looped passages), clean up, write the .srt and
-/// optionally put it inside the video, embedding file N while file N+1 is transcribed (<see cref="JobRun"/>). SubGen's
-/// run_job and transcribe_file. The model is downloaded on first use and kept loaded between runs.
+/// optionally put it inside the video, embedding file N while file N+1 is transcribed (<see cref="JobRun"/>).
+/// The model is downloaded on first use and kept loaded between runs.
 /// </summary>
 public static class SubtitleJob
 {

@@ -8,7 +8,7 @@ namespace Hushcue.Core.Tests;
 
 /// <summary>
 /// The subtitle job end to end with a fake Whisper model but real ffmpeg: embedding modes, progress, failure handling,
-/// the embed overlap. Ported from SubGen's test_run_job.py, plus Hushcue's own differences.
+/// the embed overlap.
 /// </summary>
 public sealed class JobTests : IDisposable
 {
@@ -248,12 +248,12 @@ public sealed class JobTests : IDisposable
         Assert.False(RecycleBin.Send(Path.Combine(_dir, "missing.txt")));
     }
 
-    // --- SubGen's "Best" preset (Demucs voice isolation) is not carried over
+    // --- The dropped "Best" preset
 
     [FfmpegFact]
     public async Task ProgressRisesSteadilyOverSeveralFiles()
     {
-        // from test_best_preset_isolates_the_voice_first: each file's audio is read once, in order, and the overall
+        // each file's audio is read once, in order, and the overall
         // progress never goes back
         var videos = TwoVideos();
         var read = new List<string>();
@@ -275,7 +275,7 @@ public sealed class JobTests : IDisposable
     [FfmpegFact]
     public async Task TheDroppedBestPresetRunsAsBalancedOnThePlainAudio()
     {
-        // from test_best_preset_falls_back_to_plain_audio_without_demucs (settings saved by SubGen may still say Best)
+        // old settings may still say Best
         var videos = TwoVideos();
         var model = new FakeTranscriber(Hello);
         var wanted = new List<string>();
@@ -314,7 +314,7 @@ public sealed class JobTests : IDisposable
     [FfmpegFact]
     public async Task AFailedTranscriptionStillLetsTheQueuedEmbedFinish()
     {
-        // SubGen drops the queued embeds here (and with "keep .srt" off, their transcripts); Hushcue finishes them
+        // the queued embed still finishes
         var videos = TwoVideos();
         using var failed = new ManualResetEventSlim();
         var calls = 0;

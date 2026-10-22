@@ -9,7 +9,7 @@ public static class Audio
 
     /// <summary>
     /// The audio of any video or audio file as 16 kHz mono float samples, decoded by ffmpeg straight into memory
-    /// (no temporary WAV). Samples go through 16-bit first, exactly as SubGen's WAV and faster-whisper's decoder do,
+    /// (no temporary WAV). Samples go through 16-bit first, exactly as faster-whisper's decoder does,
     /// so the model hears the same values.
     /// </summary>
     public static async Task<float[]> ReadAsync(string path, bool enhance = false, CancellationToken cancel = default)

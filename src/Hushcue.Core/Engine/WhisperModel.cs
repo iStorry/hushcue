@@ -67,7 +67,7 @@ public sealed class WhisperModel : IDisposable
 
     /// <summary>Load a converted model folder (model.bin, config.json, tokenizer.json, preprocessor_config.json).</summary>
     /// <param name="device">"cuda" or "cpu".</param>
-    /// <param name="computeType">"float16" on the GPU and "int8" on the CPU, as SubGen uses.</param>
+    /// <param name="computeType">"float16" on the GPU and "int8" on the CPU.</param>
     public static WhisperModel Load(string path, string device, string computeType, int deviceIndex = 0,
                                     int interThreads = 1, int intraThreads = 0)
     {

@@ -10,9 +10,8 @@ It can save an `.srt` file, add a subtitle track to an `.mkv`, or burn the text 
 On first run it downloads the speech model (about 1.6 GB) and, with an NVIDIA GPU, NVIDIA's cuBLAS (about 630 MB);
 without a GPU it runs on the CPU. The installer is not code-signed yet, so SmartScreen may warn: More info, Run anyway.
 
-Hushcue is a C# + WinUI 3 rewrite of SubGen. Its engine is CTranslate2, called natively through a small C++ bridge
-([Phase 1b](docs/phase1b-ctranslate2.md)); Whisper.net was tried first and dropped ([Phase 1](docs/phase1-engine-spike.md)).
-How it was built: [TODO.md](TODO.md).
+Hushcue is a native Windows app (C# + WinUI 3). It runs OpenAI's Whisper through CTranslate2, called directly
+from C# through a small C++ bridge, with a C# port of faster-whisper's decoding. What's next: [TODO.md](TODO.md).
 
 ![Generate subtitles: the file list, quality and result choices, and the sidebar with the three tools](docs/screenshots/1-generate.png)
 
@@ -30,17 +29,6 @@ within the quality and result choices. `HUSHCUE_THEME=Light` or `Dark` pins the 
 the setup screen as on a fresh PC, and `HUSHCUE_NEW_INSTANCE=1` opens a separate window even when Hushcue is already
 running (all for testing and screenshots).
 
-## How it compares with SubGen
-
-Same Whisper engine (CTranslate2) and model, called natively instead of through Python. On four 3-minute reference
-clips, Balanced preset, RTX 4070 ([details](docs/phase7-results.md)):
-
-| | SubGen (Python) | Hushcue |
-|---|---|---|
-| Full job, 12 min of audio | 28.9 s | 26.3 s |
-| Word error rate vs hand-made references | 55.1% | 49.1% |
-| Repeat runs | identical | identical |
-
 ## Layout
 
 | Project | What it is |
@@ -48,7 +36,7 @@ clips, Balanced preset, RTX 4070 ([details](docs/phase7-results.md)):
 | `src/Hushcue.Core` | Settings, subtitle cleanup, SRT, pipeline, ffmpeg and engine wrappers. No UI. |
 | `src/Hushcue.Cli` | Console front end, used for benchmarks and scripting. |
 | `native/hushcue_ct2` | C interface over CTranslate2's Whisper model, built by `native/build.ps1`. |
-| `tools/bench` | Benchmark scripts comparing Hushcue with SubGen on the reference clips. |
+| `tools/bench` | Scripts that check the C# engine against faster-whisper and write the test fixtures. |
 | `src/Hushcue.App` | The WinUI 3 desktop app. |
 | `tests/Hushcue.Core.Tests` | xUnit tests for Core. |
 
@@ -88,7 +76,12 @@ more slowly. Nothing else leaves your PC.
 
 Needs the .NET 10 SDK (pinned in `global.json`) on Windows 10 1809 or later, x64. The engine bridge also needs
 Visual Studio 2022 or later Build Tools (C++ workload), CMake, and a Python environment with the `ctranslate2==4.8.2`
-wheel, plus `nvidia-cublas-cu12` to run on the GPU during development (SubGen's venv by default).
+wheel, plus `nvidia-cublas-cu12` to run on the GPU during development. By default the scripts look in
+`native\deps\site-packages`:
+
+```bash
+python -m pip install --no-deps --target native/deps/site-packages ctranslate2==4.8.2 nvidia-cublas-cu12
+```
 
 ```bash
 powershell -ExecutionPolicy Bypass -File native/build.ps1

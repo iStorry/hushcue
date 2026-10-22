@@ -18,7 +18,7 @@ cuBLAS is not included: the app downloads it on first run (Hushcue.Core.Pipeline
 param(
     [string]$Output = (Join-Path $PSScriptRoot "..\artifacts\publish\Hushcue"),
     [string]$Version,
-    [string]$SitePackages = (Join-Path $PSScriptRoot "..\..\subgen\.venv\Lib\site-packages"),
+    [string]$SitePackages = (Join-Path $PSScriptRoot "..\native\deps\site-packages"),
     [string]$Ct2Version = "4.8.2",
     [string]$BundleFfmpeg,
     [switch]$NoReadyToRun,

@@ -4,13 +4,12 @@ using Hushcue.Core.Subtitles;
 namespace Hushcue.Core.Tests;
 
 /// <summary>
-/// Loop recovery, transcribe_file and the presets: the 7 model tests of SubGen's test_pipeline.py (with a fake model),
-/// plus the VAD options SubGen's _decode_words uses and its WAV slicing.
+/// Loop recovery, a file's transcription and the presets (with a fake model), the VAD options and audio slicing.
 /// </summary>
 public class TranscriptionTests
 {
     private const int Rate = 16000;
-    private static readonly float[] Silence = new float[20 * Rate]; // SubGen's 20 s silent WAV
+    private static readonly float[] Silence = new float[20 * Rate]; // 20 s of silence
     private static readonly Preset Balanced = Presets.Get("Balanced");
 
     private static Word W(string text, double start, double end) => new(text, start, end);
@@ -103,7 +102,7 @@ public class TranscriptionTests
     public void RecoverLoopsIsOnByDefault() => Assert.True(new JobSettings().RecoverLoops);
 
     [Fact]
-    public void DecodeUsesSubGensOptions()
+    public void DecodeUsesThePresetsOptions()
     {
         var model = new FakeTranscriber([W(" hi", 0, 1)]);
         FileTranscription.DecodeWords(model, Silence, new JobSettings { Vocabulary = "  Anna \n" }, Balanced, default);
@@ -121,9 +120,9 @@ public class TranscriptionTests
     [InlineData("Fast", true, 0.1)]
     [InlineData("Balanced", true, 0.1)]
     [InlineData("Thorough", true, 0.1)]
-    public void VadUsesSubGensOptions(string preset, bool skipSilence, double threshold)
+    public void VadUsesThePresetsOptions(string preset, bool skipSilence, double threshold)
     {
-        // pipeline._decode_words: threshold = preset's or 0.1, min_silence = preset's or 1000, speech_pad_ms = 500
+        // threshold = preset's or 0.1, min_silence = preset's or 1000, speech_pad_ms = 500
         var vad = Presets.Vad(Presets.Get(preset), new JobSettings { SkipSilence = skipSilence });
         Assert.NotNull(vad);
         Assert.Equal((threshold, 1000, 500), (vad.Threshold, vad.MinSilenceDurationMs, vad.SpeechPadMs));
@@ -139,7 +138,7 @@ public class TranscriptionTests
     }
 
     [Fact]
-    public void SliceReadsLikeSubGensWavSlice()
+    public void SliceCutsWholeSamples()
     {
         var audio = Enumerable.Range(0, 3 * Rate).Select(i => (float)i).ToArray();
         // int(start * rate) samples in, int((end - start) * rate) of them

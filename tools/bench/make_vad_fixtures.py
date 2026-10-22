@@ -1,6 +1,6 @@
-"""Write test fixtures for the C# voice activity detection from faster-whisper itself (run with SubGen's venv).
+"""Write test fixtures for the C# voice activity detection from faster-whisper itself (needs faster-whisper 1.2.1).
 
-    ..\\subgen\\.venv\\Scripts\\python tools\\bench\\make_vad_fixtures.py SPEECH1 SPEECH2 SPEECH3
+    python tools\\bench\\make_vad_fixtures.py SPEECH1 SPEECH2 SPEECH3
 
   tests/Hushcue.Core.Tests/Golden/vad-input.s16  the three speech clips with silence of different lengths between
                                                  them, the last one repeated quietly, in low noise (fixed seed)

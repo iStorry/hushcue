@@ -13,10 +13,8 @@ namespace Hushcue.Core.Pipeline;
 /// failed embed of one video is reported at the end; anything else stops both.
 /// </summary>
 /// <remarks>
-/// SubGen's run_job, with two deliberate differences. When a transcription fails, SubGen skips the embeds still
-/// queued (their transcripts were in its temporary folder and were lost when "keep .srt" was off); Hushcue finishes
-/// them first. When an embed fails with an unexpected error, SubGen stops and could report "cancelled" instead of
-/// the error; Hushcue reports the error.
+/// When a transcription fails, the embeds already queued still finish. When an embed fails with an unexpected
+/// error, the job reports that error (not "cancelled").
 /// </remarks>
 internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSettings settings, string modelPath,
                              JobSteps steps, Action<double, string> progress, Action<string> log,

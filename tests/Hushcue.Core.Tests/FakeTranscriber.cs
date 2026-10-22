@@ -4,7 +4,7 @@ using Hushcue.Core.Subtitles;
 namespace Hushcue.Core.Tests;
 
 /// <summary>
-/// A Whisper stand-in, like the fake models of SubGen's tests: a decode of the whole file (audio of
+/// A Whisper stand-in: a decode of the whole file (audio of
 /// <paramref name="wholeSamples"/> samples, or any audio when that is null) returns <paramref name="whole"/> as one
 /// segment, a decode of anything shorter (a clip re-decoded by loop recovery) returns <paramref name="clip"/>.
 /// </summary>

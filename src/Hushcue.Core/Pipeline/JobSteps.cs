@@ -4,8 +4,8 @@ using Hushcue.Core.Media;
 namespace Hushcue.Core.Pipeline;
 
 /// <summary>
-/// The outside work a <see cref="SubtitleJob"/> does, replaceable so tests can fake the model and the media steps (as
-/// SubGen's tests patch load_model, burn.embed_subtitles and burn.recycle) and benchmarks can feed in features.
+/// The outside work a <see cref="SubtitleJob"/> does, replaceable so tests can fake the model and the media steps
+/// (loading the model, embedding, recycling) and benchmarks can feed in features.
 /// </summary>
 internal sealed class JobSteps
 {
@@ -38,7 +38,7 @@ internal sealed class JobSteps
 
     private static ITranscriber LoadWhisper(string path, string device) => LoadWhisper(path, device, null);
 
-    /// <summary>The CTranslate2 model in float16 on the GPU or int8 on the CPU, as SubGen loads it.</summary>
+    /// <summary>The CTranslate2 model in float16 on the GPU or int8 on the CPU.</summary>
     /// <param name="featureSource">see <see cref="Transcriber.FeatureSource"/></param>
     public static ITranscriber LoadWhisper(string path, string device, Func<float[], (float[], int)>? featureSource) =>
         new LoadedWhisper(WhisperModel.Load(path, device, device == "cuda" ? "float16" : "int8"), featureSource);

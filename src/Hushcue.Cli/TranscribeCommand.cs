@@ -8,10 +8,10 @@ using Hushcue.Core.Media;
 namespace Hushcue.Cli;
 
 /// <summary>
-/// Transcribe files with the CTranslate2 engine, decoding the way SubGen's Balanced preset does (beam 5, temperature 0,
+/// Transcribe files with the CTranslate2 engine, decoding the way the Balanced preset does (beam 5, temperature 0,
 /// no previous-text context, English, word timestamps, no VAD unless --vad options are given), and record the speed.
 /// Writes NAME.raw.srt (one cue per segment, no clean-up), NAME.words.json and metrics.json into the output folder,
-/// the files tools/bench/compare.py reads. --features DIR decodes faster-whisper's recorded features
+/// for comparing with faster-whisper (tools/bench/compare_words.py). --features DIR decodes faster-whisper's recorded features
 /// (<see cref="FeatureFiles"/>) instead of the engine's own, with or without VAD.
 /// </summary>
 internal static class TranscribeCommand
@@ -130,7 +130,7 @@ internal static class TranscribeCommand
         return 0;
     }
 
-    /// <summary>One cue per segment, written the way SubGen writes SRTs.</summary>
+    /// <summary>One cue per segment, no clean-up.</summary>
     private static string Srt(IEnumerable<Segment> segments) =>
         Hushcue.Core.Subtitles.Srt.Write(segments.Where(s => s.Text.Trim().Length > 0)
                                                   .Select(s => new Hushcue.Core.Subtitles.Cue(s.Start, s.End, s.Text.Trim())));

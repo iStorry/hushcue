@@ -16,7 +16,7 @@ public sealed class ModelFactAttribute : FactAttribute
 
 /// <summary>
 /// The C# engine against faster-whisper's own results (fixtures from tools/bench/make_engine_fixtures.py).
-/// Transcription itself is checked end to end on real clips by tools/bench (docs/phase1b-ctranslate2.md).
+/// Whole transcriptions can be checked against faster-whisper with tools/bench/fw_reference.py and compare_words.py.
 /// </summary>
 public class EngineTests
 {
