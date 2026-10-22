@@ -1,18 +1,36 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 
 namespace Hushcue.Controls;
 
-/// <summary>Status line, progress bar, collapsible log, and the Cancel / start buttons of a page.</summary>
+public enum StatusKind
+{
+    Normal,
+    Done,
+    Warning,
+    Error,
+}
+
+/// <summary>The bottom bar of a page: the batch's status and progress, a collapsible log, Cancel and start.</summary>
 public sealed partial class RunPanel : UserControl
 {
     private const int MaxLogLines = 500;
     private readonly Queue<string> _log = new();
+    private StatusKind _kind;
 
-    public RunPanel() => InitializeComponent();
+    public RunPanel()
+    {
+        InitializeComponent();
+        ActualThemeChanged += (_, _) => SetStatus("", _kind);
+    }
 
     public event EventHandler? StartRequested;
-    public event EventHandler? CancelRequested;
+
+    /// <summary>Cancel was asked for: true when by Esc, which asks first, false for the button.</summary>
+    public event EventHandler<bool>? CancelRequested;
 
     public string StartText
     {
@@ -20,29 +38,43 @@ public sealed partial class RunPanel : UserControl
         set => StartButton.Content = value;
     }
 
+    public bool IsRunning => CancelButton.IsEnabled;
+
     public void SetRunning(bool running)
     {
         StartButton.IsEnabled = !running;
         CancelButton.IsEnabled = running;
+        if (running)
+            Bar.Visibility = Visibility.Visible;
     }
 
-    public void SetProgress(double fraction, string text)
+    public void SetProgress(double fraction) => Bar.Value = Math.Clamp(fraction, 0, 1) * 1000;
+
+    /// <summary>Hide the bar, e.g. when the queue is changed after a run.</summary>
+    public void HideProgress()
     {
-        Bar.Value = Math.Clamp(fraction, 0, 1) * 1000;
-        SetStatus(text);
+        if (!IsRunning)
+            Bar.Visibility = Visibility.Collapsed;
     }
 
-    /// <param name="state">"done" (green), "error" (red) or "" (normal)</param>
-    public void SetStatus(string text, string state = "")
+    /// <param name="text">the new status; empty keeps the current one (to change only its colour)</param>
+    public void SetStatus(string text, StatusKind kind = StatusKind.Normal)
     {
+        _kind = kind;
+        var changed = text.Length > 0 && text != StatusText.Text;
         if (text.Length > 0)
             StatusText.Text = text;
-        StatusText.Foreground = ThemeBrushes.Get(state switch
+        StatusText.Foreground = ThemeBrushes.Get(kind switch
         {
-            "done" => ThemeBrushes.Success,
-            "error" => ThemeBrushes.Critical,
+            StatusKind.Done => ThemeBrushes.Success,
+            StatusKind.Warning => ThemeBrushes.Caution,
+            StatusKind.Error => ThemeBrushes.Critical,
             _ => ThemeBrushes.Primary,
         });
+        AutomationProperties.SetName(StatusText, StatusText.Text);
+        // announce changes of state, not the time-left countdown
+        if (changed && kind != StatusKind.Normal && FrameworkElementAutomationPeer.FromElement(StatusText) is { } peer)
+            peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
     public void Reset()
@@ -76,5 +108,12 @@ public sealed partial class RunPanel : UserControl
 
     private void OnStart(object sender, RoutedEventArgs e) => StartRequested?.Invoke(this, EventArgs.Empty);
 
-    private void OnCancel(object sender, RoutedEventArgs e) => CancelRequested?.Invoke(this, EventArgs.Empty);
+    private void OnCancel(object sender, RoutedEventArgs e) => CancelRequested?.Invoke(this, false);
+
+    private void OnCancelShortcut(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        if (CancelButton.IsEnabled)
+            CancelRequested?.Invoke(this, true);
+    }
 }

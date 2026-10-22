@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Hushcue.Controls.SetupView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Hushcue.Controls">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Border Style="{StaticResource Card}" MaxWidth="600" Margin="0,12" Padding="28,24,28,24"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel Spacing="20">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="Heading" Text="Set up Hushcue" Style="{StaticResource SubtitleTextBlockStyle}"
+                               AutomationProperties.HeadingLevel="Level1" />
+                    <TextBlock Text="Everything runs on this PC. Nothing is uploaded." Style="{StaticResource Hint}" />
+                </StackPanel>
+
+                <StackPanel Spacing="16">
+                    <local:CheckRow x:Name="GpuRow" />
+                    <!-- HOOK(gpu-runtime): the step that downloads the GPU runtime libraries goes here; see SetupView.xaml.cs -->
+                    <local:CheckRow x:Name="GpuRuntimeRow" Visibility="Collapsed" />
+                    <local:CheckRow x:Name="FfmpegRow" />
+                    <StackPanel Spacing="10">
+                        <local:CheckRow x:Name="ModelRow" />
+                        <StackPanel x:Name="DownloadPanel" Spacing="6" Margin="32,0,0,0" Visibility="Collapsed">
+                            <ProgressBar x:Name="DownloadBar" Maximum="1000" AutomationProperties.Name="Model download" />
+                            <Grid>
+                                <TextBlock x:Name="DownloadText" Style="{StaticResource Hint}" />
+                                <TextBlock Text="resumes if closed" HorizontalAlignment="Right" Style="{StaticResource Hint}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="RecheckButton" Content="Check again" Click="OnRecheck" />
+                    <Button x:Name="DownloadButton" Grid.Column="2" Click="OnDownload" Visibility="Collapsed" Style="{ThemeResource AccentButtonStyle}" />
+                    <Button x:Name="ContinueButton" Grid.Column="3" Content="Continue" MinWidth="120" IsEnabled="False"
+                            Style="{ThemeResource AccentButtonStyle}" Click="OnContinue" />
+                </Grid>
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

@@ -37,6 +37,8 @@
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
                 <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
                 <Setter Property="Padding" Value="12,8" />
+                <!-- the default RadioButton style's MinWidth (120) would overflow three cards in a narrow column -->
+                <Setter Property="MinWidth" Value="0" />
                 <Setter Property="HorizontalAlignment" Value="Stretch" />
                 <Setter Property="HorizontalContentAlignment" Value="Left" />
                 <Setter Property="UseSystemFocusVisuals" Value="True" />
@@ -45,6 +47,8 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                                <Border x:Name="SelectionFill" Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                        CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
                                 <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
                                         CornerRadius="{TemplateBinding CornerRadius}" />
                                 <Border x:Name="Selection" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
@@ -69,7 +73,7 @@
                                         </VisualState>
                                         <VisualState x:Name="Disabled">
                                             <VisualState.Setters>
-                                                <Setter Target="Content.Foreground" Value="{ThemeResource TextFillColorDisabledBrush}" />
+                                                <Setter Target="Content.Opacity" Value="0.5" />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>
@@ -77,6 +81,7 @@
                                         <VisualState x:Name="Checked">
                                             <VisualState.Setters>
                                                 <Setter Target="Selection.Opacity" Value="1" />
+                                                <Setter Target="SelectionFill.Opacity" Value="0.12" />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="Unchecked" />

@@ -10,20 +10,29 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Spacing="8" VerticalAlignment="Center">
-                <Grid>
-                    <TextBlock x:Name="StatusText" Text="Ready" TextTrimming="CharacterEllipsis"
-                               AutomationProperties.LiveSetting="Polite" />
-                    <HyperlinkButton x:Name="LogToggle" Content="Show log" HorizontalAlignment="Right" Padding="4,0"
-                                     Click="OnToggleLog" />
-                </Grid>
-                <ProgressBar x:Name="Bar" Maximum="1000" Value="0" AutomationProperties.Name="Progress" />
+            <StackPanel Spacing="6" VerticalAlignment="Center">
+                <TextBlock x:Name="StatusText" Text="Ready" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                           Style="{StaticResource BodyStrongTextBlockStyle}" AutomationProperties.LiveSetting="Polite"
+                           AutomationProperties.Name="Status" />
+                <ProgressBar x:Name="Bar" Maximum="1000" Value="0" Visibility="Collapsed"
+                             AutomationProperties.Name="Overall progress" />
             </StackPanel>
-            <Button x:Name="CancelButton" Grid.Column="1" Content="Cancel" IsEnabled="False" Click="OnCancel"
-                    VerticalAlignment="Center" />
-            <Button x:Name="StartButton" Grid.Column="2" MinWidth="220" Padding="22,10" Click="OnStart"
-                    Style="{ThemeResource AccentButtonStyle}" VerticalAlignment="Center" />
+            <HyperlinkButton x:Name="LogToggle" Grid.Column="1" Content="Show log" VerticalAlignment="Center"
+                             Click="OnToggleLog" />
+            <Button x:Name="CancelButton" Grid.Column="2" Content="Cancel" IsEnabled="False" Click="OnCancel"
+                    MinWidth="96" VerticalAlignment="Center" ToolTipService.ToolTip="Stop the run (Esc)">
+                <Button.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Escape" Invoked="OnCancelShortcut" />
+                </Button.KeyboardAccelerators>
+            </Button>
+            <Button x:Name="StartButton" Grid.Column="3" MinWidth="200" Padding="22,9" Click="OnStart"
+                    Style="{ThemeResource AccentButtonStyle}" VerticalAlignment="Center" ToolTipService.ToolTip="Start (Ctrl+Enter)">
+                <Button.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Enter" Modifiers="Control" />
+                </Button.KeyboardAccelerators>
+            </Button>
         </Grid>
         <TextBox x:Name="LogBox" Visibility="Collapsed" Height="130" IsReadOnly="True" TextWrapping="NoWrap"
                  AcceptsReturn="True" FontFamily="Cascadia Mono, Consolas" FontSize="12"

@@ -5,72 +5,108 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Hushcue.Controls">
 
-    <Grid RowSpacing="12">
+    <Grid RowSpacing="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Drop zone: dashed outline, empty state until files are added -->
-        <Grid MinHeight="96">
+        <!-- Header: what the list holds, how much, and the buttons that change it -->
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center"
+                           AutomationProperties.HeadingLevel="Level2" />
+                <TextBlock x:Name="CountText" Style="{StaticResource CaptionTextBlockStyle}" VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <Button x:Name="AddButton" Grid.Column="1" Click="OnAdd" ToolTipService.ToolTip="Add files (Ctrl+O)"
+                    AutomationProperties.Name="Add files" AutomationProperties.AcceleratorKey="Control+O">
+                <Button.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="O" Modifiers="Control" />
+                </Button.KeyboardAccelerators>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE710;" FontSize="14" />
+                    <TextBlock Text="Add files" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="ClearButton" Grid.Column="2" Click="OnClear" Style="{ThemeResource SubtleButtonStyle}"
+                    ToolTipService.ToolTip="Remove every file from the list" AutomationProperties.Name="Clear the list">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                    <TextBlock Text="Clear" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- Drop zone: dashed outline and an empty state until files are added -->
+        <Grid Grid.Row="1" MinHeight="120">
             <Rectangle x:Name="Outline" RadiusX="8" RadiusY="8" StrokeThickness="1.5" StrokeDashArray="4,3"
                        Stroke="{ThemeResource ControlStrongStrokeColorDefaultBrush}"
                        Fill="{ThemeResource LayerOnMicaBaseAltFillColorTransparentBrush}" />
-            <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
+            <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6" Margin="12">
                 <FontIcon Glyph="&#xE898;" FontSize="32" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <TextBlock x:Name="EmptyTitle" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                <TextBlock Text="or use Add files below" HorizontalAlignment="Center"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock x:Name="EmptyTitle" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                           Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <TextBlock Text="or select Add files (Ctrl+O)" HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
-            <ListView x:Name="List" Margin="6" SelectionMode="Extended" Visibility="Collapsed"
-                      AutomationProperties.Name="Files to process">
+            <ListView x:Name="List" SelectionMode="Extended" Visibility="Collapsed" Margin="-12,0"
+                      KeyDown="OnListKeyDown" DoubleTapped="OnListDoubleTapped"
+                      AutomationProperties.Name="Files">
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="local:QueuedFile">
-                        <Grid Padding="0,8" ColumnSpacing="12" ToolTipService.ToolTip="{x:Bind Path}"
-                              AutomationProperties.Name="{x:Bind Name}">
+                        <Grid Padding="0,8" ColumnSpacing="14" ToolTipService.ToolTip="{x:Bind Path}"
+                              AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <FontIcon Glyph="{x:Bind Glyph, Mode=OneWay}" Foreground="{x:Bind GlyphBrush, Mode=OneWay}"
-                                      FontSize="16" VerticalAlignment="Center" />
-                            <StackPanel Grid.Column="1" Spacing="2">
-                                <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{x:Bind Detail, Mode=OneWay}" TextTrimming="CharacterEllipsis"
-                                           ToolTipService.ToolTip="{x:Bind Detail, Mode=OneWay}"
-                                           Style="{StaticResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <ProgressBar Value="{x:Bind Percent, Mode=OneWay}"
-                                             Visibility="{x:Bind ProgressVisibility, Mode=OneWay}" Margin="0,4,0,0" />
+                            <Border Width="36" Height="36" CornerRadius="6" VerticalAlignment="Center"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <FontIcon Glyph="{x:Bind Glyph, Mode=OneWay}" Foreground="{x:Bind GlyphBrush, Mode=OneWay}"
+                                          FontSize="16" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                <TextBlock Text="{x:Bind Detail, Mode=OneWay}" Foreground="{x:Bind DetailBrush, Mode=OneWay}"
+                                           Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Detail, Mode=OneWay}" />
+                                <ProgressBar Value="{x:Bind Percent, Mode=OneWay}" Margin="0,6,0,2"
+                                             Visibility="{x:Bind ProgressVisibility, Mode=OneWay}"
+                                             AutomationProperties.Name="{x:Bind Name}" />
                             </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{x:Bind PercentText, Mode=OneWay}" VerticalAlignment="Center"
-                                       Style="{StaticResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <Button Grid.Column="2" Visibility="{x:Bind OutputVisibility, Mode=OneWay}"
-                                    Style="{ThemeResource SubtleButtonStyle}" Padding="6" VerticalAlignment="Center"
-                                    Click="OnShowOutput" ToolTipService.ToolTip="Show in folder"
-                                    AutomationProperties.Name="Show in folder">
-                                <FontIcon Glyph="&#xE838;" FontSize="14" />
-                            </Button>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="{x:Bind PercentText, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,4,0"
+                                           Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                <Button Visibility="{x:Bind OutputVisibility, Mode=OneWay}" Click="OnShowOutput"
+                                        Style="{ThemeResource SubtleButtonStyle}" Padding="8" VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Show in folder"
+                                        AutomationProperties.Name="{x:Bind ShowName, Mode=OneWay}">
+                                    <FontIcon Glyph="&#xE838;" FontSize="14" />
+                                </Button>
+                                <Button Visibility="{x:Bind RemoveVisibility, Mode=OneWay}" Click="OnRemoveOne"
+                                        Style="{ThemeResource SubtleButtonStyle}" Padding="8" VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Remove from the list (Delete)"
+                                        AutomationProperties.Name="{x:Bind RemoveName}">
+                                    <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>
+                <ListView.Footer>
+                    <TextBlock x:Name="DropHint" Margin="12,10,12,4" HorizontalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="+ Drop more files anywhere in the window" />
+                </ListView.Footer>
             </ListView>
-        </Grid>
-
-        <Grid Grid.Row="1" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <Button x:Name="AddButton" Content="Add files" Click="OnAdd" />
-            <Button Grid.Column="1" Content="Remove selected" Click="OnRemove" />
-            <Button Grid.Column="2" Content="Clear" Click="OnClear" Style="{ThemeResource SubtleButtonStyle}" />
-            <TextBlock x:Name="CountText" Grid.Column="3" Text="No files" HorizontalAlignment="Right" VerticalAlignment="Center"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </Grid>
     </Grid>
 </UserControl>

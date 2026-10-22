@@ -15,14 +15,14 @@
                 </Grid.ColumnDefinitions>
                 <FontIcon Glyph="{x:Bind Glyph}" FontSize="18" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1">
-                    <TextBlock Text="{x:Bind Title}" />
+                    <TextBlock Text="{x:Bind Title}" TextWrapping="Wrap" />
                     <TextBlock Text="{x:Bind Detail}" Style="{StaticResource Hint}" />
                 </StackPanel>
             </Grid>
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid RowSpacing="18">
+    <Grid RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -30,40 +30,32 @@
 
         <Grid ColumnSpacing="16">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="5*" />
-                <ColumnDefinition Width="4*" />
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="2*" MinWidth="330" />
             </Grid.ColumnDefinitions>
 
-            <Grid RowSpacing="16">
+            <Grid RowSpacing="12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Border Style="{StaticResource Card}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="INPUT" Style="{StaticResource CardTitle}" />
-                        <controls:FileQueue x:Name="Queue" Grid.Row="1" EmptyText="Drop videos or audio here" />
-                    </Grid>
+                <Border Style="{StaticResource Card}" Padding="20,14,20,12">
+                    <controls:FileQueue x:Name="Queue" Title="FILES" EmptyText="Drop videos or audio files here" />
                 </Border>
-                <Border Grid.Row="1" Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="OUTPUT FOLDER" Style="{StaticResource CardTitle}" />
+                <Border Grid.Row="1" Style="{StaticResource Card}" Padding="20,12,20,14">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="SAVE TO" Style="{StaticResource CardTitle}" Margin="0" />
                         <controls:OutputFolderBox x:Name="Output" />
                     </StackPanel>
                 </Border>
             </Grid>
 
-            <Border Grid.Column="1" Style="{StaticResource Card}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <Border x:Name="OptionsCard" Grid.Column="1" Style="{StaticResource Card}" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
                     <StackPanel Spacing="18">
-                        <TextBlock Text="OPTIONS" Style="{StaticResource CardTitle}" Margin="0" />
-
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Quality" />
+                            <TextBlock Text="Quality" Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       AutomationProperties.HeadingLevel="Level2" />
                             <!-- One card per preset, added from Presets.All -->
                             <Grid x:Name="PresetChoices" ColumnSpacing="6" XYFocusKeyboardNavigation="Enabled"
                                   TabFocusNavigation="Once" AutomationProperties.Name="Quality">
@@ -73,11 +65,16 @@
                                     </Style>
                                 </Grid.Resources>
                             </Grid>
-                            <TextBlock x:Name="PresetHint" Style="{StaticResource Hint}" />
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="PresetHint" Style="{StaticResource Hint}" />
+                                <TextBlock x:Name="SpeedHint" Style="{StaticResource Hint}" Visibility="Collapsed"
+                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </StackPanel>
                         </StackPanel>
 
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Result" />
+                            <TextBlock Text="Result" Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       AutomationProperties.HeadingLevel="Level2" />
                             <StackPanel x:Name="ResultChoices" Spacing="6" XYFocusKeyboardNavigation="Enabled"
                                         TabFocusNavigation="Once" AutomationProperties.Name="Result">
                                 <StackPanel.Resources>
@@ -85,38 +82,53 @@
                                         <Setter Property="ContentTemplate" Value="{StaticResource ResultCard}" />
                                     </Style>
                                 </StackPanel.Resources>
-                                <RadioButton Checked="OnResultChanged" AutomationProperties.Name="Subtitle file">
+                                <RadioButton Checked="OnResultChanged"
+                                             AutomationProperties.Name="Subtitle file (.srt): a separate file that most players pick up">
                                     <pages:ResultChoice Mode="None" Glyph="&#xE8A5;" Title="Subtitle file (.srt)"
                                                         Detail="A separate file that most players pick up" />
                                 </RadioButton>
-                                <RadioButton Checked="OnResultChanged" AutomationProperties.Name="Subtitle track">
-                                    <pages:ResultChoice Mode="Soft" Glyph="&#xE714;" Title="Subtitle track (.mkv)"
+                                <RadioButton Checked="OnResultChanged"
+                                             AutomationProperties.Name="Subtitle track (.mkv): instant and lossless, can be switched off in the player">
+                                    <pages:ResultChoice Mode="Soft" Glyph="&#xE81E;" Title="Subtitle track (.mkv)"
                                                         Detail="Instant and lossless; can be switched off in the player" />
                                 </RadioButton>
-                                <RadioButton Checked="OnResultChanged" AutomationProperties.Name="Burn into the picture">
+                                <RadioButton Checked="OnResultChanged"
+                                             AutomationProperties.Name="Burn into the picture (.mp4): works in every player, permanent, re-encodes the video">
                                     <pages:ResultChoice Mode="Burn" Glyph="&#xE8B9;" Title="Burn into the picture (.mp4)"
                                                         Detail="Works in every player; permanent, re-encodes the video" />
                                 </RadioButton>
                             </StackPanel>
-                            <CheckBox x:Name="KeepSrtBox" Content="Also keep the .srt file" />
-                            <CheckBox x:Name="DeleteBox" Content="Move the original video to the Recycle Bin when done"
-                                      ToolTipService.ToolTip="Only after the new video has been written successfully. Recoverable from the Recycle Bin." />
+                            <StackPanel>
+                                <CheckBox x:Name="KeepSrtBox" Content="Also keep the .srt file" />
+                                <CheckBox x:Name="DeleteBox" Content="Move the original to the Recycle Bin when done"
+                                          ToolTipService.ToolTip="Only after the new video has been written. You can put it back from the finished screen or the Recycle Bin." />
+                            </StackPanel>
                         </StackPanel>
 
-                        <Expander x:Name="MoreOptions" Header="More options" HorizontalAlignment="Stretch"
-                                  HorizontalContentAlignment="Stretch">
+                        <Expander x:Name="MoreOptions" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                  AutomationProperties.Name="More options: language, vocabulary, clean-up">
+                            <Expander.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xE9E9;" FontSize="14" />
+                                    <TextBlock Text="Language, vocabulary, clean-up" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Expander.Header>
                             <StackPanel Spacing="14">
                                 <ComboBox x:Name="LanguageBox" Header="Language" HorizontalAlignment="Stretch" />
-                                <TextBox x:Name="VocabularyBox" Header="Vocabulary"
+                                <TextBox x:Name="VocabularyBox" Header="Vocabulary" TextWrapping="Wrap"
                                          PlaceholderText="Names or words to spell correctly, comma separated" />
                                 <StackPanel>
-                                    <CheckBox x:Name="EnhanceBox" Content="Clean up audio first (denoise + normalize)" />
+                                    <CheckBox x:Name="EnhanceBox" Content="Clean up audio first (denoise and normalize)" />
                                     <CheckBox x:Name="SkipSilenceBox" Content="Skip silent parts (faster, may drop quiet speech)" />
                                 </StackPanel>
                             </StackPanel>
                         </Expander>
                     </StackPanel>
                 </ScrollViewer>
+            </Border>
+
+            <Border x:Name="FinishedCard" Grid.Column="1" Style="{StaticResource Card}" Visibility="Collapsed">
+                <controls:FinishedPanel x:Name="Summary" />
             </Border>
         </Grid>
 

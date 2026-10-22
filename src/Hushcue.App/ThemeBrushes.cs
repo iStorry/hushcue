@@ -9,6 +9,7 @@ internal static class ThemeBrushes
     public const string Secondary = "TextFillColorSecondaryBrush";
     public const string Success = "SystemFillColorSuccessBrush";
     public const string Critical = "SystemFillColorCriticalBrush";
+    public const string Caution = "SystemFillColorCautionBrush";
     public const string Accent = "AccentFillColorDefaultBrush";
     public const string StrongStroke = "ControlStrongStrokeColorDefaultBrush";
 

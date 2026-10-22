@@ -8,6 +8,9 @@ public partial class App : Application
 
     public App()
     {
+        // The app follows the Windows theme; HUSHCUE_THEME=Light or Dark pins one (for screenshots and testing).
+        if (Enum.TryParse<ApplicationTheme>(Environment.GetEnvironmentVariable("HUSHCUE_THEME"), ignoreCase: true, out var theme))
+            RequestedTheme = theme;
         InitializeComponent();
     }
 

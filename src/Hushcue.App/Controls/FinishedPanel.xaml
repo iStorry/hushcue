@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Hushcue.Controls.FinishedPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <Style x:Key="Tile" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="16">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon x:Name="HeadIcon" Glyph="&#xE930;" FontSize="22" VerticalAlignment="Center" />
+                    <TextBlock x:Name="HeadText" Grid.Column="1" Style="{StaticResource SubtitleTextBlockStyle}"
+                               TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2" />
+                </Grid>
+
+                <Grid x:Name="Tiles" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource Tile}">
+                        <StackPanel>
+                            <TextBlock Text="Video" Style="{StaticResource Hint}" />
+                            <TextBlock x:Name="VideoText" Style="{StaticResource TileValue}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Tile}">
+                        <StackPanel>
+                            <TextBlock Text="Took" Style="{StaticResource Hint}" />
+                            <TextBlock x:Name="TookText" Style="{StaticResource TileValue}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Tile}">
+                        <StackPanel>
+                            <TextBlock Text="Speed" Style="{StaticResource Hint}" />
+                            <TextBlock x:Name="SpeedText" Style="{StaticResource TileValue}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <ItemsControl x:Name="Notes" IsTabStop="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="8" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE7BA;" FontSize="16" VerticalAlignment="Top" Margin="0,2,0,0"
+                                          Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <StackPanel x:Name="RecyclePanel" Spacing="2" Visibility="Collapsed">
+                    <TextBlock x:Name="RecycleText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <StackPanel Orientation="Horizontal" Margin="-12,0,0,0">
+                        <HyperlinkButton x:Name="RestoreButton" Click="OnRestore" />
+                        <HyperlinkButton Content="Open Recycle Bin" Click="OnOpenRecycleBin" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="1" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="BackButton" Content="Back to options" Click="OnBack" />
+            <Button x:Name="OpenButton" Grid.Column="2" Style="{ThemeResource AccentButtonStyle}" Click="OnOpenFolder"
+                    AutomationProperties.Name="Open folder">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE838;" FontSize="14" />
+                    <TextBlock Text="Open folder" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

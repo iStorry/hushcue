@@ -9,8 +9,8 @@
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <TextBox x:Name="FolderText" PlaceholderText="Same folder as each input file"
+        <TextBox x:Name="FolderText" PlaceholderText="Same folder as each file"
                  AutomationProperties.Name="Output folder" />
-        <Button Grid.Column="1" Content="Browse" Click="OnBrowse" />
+        <Button Grid.Column="1" Content="Browse" Click="OnBrowse" AutomationProperties.Name="Browse for the output folder" />
     </Grid>
 </UserControl>
