@@ -31,7 +31,7 @@
         <Grid ColumnSpacing="16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="2*" MinWidth="330" />
+                <ColumnDefinition Width="2*" MinWidth="330" MaxWidth="540" />
             </Grid.ColumnDefinitions>
 
             <Grid RowSpacing="12">
@@ -83,24 +83,24 @@
                                     </Style>
                                 </StackPanel.Resources>
                                 <RadioButton Checked="OnResultChanged"
-                                             AutomationProperties.Name="Subtitle file (.srt): a separate file that most players pick up">
+                                             AutomationProperties.Name="Subtitle file (.srt): a separate file most players pick up">
                                     <pages:ResultChoice Mode="None" Glyph="&#xE8A5;" Title="Subtitle file (.srt)"
-                                                        Detail="A separate file that most players pick up" />
+                                                        Detail="A separate file most players pick up" />
                                 </RadioButton>
                                 <RadioButton Checked="OnResultChanged"
-                                             AutomationProperties.Name="Subtitle track (.mkv): instant and lossless, can be switched off in the player">
+                                             AutomationProperties.Name="Subtitle track (.mkv): instant and lossless, can be turned off in the player">
                                     <pages:ResultChoice Mode="Soft" Glyph="&#xE81E;" Title="Subtitle track (.mkv)"
-                                                        Detail="Instant and lossless; can be switched off in the player" />
+                                                        Detail="Instant and lossless; can be turned off" />
                                 </RadioButton>
                                 <RadioButton Checked="OnResultChanged"
-                                             AutomationProperties.Name="Burn into the picture (.mp4): works in every player, permanent, re-encodes the video">
+                                             AutomationProperties.Name="Burn into the picture (.mp4): shows in every player, permanent, re-encodes the video">
                                     <pages:ResultChoice Mode="Burn" Glyph="&#xE8B9;" Title="Burn into the picture (.mp4)"
-                                                        Detail="Works in every player; permanent, re-encodes the video" />
+                                                        Detail="Shows in every player; re-encodes the video" />
                                 </RadioButton>
                             </StackPanel>
                             <StackPanel>
                                 <CheckBox x:Name="KeepSrtBox" Content="Also keep the .srt file" />
-                                <CheckBox x:Name="DeleteBox" Content="Move the original to the Recycle Bin when done"
+                                <CheckBox x:Name="DeleteBox" Content="Move the original to the Recycle Bin"
                                           ToolTipService.ToolTip="Only after the new video has been written. You can put it back from the finished screen or the Recycle Bin." />
                             </StackPanel>
                         </StackPanel>
@@ -108,10 +108,14 @@
                         <Expander x:Name="MoreOptions" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                   AutomationProperties.Name="More options: language, vocabulary, clean-up">
                             <Expander.Header>
-                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE9E9;" FontSize="14" />
-                                    <TextBlock Text="Language, vocabulary, clean-up" TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="Language, vocabulary, clean-up" TextTrimming="CharacterEllipsis" />
+                                </Grid>
                             </Expander.Header>
                             <StackPanel Spacing="14">
                                 <ComboBox x:Name="LanguageBox" Header="Language" HorizontalAlignment="Stretch" />

@@ -71,6 +71,9 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         Run.StartRequested += async (_, _) => await StartAsync();
         Run.CancelRequested += async (_, ask) => await CancelAsync(ask);
         Summary.Closed += (_, _) => ShowSummary(null);
+        // in a short window the options scroll: show what just opened
+        MoreOptions.Expanding += (_, _) => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+            () => MoreOptions.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true }));
     }
 
     public event EventHandler<RunProgress>? ProgressChanged;

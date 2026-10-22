@@ -162,6 +162,7 @@ public sealed partial class SetupView : UserControl
         _download = new CancellationTokenSource();
         (_rateBytes, _rateTime, _bytesPerSecond) = (-1, 0, 0);
         DownloadButton.Content = "Pause";
+        DownloadButton.Style = (Style)Application.Current.Resources["DefaultButtonStyle"];
         ModelRow.Set(CheckState.Checking, "Downloading the speech model", $"{name}, checked against its published checksum");
         DownloadPanel.Visibility = Visibility.Visible;
         UpdateButtons();
@@ -187,6 +188,7 @@ public sealed partial class SetupView : UserControl
         {
             _download.Dispose();
             _download = null;
+            DownloadButton.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
         }
         if (_model)
         {
