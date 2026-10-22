@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Hushcue.Pages.EditPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:pages="using:Hushcue.Pages">
+
+    <Grid>
+        <!-- Start: open a video with subtitles it already has, or one edited before -->
+        <ScrollViewer x:Name="Landing" VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="1000" HorizontalAlignment="Stretch" Spacing="16" Padding="4,8,4,24">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Edit subtitles" Style="{StaticResource TitleTextBlockStyle}"
+                               AutomationProperties.HeadingLevel="Level1" />
+                    <TextBlock Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="Open a video with subtitles you already have: check them against the picture, fix the text and the timing, then save the .srt or put it into a copy of the video. Nothing is transcribed unless you re-run a part." />
+                </StackPanel>
+
+                <Border Style="{StaticResource Card}" Padding="16">
+                    <Grid MinHeight="220">
+                        <Rectangle RadiusX="8" RadiusY="8" StrokeThickness="1.5" StrokeDashArray="4,3"
+                                   Stroke="{ThemeResource ControlStrongStrokeColorDefaultBrush}" />
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="24">
+                            <FontIcon Glyph="&#xE70F;" FontSize="32" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="Drop a video and its .srt here" HorizontalAlignment="Center"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                            <TextBlock HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="460"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Text="A video on its own works too: the subtitles next to it are found by name (talk.mp4 and talk.srt or talk.en.srt)." />
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,6,0,0">
+                                <Button Style="{ThemeResource AccentButtonStyle}" Click="OnOpenVideo"
+                                        AutomationProperties.Name="Open a video to edit its subtitles">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE8E5;" FontSize="14" />
+                                        <TextBlock Text="Open video" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="OnOpenSubtitles" AutomationProperties.Name="Open an .srt file to edit">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE8A5;" FontSize="14" />
+                                        <TextBlock Text="Open .srt" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <StackPanel x:Name="RecentPanel" Spacing="8">
+                    <TextBlock Text="Recent" Style="{StaticResource BodyStrongTextBlockStyle}"
+                               AutomationProperties.HeadingLevel="Level2" />
+                    <ListView x:Name="RecentList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnRecentClick"
+                              AutomationProperties.Name="Recently edited subtitles">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="pages:RecentEdit">
+                                <Grid ColumnSpacing="12" Padding="0,8" AutomationProperties.Name="{x:Bind Name}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE8B2;" FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind Detail}" TextTrimming="CharacterEllipsis"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <pages:ReviewPage x:Name="Review" Visibility="Collapsed" />
+    </Grid>
+</UserControl>

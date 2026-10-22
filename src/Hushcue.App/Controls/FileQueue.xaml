@@ -17,7 +17,6 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                 <TextBlock x:Name="TitleText" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center"
@@ -35,16 +34,7 @@
                     <TextBlock Text="Add files" />
                 </StackPanel>
             </Button>
-            <!-- Open a video with subtitles it already has, straight in the editor (the Generate page only) -->
-            <Button x:Name="EditButton" Grid.Column="2" Click="OnEdit" Visibility="Collapsed"
-                    ToolTipService.ToolTip="Open a video and its existing .srt in the subtitle editor"
-                    AutomationProperties.Name="Edit existing subtitles">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE70F;" FontSize="14" />
-                    <TextBlock Text="Edit subtitles" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="ClearButton" Grid.Column="3" Click="OnClear" Style="{ThemeResource SubtleButtonStyle}"
+            <Button x:Name="ClearButton" Grid.Column="2" Click="OnClear" Style="{ThemeResource SubtleButtonStyle}"
                     ToolTipService.ToolTip="Remove every file from the list" AutomationProperties.Name="Clear the list">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon Glyph="&#xE74D;" FontSize="14" />

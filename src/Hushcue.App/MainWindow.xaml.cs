@@ -18,9 +18,20 @@ using Windows.UI;
 
 namespace Hushcue;
 
+/// <summary>The pages the sidebar switches between; the first three are remembered between runs.</summary>
+public enum AppPage
+{
+    Generate,
+    Convert,
+    Edit,
+    Settings,
+    About,
+}
+
 public sealed partial class MainWindow : Window
 {
     private readonly AppSettings _settings = AppSettings.Load();
+    private AppPage _page;
     private readonly Taskbar _taskbar;
     private string? _gpuName;
     private bool _closeConfirmed;
@@ -42,7 +53,18 @@ public sealed partial class MainWindow : Window
 
         Generate.Load(_settings);
         Convert.Load(_settings);
-        Modes.SelectedItem = _settings.Page == 1 ? ConvertItem : GenerateItem;
+        Edit.Load(_settings);
+        SettingsView.Load(_settings);
+        Edit.IsJobRunning = () => Generate.IsRunning;
+        Generate.SettingsRequested += (_, _) => Navigate(AppPage.Settings);
+        SettingsView.Changed += (_, _) =>
+        {
+            Generate.RefreshSettingsSummary();
+            ApplyTheme();
+        };
+        SettingsView.SystemCheckRequested += (_, _) => OnBadgeClick(this, new RoutedEventArgs());
+        ApplyTheme();
+        Navigate(_settings.Page is >= 0 and <= (int)AppPage.Edit ? (AppPage)_settings.Page : AppPage.Generate);
         foreach (var page in new IRunPage[] { Generate, Convert })
         {
             page.ProgressChanged += (_, progress) => _taskbar.SetProgress(progress.Fraction, progress.State);
@@ -68,7 +90,54 @@ public sealed partial class MainWindow : Window
         _ = Setup.CheckAsync();
     }
 
-    private Controls.FileQueue ActiveQueue => Convert.Visibility == Visibility.Visible ? Convert.Files : Generate.Files;
+    /// <summary>The queue files go to: the MKV page's on that page, else the Generate page's.</summary>
+    private Controls.FileQueue ActiveQueue => _page == AppPage.Convert ? Convert.Files : Generate.Files;
+
+    /// <summary>Show a page and select it in the sidebar.</summary>
+    private void Navigate(AppPage page)
+    {
+        _page = page;
+        Nav.SelectedItem = page switch
+        {
+            AppPage.Convert => ConvertItem,
+            AppPage.Edit => EditItem,
+            AppPage.Settings => Nav.SettingsItem,
+            AppPage.About => AboutItem,
+            _ => GenerateItem,
+        };
+        ShowPage();
+    }
+
+    private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        var item = args.SelectedItem as NavigationViewItem;
+        _page = args.IsSettingsSelected ? AppPage.Settings
+            : item == ConvertItem ? AppPage.Convert
+            : item == EditItem ? AppPage.Edit
+            : item == AboutItem ? AppPage.About
+            : AppPage.Generate;
+        ShowPage();
+    }
+
+    /// <summary>The current page, or the setup screen over everything while it is open.</summary>
+    private void ShowPage()
+    {
+        var setup = Setup.Visibility == Visibility.Visible;
+        Generate.Visibility = Shown(!setup && _page == AppPage.Generate);
+        Convert.Visibility = Shown(!setup && _page == AppPage.Convert);
+        Edit.Visibility = Shown(!setup && _page == AppPage.Edit);
+        SettingsView.Visibility = Shown(!setup && _page == AppPage.Settings);
+        About.Visibility = Shown(!setup && _page == AppPage.About);
+    }
+
+    private static Visibility Shown(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
+
+    private void ApplyTheme() => Root.RequestedTheme = _settings.Theme switch
+    {
+        "Light" => ElementTheme.Light,
+        "Dark" => ElementTheme.Dark,
+        _ => ElementTheme.Default,
+    };
 
 
     /// <summary>
@@ -89,6 +158,7 @@ public sealed partial class MainWindow : Window
 
     private readonly List<SubtitlePair> _pendingEdits = [];
     private readonly List<string> _pendingOrphans = [];
+    private string? _pendingVideo;
 
     /// <summary>
     /// Queue files on the page that is showing. Subtitles (.srt) open in the editor with their video instead: dropped
@@ -97,9 +167,19 @@ public sealed partial class MainWindow : Window
     public void AddFiles(IEnumerable<string> paths)
     {
         var (pairs, orphans, others) = SubtitlePairs.Split(paths);
+        if (_page == AppPage.Edit && pairs.Count == 0 && others.FirstOrDefault(SubtitlePairs.IsMedia) is { } video)
+        {
+            // on the editor's page a video on its own opens with the subtitles next to it
+            _pendingVideo = video;
+            others = [.. others.Where(p => p != video)];
+        }
         if (others.Count > 0)
+        {
+            if (_page is not (AppPage.Generate or AppPage.Convert))
+                Navigate(AppPage.Generate);
             ActiveQueue.AddPaths(others);
-        if (pairs.Count == 0 && orphans.Count == 0)
+        }
+        if (pairs.Count == 0 && orphans.Count == 0 && _pendingVideo is null)
             return;
         _pendingEdits.AddRange(pairs);
         _pendingOrphans.AddRange(orphans);
@@ -109,15 +189,22 @@ public sealed partial class MainWindow : Window
     /// <summary>Open what was asked for once the window is up and past the setup screen (editing needs no model).</summary>
     private async void OpenPendingEdits()
     {
-        if (Root.XamlRoot is null || Setup.Visibility == Visibility.Visible || (_pendingEdits.Count == 0 && _pendingOrphans.Count == 0))
+        if (Root.XamlRoot is null || Setup.Visibility == Visibility.Visible
+            || (_pendingEdits.Count == 0 && _pendingOrphans.Count == 0 && _pendingVideo is null))
             return;
         var pairs = _pendingEdits.ToList();
         var orphans = _pendingOrphans.ToList();
+        var video = _pendingVideo;
         _pendingEdits.Clear();
         _pendingOrphans.Clear();
-        Modes.SelectedItem = GenerateItem;
-        for (var i = 0; i < pairs.Count; i++)
-            await Generate.OpenInEditorAsync(pairs[i].Video, pairs[i].Srt, open: i == 0);
+        _pendingVideo = null;
+        Navigate(AppPage.Edit);
+        foreach (var pair in pairs.Skip(1))
+            Edit.Remember(pair); // one opens; the others wait in Recent
+        if (pairs.Count > 0)
+            await Edit.OpenAsync(pairs[0].Video, pairs[0].Srt);
+        else if (video is not null)
+            await Edit.OpenAsync(video, null);
         if (orphans.Count > 0)
         {
             var names = string.Join(", ", orphans.Select(Path.GetFileName));
@@ -130,21 +217,8 @@ public sealed partial class MainWindow : Window
     {
         Setup.SetFirstRun(firstRun);
         Setup.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        Modes.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
-        ShowPage(show ? null : Modes.SelectedItem == ConvertItem);
-    }
-
-    /// <param name="convert">null hides both pages</param>
-    private void ShowPage(bool? convert)
-    {
-        Generate.Visibility = convert == false ? Visibility.Visible : Visibility.Collapsed;
-        Convert.Visibility = convert == true ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void OnModeChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
-    {
-        if (Setup.Visibility != Visibility.Visible)
-            ShowPage(sender.SelectedItem == ConvertItem);
+        Nav.IsPaneVisible = !show;
+        ShowPage();
     }
 
     private void OnGpuChecked(GpuStatus gpu)
@@ -153,6 +227,9 @@ public sealed partial class MainWindow : Window
         var device = gpu.Cuda ? "cuda" : "cpu";
         Generate.SetDevice(device);
         ShowBadge(device);
+        SettingsView.SetDevice(gpu.Cuda && gpu.Name is not null ? $"On your {gpu.Name}."
+            : gpu.Name is not null ? $"On the CPU: {gpu.Name} is there, but CUDA or its libraries are not ready. Run the system check."
+            : "On the CPU: no NVIDIA graphics card was found. It works, more slowly.");
         if (Setup.Visibility != Visibility.Visible && !Setup.IsReadyToRun)
             ShowSetup(true, firstRun: true); // the engine itself is missing
     }
@@ -189,9 +266,10 @@ public sealed partial class MainWindow : Window
     private void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var ctrl = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
-        if (e.Key != VirtualKey.Enter || !ctrl || Setup.Visibility == Visibility.Visible)
+        if (e.Key != VirtualKey.Enter || !ctrl || Setup.Visibility == Visibility.Visible
+            || _page is not (AppPage.Generate or AppPage.Convert))
             return;
-        (Convert.Visibility == Visibility.Visible ? (IRunPage)Convert : Generate).Start();
+        (_page == AppPage.Convert ? (IRunPage)Convert : Generate).Start();
         e.Handled = true;
     }
 
@@ -200,8 +278,9 @@ public sealed partial class MainWindow : Window
         if (!e.DataView.Contains(StandardDataFormats.StorageItems) || Setup.Visibility == Visibility.Visible)
             return;
         e.AcceptedOperation = DataPackageOperation.Copy;
-        e.DragUIOverride.Caption = "Add to the queue";
-        ActiveQueue.SetDropActive(true);
+        e.DragUIOverride.Caption = _page == AppPage.Edit ? "Open in the editor" : "Add to the queue";
+        if (_page is AppPage.Generate or AppPage.Convert)
+            ActiveQueue.SetDropActive(true);
     }
 
     private void OnDragLeave(object sender, DragEventArgs e) => ActiveQueue.SetDropActive(false);
@@ -218,7 +297,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (!_closeConfirmed && Generate.HasUnsavedEdits)
+        if (!_closeConfirmed && (Generate.HasUnsavedEdits || Edit.HasUnsavedEdits))
         {
             args.Cancel = true;
             if (!await Dialogs.ConfirmAsync(Root.XamlRoot, "Your edits to the subtitles are not saved. Close Hushcue without saving them?",
@@ -252,9 +331,10 @@ public sealed partial class MainWindow : Window
     {
         Generate.Save(_settings);
         Convert.Save(_settings);
-        _settings.Page = Modes.SelectedItem == ConvertItem ? 1 : 0;
+        _settings.Page = _page <= AppPage.Edit ? (int)_page : 0;
         _settings.Save();
         Setup.Stop();
+        Edit.Stop();
         Generate.Stop();
         Convert.Stop();
         _taskbar.Clear();

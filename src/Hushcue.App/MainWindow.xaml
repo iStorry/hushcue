@@ -16,27 +16,11 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Title bar: the app, its two tools, and where the work runs -->
+        <!-- Title bar: the app, and where the work runs -->
         <TitleBar x:Name="AppTitleBar" Title="Hushcue" IsBackButtonVisible="False" IsPaneToggleButtonVisible="False">
             <TitleBar.IconSource>
                 <FontIconSource Glyph="&#xE7F0;" />
             </TitleBar.IconSource>
-            <TitleBar.Content>
-                <SelectorBar x:Name="Modes" SelectionChanged="OnModeChanged" AutomationProperties.Name="Tool">
-                    <SelectorBarItem x:Name="GenerateItem" Text="Generate subtitles"
-                                     ToolTipService.ToolTip="Make subtitles for videos and audio files">
-                        <SelectorBarItem.Icon>
-                            <FontIcon Glyph="&#xED1E;" />
-                        </SelectorBarItem.Icon>
-                    </SelectorBarItem>
-                    <SelectorBarItem x:Name="ConvertItem" Text="MKV to MP4"
-                                     ToolTipService.ToolTip="Remove the subtitle tracks from .mkv files and save them as .mp4">
-                        <SelectorBarItem.Icon>
-                            <FontIcon Glyph="&#xE8AB;" />
-                        </SelectorBarItem.Icon>
-                    </SelectorBarItem>
-                </SelectorBar>
-            </TitleBar.Content>
             <TitleBar.RightHeader>
                 <!-- "Offline · RTX 4070": everything runs here; opens the system check -->
                 <Button x:Name="Badge" Click="OnBadgeClick" Padding="10,4" Margin="0,0,4,0" CornerRadius="12"
@@ -52,11 +36,48 @@
             </TitleBar.RightHeader>
         </TitleBar>
 
-        <!-- On very wide screens the pages stop growing and stay centred -->
-        <Grid Grid.Row="1" Padding="20,2,20,16" MaxWidth="1880">
-            <pages:GeneratePage x:Name="Generate" />
-            <pages:ConvertPage x:Name="Convert" Visibility="Collapsed" />
-            <controls:SetupView x:Name="Setup" Visibility="Collapsed" />
-        </Grid>
+        <!-- The app's three tools in a sidebar, with Settings and About at the bottom -->
+        <NavigationView x:Name="Nav" Grid.Row="1" PaneDisplayMode="Auto" IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="True" OpenPaneLength="232" CompactModeThresholdWidth="760"
+                        ExpandedModeThresholdWidth="1100" SelectionChanged="OnNavSelectionChanged"
+                        AutomationProperties.Name="Tools">
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="GenerateItem" Content="Generate subtitles"
+                                    ToolTipService.ToolTip="Make subtitles for videos and audio files">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xED1E;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="EditItem" Content="Edit subtitles"
+                                    ToolTipService.ToolTip="Open a video with its .srt and fix the text and timing">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE70F;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ConvertItem" Content="MKV to MP4"
+                                    ToolTipService.ToolTip="Remove the subtitle tracks from .mkv files and save them as .mp4">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8AB;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem x:Name="AboutItem" Content="About">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE946;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+
+            <!-- Very wide screens: the pages stop growing and stay centred -->
+            <Grid Padding="20,8,20,16" MaxWidth="2560">
+                <pages:GeneratePage x:Name="Generate" />
+                <pages:EditPage x:Name="Edit" Visibility="Collapsed" />
+                <pages:ConvertPage x:Name="Convert" Visibility="Collapsed" />
+                <pages:SettingsPage x:Name="SettingsView" Visibility="Collapsed" />
+                <pages:AboutPage x:Name="About" Visibility="Collapsed" />
+                <controls:SetupView x:Name="Setup" Visibility="Collapsed" />
+            </Grid>
+        </NavigationView>
     </Grid>
 </Window>

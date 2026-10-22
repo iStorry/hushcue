@@ -60,23 +60,19 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         }
         ChoiceGroup.Attach(PresetChoices);
         ChoiceGroup.Attach(ResultChoices);
-        foreach (var (name, _) in Presets.Languages)
-            LanguageBox.Items.Add(name);
         Run.StartRequested += async (_, _) => await StartAsync();
         Run.CancelRequested += async (_, ask) => await CancelAsync(ask);
         Summary.Closed += (_, _) => ShowSummary(null);
         Summary.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
         Queue.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
-        Queue.CanEdit = true;
         SizeChanged += OnPageSizeChanged;
-        Queue.EditRequested += async (_, _) => await PickAndEditAsync();
         Review.Closed += (_, _) => ShowReview(false);
         Review.Embedded += (_, embedded) => Queue.Update(FileProgress.Done(embedded.File.Path, embedded.Result.Video));
         Review.IsJobRunning = () => IsRunning;
-        // in a short window the options scroll: show what just opened
-        MoreOptions.Expanding += (_, _) => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-            () => MoreOptions.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true }));
     }
+
+    /// <summary>"Change in Settings" under the options: the transcription and output choices live there.</summary>
+    public event EventHandler? SettingsRequested;
 
     public event EventHandler<RunProgress>? ProgressChanged;
     public event EventHandler? Finished;
@@ -106,30 +102,15 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var preset = Presets.Get(settings.Preset).Name;
         Check<string>(PresetChoices, name => name == preset);
         Check<ResultChoice>(ResultChoices, choice => choice.Mode == settings.Embed);
-        LanguageBox.SelectedItem = Presets.Languages.Any(l => l.Name == settings.Language) ? settings.Language : "English";
-        VocabularyBox.Text = settings.Vocabulary;
-        KeepSrtBox.IsChecked = settings.KeepSrt;
-        DeleteBox.IsChecked = settings.DeleteOriginal;
-        ReviewBox.IsChecked = settings.ReviewBeforeEmbed;
-        EnhanceBox.IsChecked = settings.Enhance;
-        SkipSilenceBox.IsChecked = settings.SkipSilence;
         Output.Folder = settings.OutputFolder;
-        MoreOptions.IsExpanded = HasAdvancedChoices(settings);
-        UpdateEmbedOptions();
+        RefreshSettingsSummary();
         ShowIdleStatus();
     }
 
     public void Save(AppSettings settings)
     {
         settings.Preset = SelectedPreset;
-        settings.Language = (string)LanguageBox.SelectedItem;
-        settings.Vocabulary = VocabularyBox.Text;
         settings.Embed = SelectedEmbed;
-        settings.KeepSrt = KeepSrtBox.IsChecked == true;
-        settings.DeleteOriginal = DeleteBox.IsChecked == true;
-        settings.ReviewBeforeEmbed = ReviewBox.IsChecked == true;
-        settings.Enhance = EnhanceBox.IsChecked == true;
-        settings.SkipSilence = SkipSilenceBox.IsChecked == true;
         settings.OutputFolder = Output.Folder;
     }
 
@@ -176,11 +157,6 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             card.IsChecked = card.Content is T content && match(content);
     }
 
-    /// <summary>Open "More options" when something in it differs from the defaults, so it isn't forgotten.</summary>
-    private static bool HasAdvancedChoices(AppSettings settings) =>
-        settings.Language != new AppSettings().Language || settings.Vocabulary.Length > 0 || settings.Enhance
-        || settings.SkipSilence;
-
     /// <summary>What a run will make of a file, from its probe: warned about in its row before the run.</summary>
     private FileCheck? CheckFile(QueuedFile file)
     {
@@ -217,19 +193,39 @@ public sealed partial class GeneratePage : UserControl, IRunPage
 
     private void OnResultChanged(object sender, RoutedEventArgs e)
     {
-        UpdateEmbedOptions();
+        RefreshSettingsSummary();
         Queue.RefreshChecks();
     }
 
-    private void UpdateEmbedOptions()
+    /// <summary>
+    /// One line under the options with the choices kept in Settings that apply to this run ("English · keeps the
+    /// .srt · originals to the Recycle Bin"), so nothing set there is a surprise.
+    /// </summary>
+    public void RefreshSettingsSummary()
     {
-        var embedding = SelectedEmbed != EmbedMode.None;
-        KeepSrtBox.IsEnabled = embedding;
-        DeleteBox.IsEnabled = embedding;
-        ReviewBox.IsEnabled = embedding;
-        if (!embedding)
-            DeleteBox.IsChecked = false;
+        if (SettingsSummary is null || ResultChoices.Children.Count == 0)
+            return;
+        var parts = new List<string> { _settings.Language };
+        var words = _settings.Vocabulary.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+        if (words > 0)
+            parts.Add(words == 1 ? "1 vocabulary word" : $"{words} vocabulary words");
+        if (_settings.Enhance)
+            parts.Add("audio clean-up");
+        if (_settings.SkipSilence)
+            parts.Add("skips silence");
+        if (SelectedEmbed != EmbedMode.None)
+        {
+            if (_settings.KeepSrt)
+                parts.Add("keeps the .srt");
+            if (_settings.DeleteOriginal)
+                parts.Add("originals to the Recycle Bin");
+            if (_settings.ReviewBeforeEmbed)
+                parts.Add("review before embedding");
+        }
+        SettingsSummary.Text = string.Join(" · ", parts);
     }
+
+    private void OnSettingsLink(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
     private void OnQueueChanged()
     {
@@ -566,88 +562,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         ActivityColumn.Width = beside ? new GridLength(2, GridUnitType.Star) : new GridLength(0);
     }
 
-    private JobSettings CurrentSettings() => new()
-    {
-        Preset = SelectedPreset,
-        Language = Presets.Languages.First(l => l.Name == (string)LanguageBox.SelectedItem).Code,
-        Enhance = EnhanceBox.IsChecked == true,
-        Vocabulary = VocabularyBox.Text,
-        SkipSilence = SkipSilenceBox.IsChecked == true,
-        Embed = SelectedEmbed,
-        KeepSrt = KeepSrtBox.IsChecked == true,
-        DeleteOriginal = DeleteBox.IsChecked == true,
-        ReviewBeforeEmbed = ReviewBox.IsChecked == true,
-    };
-
-    /// <summary>"Edit subtitles": pick a video, then edit the .srt next to it (or one picked by hand).</summary>
-    private async Task PickAndEditAsync()
-    {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker
-        {
-            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.VideosLibrary,
-        };
-        foreach (var extension in MediaFiles.Extensions)
-            picker.FileTypeFilter.Add(extension);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
-        if (await picker.PickSingleFileAsync() is { } video)
-            await OpenInEditorAsync(video.Path, null);
-    }
-
-    /// <summary>
-    /// Open a video and subtitles it already has in the editor, without transcribing: the .srt given, else the one next
-    /// to the video ("name.srt" or "name.en.srt"), else one the user picks. The video joins the list as done, so it can
-    /// be reopened, and the editor's Save and Embed work on that .srt.
-    /// </summary>
-    /// <param name="open">false only adds the video to the list, ready to review (for a second file dropped at once)</param>
-    public async Task OpenInEditorAsync(string video, string? srt, bool open = true)
-    {
-        if (open && IsReviewing && Review.Current is not null && !await Review.CloseAsync())
-            return;
-        srt ??= SubtitlePairs.FindSubtitles(video) ?? await PickSubtitlesAsync(video);
-        if (srt is null)
-            return;
-        List<Cue> cues;
-        try
-        {
-            cues = await Srt.LoadAsync(srt);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or OverflowException)
-        {
-            await Dialogs.ErrorAsync(XamlRoot, $"Could not read {Path.GetFileName(srt)}: {e.Message}");
-            return;
-        }
-        if (cues.Count == 0)
-        {
-            await Dialogs.InfoAsync(XamlRoot, $"{Path.GetFileName(srt)} has no subtitles in it.");
-            return;
-        }
-
-        Queue.AddPaths([video]);
-        if (Queue.Get(video) is not { } file)
-            return;
-        await file.Probing;
-        if (file.ProbeError is not null)
-        {
-            await Dialogs.ErrorAsync(XamlRoot, $"Could not open {file.Name}: {file.ProbeError}");
-            return;
-        }
-        file.Update(FileProgress.Done(file.Path, srt));
-        file.SetTranscript(new Transcript(cues, srt, CurrentSettings(), Output.FolderOrNull,
-                                          Math.Max(file.Duration, cues[^1].End)));
-        if (open)
-            await OpenReviewAsync(file);
-    }
-
-    private async Task<string?> PickSubtitlesAsync(string video)
-    {
-        if (!await Dialogs.ConfirmAsync(XamlRoot,
-                $"There is no .srt next to {Path.GetFileName(video)}. Pick the subtitles to edit?", "Pick an .srt"))
-            return null;
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-        picker.FileTypeFilter.Add(".srt");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
-        return (await picker.PickSingleFileAsync())?.Path;
-    }
+    private JobSettings CurrentSettings() => _settings.ToJob(SelectedPreset, SelectedEmbed);
 
     private async Task OpenReviewAsync(QueuedFile file)
     {
@@ -669,12 +584,10 @@ public sealed partial class GeneratePage : UserControl, IRunPage
 
     private void SetOptionsEnabled(bool enabled)
     {
-        foreach (var control in new Control[] { MoreOptions, KeepSrtBox, DeleteBox, ReviewBox, Output })
-            control.IsEnabled = enabled;
+        Output.IsEnabled = enabled;
+        SettingsLink.IsEnabled = enabled;
         foreach (var card in PresetChoices.Children.Concat(ResultChoices.Children).OfType<Control>())
             card.IsEnabled = enabled;
-        if (enabled)
-            UpdateEmbedOptions();
     }
 
     private async Task CancelAsync(bool ask)

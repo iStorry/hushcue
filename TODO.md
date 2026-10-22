@@ -220,10 +220,10 @@ Core: `src/Hushcue.Core/Review/` (cue editor with undo, flags, waveform envelope
 embedding; `ReviewTests.cs`); the job reports stages and events as data, so the app no longer reads Core's log
 wording. App: Review page, live transcript, waveform timeline.
 
-- [x] Open existing subtitles in the editor without transcribing: "Edit subtitles" button (pick a video; its
-      `name.srt` / `name.en.srt` is found, or pick one), drop a video with its .srt, pass an .srt on the command line,
-      or Explorer's "Edit subtitles with Hushcue" on .srt files (installer). Pairing in `Subtitles/SubtitlePairs.cs`
-      (tested); app side built, not run
+- [x] Open existing subtitles in the editor without transcribing: the "Edit subtitles" page (open a video; its
+      `name.srt` / `name.en.srt` is found, or pick one; recent edits listed), drop a video with its .srt, pass an .srt
+      on the command line, or Explorer's "Edit subtitles with Hushcue" on .srt files (installer). Pairing in
+      `Subtitles/SubtitlePairs.cs` (tested); app side built, not run
 - [ ] Subtitle tracks inside an .mkv: extract to edit, write back as a new file
 - [ ] Run and check every item below in the app
 - [ ] Show cues as they are transcribed in a side panel
@@ -244,6 +244,18 @@ wording. App: Review page, live transcript, waveform timeline.
 - [x] Finished screen (`Controls/FinishedPanel`) in place of the options: video length, time taken, speed, coverage
       warnings and failures by file, Open folder, and "Put them back" for originals moved to the Recycle Bin
       (`Media/RecycleBinRestore.cs`, plus Open Recycle Bin). Restore checked on two recycled test files
+
+**Navigation, Settings, About** (built, not run)
+
+- [x] Sidebar (`NavigationView`) with the three tools: Generate subtitles, Edit subtitles, MKV to MP4; Settings and
+      About at the bottom. Replaces the tabs in the title bar
+- [x] Settings page: language, vocabulary, audio clean-up, skip silence, keep the .srt, Recycle Bin, review before
+      embedding, theme (Windows / light / dark), where transcription runs, open the models and data folder. The
+      options card on Generate keeps only Quality and Result, with a one-line summary of the rest and a link
+- [x] About page: version, privacy note, what it is built on, source code, report a problem, third-party notices
+- [x] Big windows: options card as tall as its content; on wide pages (1400+ px) the live transcript and finished
+      summary get their own column; pages grow to 2560 px for ultra-wide screens
+- [ ] Check all of the above in the running app (light and dark, 900 px to ultra-wide)
 
 **Windows touches**
 

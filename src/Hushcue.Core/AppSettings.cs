@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Hushcue.Core.Media;
+using Hushcue.Core.Pipeline;
+using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Core;
 
@@ -20,6 +22,45 @@ public sealed class AppSettings
     public bool ConvertDeleteOriginal { get; set; }
     public string ConvertOutputFolder { get; set; } = "";
     public int Page { get; set; }
+
+    /// <summary>"System" follows Windows; "Light" or "Dark" pins the app's theme.</summary>
+    public string Theme { get; set; } = "System";
+
+    /// <summary>Videos and subtitles opened in the editor, most recent first (at most <see cref="MaxRecentEdits"/>).</summary>
+    public List<SubtitlePair> RecentEdits { get; set; } = [];
+
+    public const int MaxRecentEdits = 8;
+
+    /// <summary>Put <paramref name="pair"/> first in <see cref="RecentEdits"/>.</summary>
+    public void AddRecentEdit(SubtitlePair pair)
+    {
+        RecentEdits.RemoveAll(p => string.Equals(p.Video, pair.Video, StringComparison.OrdinalIgnoreCase));
+        RecentEdits.Insert(0, pair);
+        if (RecentEdits.Count > MaxRecentEdits)
+            RecentEdits.RemoveRange(MaxRecentEdits, RecentEdits.Count - MaxRecentEdits);
+    }
+
+    /// <summary>
+    /// A job's settings from these choices. The options that only apply when subtitles go into the video (keep the
+    /// .srt, recycle the original, review first) are off when <paramref name="embed"/> is None.
+    /// </summary>
+    public JobSettings ToJob(string? preset = null, EmbedMode? embed = null)
+    {
+        var mode = embed ?? Embed;
+        var embedding = mode != EmbedMode.None;
+        return new JobSettings
+        {
+            Preset = preset ?? Preset,
+            Language = Presets.Languages.FirstOrDefault(l => l.Name == Language, Presets.Languages[0]).Code,
+            Enhance = Enhance,
+            Vocabulary = Vocabulary,
+            SkipSilence = SkipSilence,
+            Embed = mode,
+            KeepSrt = embedding && KeepSrt,
+            DeleteOriginal = embedding && DeleteOriginal,
+            ReviewBeforeEmbed = embedding && ReviewBeforeEmbed,
+        };
+    }
 
     /// <summary>
     /// How many times faster than real time transcription ran on this PC, by preset and device ("Balanced/cuda"):

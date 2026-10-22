@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Hushcue.Pages.AboutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="1000" HorizontalAlignment="Stretch" Spacing="16" Padding="4,8,4,24">
+            <TextBlock Text="About" Style="{StaticResource TitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level1" />
+
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnSpacing="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Image x:Name="AppIcon" Width="72" Height="72" VerticalAlignment="Top" AutomationProperties.AccessibilityView="Raw" />
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock x:Name="NameText" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Name="VersionText" Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="TaglineText" Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Private by design" Style="{StaticResource BodyStrongTextBlockStyle}" AutomationProperties.HeadingLevel="Level2" />
+                    <TextBlock Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap"
+                               Text="Everything happens on this PC. Your videos and subtitles are never uploaded; the only downloads are the speech model and the GPU libraries, once, the first time you need them." />
+                    <TextBlock Text="Built with" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,8,0,0" AutomationProperties.HeadingLevel="Level2" />
+                    <TextBlock Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap"
+                               Text="OpenAI's Whisper models (large-v3 and large-v3-turbo) running on CTranslate2, the transcription logic of faster-whisper, Silero VAD for skipping silence, and ffmpeg for audio and video. Thanks to all of their authors." />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Click="OnSource">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE943;" FontSize="14" />
+                        <TextBlock Text="Source code" />
+                    </StackPanel>
+                </Button>
+                <Button Click="OnIssues">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xEBE8;" FontSize="14" />
+                        <TextBlock Text="Report a problem" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="NoticesButton" Click="OnNotices">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE8A5;" FontSize="14" />
+                        <TextBlock Text="Third-party notices" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -103,37 +103,16 @@
                                                         Detail="Shows in every player; re-encodes the video" />
                                 </RadioButton>
                             </StackPanel>
-                            <StackPanel>
-                                <CheckBox x:Name="KeepSrtBox" Content="Also keep the .srt file" />
-                                <CheckBox x:Name="DeleteBox" Content="Move the original to the Recycle Bin"
-                                          ToolTipService.ToolTip="Only after the new video has been written. You can put it back from the finished screen or the Recycle Bin." />
-                                <CheckBox x:Name="ReviewBox" Content="Review before embedding"
-                                          ToolTipService.ToolTip="Stop after the subtitles are made, so you can check and edit them, then embed each file from its review. The .srt is kept for your edits." />
-                            </StackPanel>
                         </StackPanel>
 
-                        <Expander x:Name="MoreOptions" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                                  AutomationProperties.Name="More options: language, vocabulary, clean-up">
-                            <Expander.Header>
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="&#xE9E9;" FontSize="14" />
-                                    <TextBlock Grid.Column="1" Text="Language, vocabulary, clean-up" TextTrimming="CharacterEllipsis" />
-                                </Grid>
-                            </Expander.Header>
-                            <StackPanel Spacing="14">
-                                <ComboBox x:Name="LanguageBox" Header="Language" HorizontalAlignment="Stretch" />
-                                <TextBox x:Name="VocabularyBox" Header="Vocabulary" TextWrapping="Wrap"
-                                         PlaceholderText="Names or words to spell correctly, comma separated" />
-                                <StackPanel>
-                                    <CheckBox x:Name="EnhanceBox" Content="Clean up audio first (denoise and normalize)" />
-                                    <CheckBox x:Name="SkipSilenceBox" Content="Skip silent parts (faster, may drop quiet speech)" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Expander>
+                        <!-- Language, vocabulary, clean-up and what happens to the files live in Settings -->
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="SettingsSummary" Style="{StaticResource Hint}"
+                                       AutomationProperties.Name="Other choices for this run" />
+                            <HyperlinkButton x:Name="SettingsLink" Padding="0" Click="OnSettingsLink"
+                                             Content="Language, vocabulary and file options in Settings"
+                                             AutomationProperties.Name="Change language, vocabulary and file options in Settings" />
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
