@@ -23,7 +23,7 @@ It can save an `.srt` file, add a subtitle track to an `.mkv`, or burn the text 
 ## Build
 
 Needs the .NET 10 SDK (pinned in `global.json`) on Windows 10 1809 or later, x64. The engine bridge also needs
-Visual Studio 2022 Build Tools (C++ workload), CMake, and a Python environment with the `ctranslate2==4.8.2`,
+Visual Studio 2022 or later Build Tools (C++ workload), CMake, and a Python environment with the `ctranslate2==4.8.2`,
 `nvidia-cublas-cu12` and `nvidia-cudnn-cu12` wheels (SubGen's venv by default).
 
 ```bash

@@ -2,10 +2,12 @@
 
     ..\\subgen\\.venv\\Scripts\\python tools\\bench\\fw_reference.py OUT_DIR [--language auto|CODE] [--prompt TEXT]
         [--repetition-penalty P] [--hallucination-silence SECONDS] [--seconds N]
+        [--vad] [--vad-threshold T] [--vad-min-silence MS]
 
 Writes OUT_DIR/CLIP.words.json and, so Hushcue.Cli can decode the very same input, bench-out/features-N/CLIP.f32
 (faster-whisper's own log-mel features). --seconds N uses only the first N seconds of each clip.
 Run Hushcue.Cli transcribe with the same options and --features bench-out/features-N, then compare the words.
+The features are of the whole clip, so with the --vad options run Hushcue.Cli with the same --vad options instead.
 """
 from __future__ import annotations
 
@@ -44,7 +46,13 @@ def main() -> int:
     parser.add_argument("--repetition-penalty", type=float, default=1.0)
     parser.add_argument("--hallucination-silence", type=float)
     parser.add_argument("--seconds", type=float)
+    parser.add_argument("--vad", action="store_true")
+    parser.add_argument("--vad-threshold", type=float)
+    parser.add_argument("--vad-min-silence", type=int)
     args = parser.parse_args()
+    vad_parameters = {key: value for key, value in [("threshold", args.vad_threshold),
+                                                    ("min_silence_duration_ms", args.vad_min_silence)]
+                      if value is not None}
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -56,7 +64,8 @@ def main() -> int:
         FeatureExtractor(feature_size=128)(audio).astype(np.float32).tofile(features_dir / f"{clip.stem}.f32")
         segments, info = model.transcribe(
             audio, language=None if args.language == "auto" else args.language, beam_size=5, temperature=[0.0],
-            condition_on_previous_text=False, vad_filter=False, word_timestamps=True, no_speech_threshold=0.6,
+            condition_on_previous_text=False, vad_filter=args.vad or bool(vad_parameters),
+            vad_parameters=vad_parameters or None, word_timestamps=True, no_speech_threshold=0.6,
             log_prob_threshold=-1.0, initial_prompt=args.prompt, repetition_penalty=args.repetition_penalty,
             hallucination_silence_threshold=args.hallucination_silence)
         words = [{"word": w.word, "start": w.start, "end": w.end, "probability": w.probability}

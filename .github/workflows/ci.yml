@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CT2_VERSION: 4.8.2
+  SITE_PACKAGES: ${{ github.workspace }}\native\deps\site-packages
+
+jobs:
+  build-and-test:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v6
+        with:
+          path: ~\.nuget\packages
+          key: nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Fetch the CTranslate2 wheel
+        run: python -m pip install --no-deps --target "$env:SITE_PACKAGES" "ctranslate2==$env:CT2_VERSION"
+
+      - name: Build the engine bridge
+        run: ./native/build.ps1 -SitePackages "$env:SITE_PACKAGES" -Ct2Version "$env:CT2_VERSION" -CpuOnly
+
+      - name: Install ffmpeg
+        run: choco install ffmpeg --no-progress -y
+
+      - name: Build
+        run: dotnet build Hushcue.slnx -c Release
+
+      - name: Test
+        run: dotnet test Hushcue.slnx -c Release --no-build

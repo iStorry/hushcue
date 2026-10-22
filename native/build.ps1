@@ -1,15 +1,16 @@
 <#
 Builds native\bin\hushcue_ct2.dll and gathers the runtime DLLs it needs into %LOCALAPPDATA%\Hushcue\runtime.
 
-    powershell -ExecutionPolicy Bypass -File native\build.ps1 [-SitePackages <python site-packages>]
+    powershell -ExecutionPolicy Bypass -File native\build.ps1 [-SitePackages <python site-packages>] [-CpuOnly]
 
-Needs Visual Studio 2022 Build Tools (C++ workload), CMake and git. The CTranslate2 binaries come from a Python
-environment with the ctranslate2 4.8.2 wheel installed (by default SubGen's venv), together with the
-nvidia-cublas-cu12 and nvidia-cudnn-cu12 wheels.
+Needs Visual Studio 2022 or later Build Tools (C++ workload), CMake and git. The CTranslate2 binaries come from a
+Python environment with the ctranslate2 4.8.2 wheel installed (by default SubGen's venv), together with the
+nvidia-cublas-cu12 and nvidia-cudnn-cu12 wheels. -CpuOnly skips the two nvidia wheels (CI has no GPU).
 #>
 param(
     [string]$SitePackages = (Join-Path $PSScriptRoot "..\..\subgen\.venv\Lib\site-packages"),
-    [string]$Ct2Version = "4.8.2"
+    [string]$Ct2Version = "4.8.2",
+    [switch]$CpuOnly
 )
 $ErrorActionPreference = "Stop"
 
@@ -35,7 +36,7 @@ if (-not $installed -or $installed.Name -ne "ctranslate2-$Ct2Version.dist-info")
 # --- MSVC tools
 $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-if (-not $vs) { throw "Visual Studio 2022 Build Tools with the C++ workload are not installed" }
+if (-not $vs) { throw "Visual Studio Build Tools with the C++ workload are not installed" }
 $msvc = Get-ChildItem (Join-Path $vs "VC\Tools\MSVC") -Directory | Sort-Object Name | Select-Object -Last 1
 $tools = Join-Path $msvc.FullName "bin\Hostx64\x64"
 $cmake = (Get-Command cmake -ErrorAction SilentlyContinue).Source
@@ -54,8 +55,8 @@ Set-Content -Path $def -Encoding ascii -Value (@("LIBRARY ctranslate2", "EXPORTS
 & (Join-Path $tools "lib.exe") /nologo /machine:x64 /def:$def /out:$lib
 if ($LASTEXITCODE -ne 0) { throw "lib.exe failed" }
 
-# --- build the bridge
-& $cmake -S (Join-Path $root "hushcue_ct2") -B $build -G "Visual Studio 17 2022" -A x64 `
+# --- build the bridge (CMake picks the newest Visual Studio generator, the same install vswhere found)
+& $cmake -S (Join-Path $root "hushcue_ct2") -B $build -A x64 `
     "-DCT2_INCLUDE_DIR=$(Join-Path $ct2Source 'include')" "-DCT2_IMPORT_LIB=$lib"
 if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
 & $cmake --build $build --config Release
@@ -65,12 +66,16 @@ Copy-Item (Join-Path $build "Release\hushcue_ct2.dll") $bin -Force
 
 # --- runtime DLLs: CTranslate2 (+ its OpenMP and cuDNN), cuBLAS, cuDNN
 New-Item -ItemType Directory -Force $runtime | Out-Null
-$sources = @(Join-Path $SitePackages "ctranslate2") + `
-    @(Get-ChildItem (Join-Path $SitePackages "nvidia") -Directory | ForEach-Object { Join-Path $_.FullName "bin" } | Where-Object { Test-Path $_ })
+$sources = @(Join-Path $SitePackages "ctranslate2")
+$nvidia = Join-Path $SitePackages "nvidia"
+if (Test-Path $nvidia) {
+    $sources += Get-ChildItem $nvidia -Directory | ForEach-Object { Join-Path $_.FullName "bin" } | Where-Object { Test-Path $_ }
+}
 foreach ($dir in $sources) {
     Get-ChildItem $dir -Filter *.dll | Copy-Item -Destination $runtime -Force
 }
-foreach ($required in "ctranslate2.dll", "cublas64_12.dll", "cudnn64_9.dll") {
+$requiredDlls = if ($CpuOnly) { @("ctranslate2.dll") } else { @("ctranslate2.dll", "cublas64_12.dll", "cudnn64_9.dll") }
+foreach ($required in $requiredDlls) {
     if (-not (Test-Path (Join-Path $runtime $required))) { throw "Missing $required (install the nvidia-cublas-cu12 and nvidia-cudnn-cu12 wheels)" }
 }
 Write-Host "Built $bin\hushcue_ct2.dll; runtime DLLs in $runtime"

@@ -9,7 +9,7 @@ namespace Hushcue.Cli;
 
 /// <summary>
 /// Transcribe files with the CTranslate2 engine, decoding the way SubGen's Balanced preset does (beam 5, temperature 0,
-/// no previous-text context, English, word timestamps, no VAD), and record the speed. Writes NAME.raw.srt (one cue per
+/// no previous-text context, English, word timestamps, no VAD unless --vad options are given), and record the speed. Writes NAME.raw.srt (one cue per
 /// segment, no clean-up), NAME.words.json and metrics.json into the output folder, the files tools/bench/compare.py
 /// reads.
 /// </summary>
@@ -19,7 +19,8 @@ internal static class TranscribeCommand
         """
         usage: Hushcue.Cli transcribe --model DIR --out DIR [--device cuda|cpu] [--compute-type TYPE] [--features DIR]
                                       [--language CODE|auto] [--prompt TEXT] [--repetition-penalty P]
-                                      [--hallucination-silence SECONDS] FILE...
+                                      [--hallucination-silence SECONDS]
+                                      [--vad] [--vad-threshold T] [--vad-min-silence MS] FILE...
         """;
 
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
@@ -30,6 +31,7 @@ internal static class TranscribeCommand
         string? language = "en";
         var repetitionPenalty = 1.0f;
         double? hallucinationSilence = null;
+        VadOptions? vad = null;
         var files = new List<string>();
         for (var i = 0; i < args.Length; i++)
         {
@@ -44,12 +46,20 @@ internal static class TranscribeCommand
                 case "--prompt" when i + 1 < args.Length: prompt = args[++i]; break;
                 case "--repetition-penalty" when i + 1 < args.Length: repetitionPenalty = float.Parse(args[++i], CultureInfo.InvariantCulture); break;
                 case "--hallucination-silence" when i + 1 < args.Length: hallucinationSilence = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--vad": vad ??= new VadOptions(); break;
+                case "--vad-threshold" when i + 1 < args.Length: vad = (vad ?? new VadOptions()) with { Threshold = double.Parse(args[++i], CultureInfo.InvariantCulture) }; break;
+                case "--vad-min-silence" when i + 1 < args.Length: vad = (vad ?? new VadOptions()) with { MinSilenceDurationMs = int.Parse(args[++i], CultureInfo.InvariantCulture) }; break;
                 default: files.Add(args[i]); break;
             }
         }
         if (model is null || outDir is null || files.Count == 0)
         {
             Console.Error.WriteLine(Usage);
+            return 2;
+        }
+        if (vad is not null && featuresDir is not null)
+        {
+            Console.Error.WriteLine("--features holds the whole clip's features, so it cannot be combined with --vad");
             return 2;
         }
         device ??= WhisperModel.CudaDeviceCount() > 0 ? "cuda" : "cpu";
@@ -68,6 +78,7 @@ internal static class TranscribeCommand
             InitialPrompt = prompt,
             RepetitionPenalty = repetitionPenalty,
             HallucinationSilenceThreshold = hallucinationSilence,
+            Vad = vad,
             BeamSize = 5,
             Temperatures = [0.0f],
             ConditionOnPreviousText = false,

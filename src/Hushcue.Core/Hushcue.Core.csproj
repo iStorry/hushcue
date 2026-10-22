@@ -8,6 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Silero VAD for skipping silence (CPU only): the model faster-whisper 1.2.1 ships, run the same way. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Engine\silero_vad_v6.onnx" LogicalName="silero_vad_v6.onnx" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The CTranslate2 bridge, built by native/build.ps1; copied next to every app that references Core. -->
     <None Include="..\..\native\bin\hushcue_ct2.dll" Condition="Exists('..\..\native\bin\hushcue_ct2.dll')"
           Link="hushcue_ct2.dll" CopyToOutputDirectory="PreserveNewest" />

@@ -41,8 +41,6 @@ public static class SubtitleJob
         var device = WhisperModel.CudaDeviceCount() > 0 ? "cuda" : "cpu";
         if (device == "cpu")
             log("No usable NVIDIA GPU found - running on CPU, this will be slow.");
-        if (settings.SkipSilence || preset.VadThreshold is not null)
-            log("Skipping silent parts is not available yet; the whole file is transcribed.");
 
         // Share of each file's progress used by transcription; burning re-encodes the video and takes far longer.
         var share = settings.Embed switch { EmbedMode.Soft => 0.85, EmbedMode.Burn => 0.3, _ => 1.0 };
@@ -146,7 +144,7 @@ public static class SubtitleJob
             try
             {
                 var transcriber = GetTranscriber(preset.Model, device, log, onLoading);
-                return Transcribe(transcriber, audio, preset, settings, onFraction, cancel);
+                return Transcribe(transcriber, audio, preset, settings, log, onFraction, cancel);
             }
             catch (EngineException e) when (device == "cuda" && attempt == 0 && IsGpuError(e))
             {
@@ -176,7 +174,7 @@ public static class SubtitleJob
     }
 
     private static List<Cue> Transcribe(Transcriber transcriber, float[] audio, Preset preset, JobSettings settings,
-                                        Action<double> onFraction, CancellationToken cancel)
+                                        Action<string> log, Action<double> onFraction, CancellationToken cancel)
     {
         var options = new TranscribeOptions
         {
@@ -190,8 +188,11 @@ public static class SubtitleJob
             WordTimestamps = true,
             HallucinationSilenceThreshold = 2.0,
             InitialPrompt = settings.Vocabulary.Trim().Length > 0 ? settings.Vocabulary.Trim() : null,
+            Vad = preset.Vad ?? (settings.SkipSilence ? Presets.SkipSilenceVad : null),
         };
         var (segments, info) = transcriber.Transcribe(audio, options, cancel);
+        if (options.Vad is not null)
+            log($"Skipping silence: {info.DurationAfterVad:F0} s of {info.Duration:F0} s contain speech");
         var total = Math.Max(info.Duration, 1.0);
         var words = new List<Word>();
         foreach (var segment in segments)

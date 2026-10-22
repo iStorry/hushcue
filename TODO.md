@@ -104,9 +104,13 @@ Port `run_job` / `transcribe_file`. A first version is in `Pipeline/SubtitleJob.
 
 - [x] Presets: Fast, Balanced (default), Thorough. **Best (Demucs) is dropped**
 - [x] Settings: language, enhance, vocabulary, skip silence, embed mode, keep .srt, delete original
-- [ ] Silero VAD (ONNX Runtime, same model and parameters as faster-whisper) when the preset or "skip silence" asks
-      for it, plus faster-whisper's restore_speech_timestamps. Until then the Fast preset and "skip silence" log
-      that it is not available and transcribe the whole file
+- [x] Silero VAD (ONNX Runtime, faster-whisper 1.2.1's `silero_vad_v6.onnx` and vad.py) when the preset or "skip
+      silence" asks for it, plus restore_speech_timestamps (`Engine/SileroVad.cs`, `Engine/SpeechTimestamps.cs`).
+      Matches faster-whisper's probabilities, speech timestamps and restored times on a fixture (`VadTests.cs`)
+- [ ] VAD end to end on the reference clips: `fw_reference.py --vad-threshold 0.1 --vad-min-silence 1000` against
+      `Hushcue.Cli transcribe` with the same options
+- [ ] Check "skip silence" against SubGen: it uses faster-whisper's default VAD options (threshold 0.5, 2 s minimum
+      silence), a guess, since SubGen's source was not at hand
 - [x] Drop segments with no-speech prob > 0.6 and avg log-prob < -1.0
 - [ ] Loop recovery: re-decode looped passages in isolation with repetition penalty 1.3
 - [ ] Overlap: embed file N while transcribing file N+1 (`Channel<T>`)
@@ -155,5 +159,8 @@ went through Generate (soft track + .srt) end to end. MKV to MP4 page still to b
 - [ ] Installer: MSIX or unpackaged (e.g. Inno Setup / WiX), decide
 - [ ] ffmpeg bundling: GPL builds (with libx264) affect the licence; pick an LGPL build + NVENC, or keep ffmpeg as a user install
 - [ ] Ship `ctranslate2.dll`, cuBLAS and cuDNN (~1.7 GB), or download them on first run
-- [ ] GitHub Actions: build, test, release artifacts
+- [ ] GitHub Actions: build and test on `windows-2025` written (`.github/workflows/ci.yml`: CPU-only engine bridge,
+      ffmpeg from Chocolatey); waiting for its first run
+- [ ] GitHub Actions: release artifacts
+- [ ] Third-party notices (CTranslate2, faster-whisper and Silero VAD are MIT)
 - [ ] GitHub repo `hushcue`, README with screenshots, first release

@@ -3,3 +3,4 @@
 *.s16 binary
 *.ico binary
 *.png binary
+*.onnx binary

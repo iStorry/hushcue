@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text;
 
 namespace Hushcue.Core.Subtitles;
@@ -6,7 +7,7 @@ namespace Hushcue.Core.Subtitles;
 /// <summary>
 /// The few Python string semantics the clean-up depends on, so the port produces byte-identical subtitles:
 /// what counts as whitespace (<c>str.isspace</c> / regex <c>\s</c>), <c>len</c> in code points,
-/// <c>round</c> to even, and <c>format(x, ".0f")</c>.
+/// <c>round</c> to even (also to a number of digits), and <c>format(x, ".0f")</c>.
 /// </summary>
 internal static class Py
 {
@@ -90,6 +91,38 @@ internal static class Py
 
     /// <summary><c>int(round(x))</c>: halves go to the even neighbour.</summary>
     public static long Round(double x) => (long)Math.Round(x, MidpointRounding.ToEven);
+
+    /// <summary>
+    /// <c>round(x, digits)</c>: CPython rounds the exact binary value of <paramref name="x"/> (halves to even), where
+    /// <see cref="Math.Round(double, int, MidpointRounding)"/> rounds an inexact <c>x * 10^digits</c>.
+    /// </summary>
+    public static double Round(double x, int digits)
+    {
+        if (!double.IsFinite(x) || x == 0)
+            return x;
+        // x = mantissa * 2^exponent exactly
+        var bits = BitConverter.DoubleToInt64Bits(x);
+        var biased = (int)((bits >> 52) & 0x7FF);
+        var mantissa = bits & 0xF_FFFF_FFFF_FFFFL;
+        if (biased == 0)
+            biased = 1;
+        else
+            mantissa |= 1L << 52;
+        var exponent = biased - 1075;
+
+        var numerator = mantissa * BigInteger.Pow(10, digits);
+        var denominator = BigInteger.One;
+        if (exponent > 0)
+            numerator <<= exponent;
+        else
+            denominator <<= -exponent;
+        var quotient = BigInteger.DivRem(numerator, denominator, out var remainder);
+        var twice = remainder * 2;
+        if (twice > denominator || (twice == denominator && !quotient.IsEven))
+            quotient++;
+        var rounded = (double)quotient / Math.Pow(10, digits);
+        return bits < 0 ? -rounded : rounded;
+    }
 
     /// <summary><c>f"{x:.0f}"</c>.</summary>
     public static string F0(double x) => Math.Round(x, MidpointRounding.ToEven).ToString("F0", CultureInfo.InvariantCulture);

@@ -4,7 +4,7 @@ using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Core.Engine;
 
-/// <summary>Options of faster-whisper's WhisperModel.transcribe, with its defaults (VAD is applied by the caller).</summary>
+/// <summary>Options of faster-whisper's WhisperModel.transcribe, with its defaults.</summary>
 public sealed record TranscribeOptions
 {
     public string? Language { get; init; }
@@ -38,6 +38,9 @@ public sealed record TranscribeOptions
     public string? Hotwords { get; init; }
     public double LanguageDetectionThreshold { get; init; } = 0.5;
     public int LanguageDetectionSegments { get; init; } = 1;
+    /// <summary>vad_filter and vad_parameters: transcribe only the speech Silero VAD finds; null transcribes
+    /// everything. Ignored when <see cref="ClipTimestamps"/> is set.</summary>
+    public VadOptions? Vad { get; init; }
 }
 
 /// <summary>A word with its timing, mutable while word timestamps are being refined.</summary>
@@ -53,7 +56,9 @@ public sealed record Segment(int Id, int Seek, double Start, double End, string 
                              double Temperature, double AvgLogprob, double CompressionRatio, double NoSpeechProb,
                              IReadOnlyList<TimedWord>? Words);
 
-public sealed record TranscriptionInfo(string Language, double LanguageProbability, double Duration);
+/// <param name="Duration">seconds of audio given</param>
+/// <param name="DurationAfterVad">seconds of it transcribed: all of it, or the speech voice activity detection kept</param>
+public sealed record TranscriptionInfo(string Language, double LanguageProbability, double Duration, double DurationAfterVad);
 
 /// <summary>
 /// faster-whisper's transcription loop (WhisperModel.transcribe / generate_segments) on top of CTranslate2: 30 s
@@ -82,15 +87,22 @@ public sealed class Transcriber
     }
 
     /// <summary>
-    /// Transcribe 16 kHz mono audio. Segments are produced lazily, one decoding window at a time, like faster-whisper's
-    /// generator; <paramref name="cancel"/> is checked before every window.
+    /// Transcribe 16 kHz mono audio. Voice activity detection, when asked for, runs first; segments are then produced
+    /// lazily, one decoding window at a time, like faster-whisper's generator. <paramref name="cancel"/> is checked
+    /// before every window.
     /// </summary>
     public (IEnumerable<Segment> Segments, TranscriptionInfo Info) Transcribe(
         float[] audio, TranscribeOptions options, CancellationToken cancel = default)
     {
-        var (features, frames) = _mel.Compute(audio);
-        return TranscribeFeatures(features, frames, audio.Length / (double)MelSpectrogram.SampleRate, options, cancel);
+        var speech = options.Vad is { } vad && options.ClipTimestamps is null ? SileroVad.SpeechChunks(audio, vad, cancel) : null;
+        var kept = speech is null ? audio : SpeechTimestamps.Collect(audio, speech);
+        var (features, frames) = _mel.Compute(kept);
+        var (segments, info) = TranscribeFeatures(features, frames, Seconds(audio), options, cancel);
+        info = info with { DurationAfterVad = Seconds(kept) };
+        return (speech is { Count: > 0 } ? SpeechTimestamps.Restore(segments, speech) : segments, info);
     }
+
+    private static double Seconds(float[] audio) => audio.Length / (double)MelSpectrogram.SampleRate;
 
     /// <summary>Transcribe precomputed log-mel features (NMels rows of <paramref name="frames"/> values).</summary>
     public (IEnumerable<Segment> Segments, TranscriptionInfo Info) TranscribeFeatures(
@@ -121,7 +133,7 @@ public sealed class Transcriber
 
         var tokenizer = new WhisperTokenizer(_tokenizerPath, _model.IsMultilingual, options.Task, language);
         var suppress = options.SuppressTokens is { Count: > 0 } ? SuppressedTokens(tokenizer, options.SuppressTokens) : options.SuppressTokens;
-        var info = new TranscriptionInfo(language, languageProbability, duration);
+        var info = new TranscriptionInfo(language, languageProbability, duration, duration);
         return (GenerateSegments(features, frames, tokenizer, options, suppress, cancel), info);
     }
 
