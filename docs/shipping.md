@@ -35,8 +35,8 @@ its window and closes it. Inno Setup does not need installing: `innosetup-6.7.3.
 
 On GitHub: push a tag `v0.2.0` (or run the **Release** workflow by hand with a version). `.github/workflows/release.yml`
 sets up the same way as CI (CTranslate2 wheel, bridge with `-CpuOnly`), builds and tests, publishes, unpacks a pinned
-Inno Setup 6.7.3 (SHA-256 checked), builds the installer and zip, and attaches them with `SHA256SUMS.txt` to a
-**draft** release to check and publish by hand. `-CpuOnly` is right for releases too: the bridge is identical either
+Inno Setup 6.7.3 (SHA-256 checked), builds the installer and zip, and publishes them with `SHA256SUMS.txt` as the
+latest release, which installed copies offer as an update. `-CpuOnly` is right for releases too: the bridge is identical either
 way (GPU support lives in `ctranslate2.dll`); the flag only skips gathering cuBLAS on the build machine. The
 workflow has not been run yet (it can't be from here); the steps it runs were each run locally, except the `gh`
 release step.
@@ -211,7 +211,9 @@ What bundling means, by build (this is a summary to decide with, not legal advic
 
 ## Choosing a licence
 
-`LICENSE` is still to be chosen (Phase 0). Things that bear on it, from the packages above:
+**Decided for v0.1.0: MIT** (`LICENSE`, Jatinjit Singh), a permissive licence as the points below suggest. ffmpeg
+stays a user install (option 1 above), and releases are not code-signed yet (Windows SmartScreen warns on the
+installer until a reputation builds up or a certificate is bought). The reasoning, from the packages above:
 
 - Everything Hushcue links to is MIT or Apache-2.0 (CTranslate2, faster-whisper, Silero VAD, ONNX Runtime, .NET,
   oneDNN) or proprietary-but-redistributable: the Windows App SDK and the VC++ runtime (Microsoft), and Intel's

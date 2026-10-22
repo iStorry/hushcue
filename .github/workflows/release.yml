@@ -1,6 +1,7 @@
 name: Release
 
-# Builds the installer and a portable zip and attaches them to a draft GitHub Release, to check and publish by hand.
+# Builds the installer and a portable zip and publishes them as a GitHub Release with SHA256SUMS.txt; the app's
+# updater (src/Hushcue.Core/Updates) offers the latest published release.
 # On a v* tag the version comes from the tag (v1.2.3 -> 1.2.3); a manual run takes it as an input.
 on:
   push:
@@ -8,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build, e.g. 0.2.0 (the draft release gets the tag v<version>)"
+        description: "Version to build, e.g. 0.2.0 (the release gets the tag v<version>)"
         required: true
 
 concurrency:
@@ -92,7 +93,7 @@ jobs:
           Get-Content SHA256SUMS.txt
           Pop-Location
 
-      - name: Attach to a draft release
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -103,7 +104,7 @@ jobs:
           }
           else {
             $notes = @"
-          Hushcue $env:VERSION for Windows 10 (1809) and 11, x64.
+          Hushcue $env:VERSION for Windows 10 (1809) and 11, x64: subtitles from any video, made on your own PC.
 
           - **Hushcue-$env:VERSION-setup.exe**: installer. Installs for the current user (no admin needed) and can add
             "Generate subtitles with Hushcue" to the right-click menu of video and audio files.
@@ -111,7 +112,9 @@ jobs:
 
           Hushcue needs ffmpeg on PATH (``winget install Gyan.FFmpeg``). On first run it downloads the speech model
           (about 1.6 GB) and, with an NVIDIA GPU, NVIDIA's cuBLAS (about 630 MB); without a GPU it runs on the CPU.
+          Installed copies update themselves from here; check the files against SHA256SUMS.txt.
+          The installer is not code-signed yet, so Windows SmartScreen may warn: choose More info, then Run anyway.
           "@
-            gh release create $env:TAG @files --draft --title "Hushcue $env:VERSION" --notes $notes --target $env:GITHUB_SHA
+            gh release create $env:TAG @files --latest --title "Hushcue $env:VERSION" --notes $notes --target $env:GITHUB_SHA
           }
           if ($LASTEXITCODE -ne 0) { throw "gh release failed" }

@@ -1,5 +1,8 @@
 # Third-party notices
 
+Hushcue itself is MIT licensed (`LICENSE`, copyright Jatinjit Singh). The rest of this file is about the work of others
+it ships with or downloads.
+
 Hushcue is built on the software listed below. This file ships with the app; the longer upstream notice files sit
 next to it in the `licenses` folder. Versions are the ones this release is built with.
 

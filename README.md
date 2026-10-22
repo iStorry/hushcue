@@ -5,15 +5,20 @@ Accurate subtitles from any video, generated privately on your PC.
 Hushcue turns the speech in your videos into subtitles with Whisper, running entirely on your own machine.
 It can save an `.srt` file, add a subtitle track to an `.mkv`, or burn the text into an `.mp4`.
 
-> Work in progress: a C# + WinUI 3 rewrite of SubGen. See [TODO.md](TODO.md) for the plan.
-> Engine: CTranslate2, the engine SubGen uses, called natively through a small C++ bridge
-> ([Phase 1b](docs/phase1b-ctranslate2.md)). Whisper.net was tried first and dropped ([Phase 1](docs/phase1-engine-spike.md)).
+**Download**: the installer is on the [Releases page](https://github.com/iStorry/hushcue/releases/latest)
+(Windows 10 1809 or later, x64). Hushcue needs [ffmpeg](https://ffmpeg.org) on PATH (`winget install Gyan.FFmpeg`).
+On first run it downloads the speech model (about 1.6 GB) and, with an NVIDIA GPU, NVIDIA's cuBLAS (about 630 MB);
+without a GPU it runs on the CPU. The installer is not code-signed yet, so SmartScreen may warn: More info, Run anyway.
 
-![A queue of four files: one done, one being transcribed, one waiting, and an audio file that will get an .srt only](docs/screenshots/2-queue-running.png)
+Hushcue is a C# + WinUI 3 rewrite of SubGen. Its engine is CTranslate2, called natively through a small C++ bridge
+([Phase 1b](docs/phase1b-ctranslate2.md)); Whisper.net was tried first and dropped ([Phase 1](docs/phase1-engine-spike.md)).
+How it was built: [TODO.md](TODO.md).
 
-| Finished | First run |
+![Generate subtitles: the file list, quality and result choices, and the sidebar with the three tools](docs/screenshots/1-generate.png)
+
+| Finished | Review and edit |
 |---|---|
-| ![The finished screen: video length, time taken and speed](docs/screenshots/3-finished.png) | ![The setup screen checking the GPU and ffmpeg and downloading the speech model](docs/screenshots/4-setup.png) |
+| ![The finished screen: video length, time taken and speed](docs/screenshots/2-finished.png) | ![The review page: video with the subtitle on it, waveform timeline and the transcript](docs/screenshots/3-review.png) |
 
 Drop videos or audio files on the window (or use Add files), pick the quality and the result, and start. Each file
 shows its own progress; the bottom bar shows the whole batch and the time left, as does the taskbar button. Files
@@ -60,8 +65,12 @@ The sidebar holds the three tools:
 - **MKV to MP4**: remove the subtitle tracks from `.mkv` files and save them as `.mp4` without re-encoding.
 
 **Settings** holds the choices that rarely change (language, vocabulary, audio clean-up, skipping silence, what happens
-to the files when subtitles go into the video, the theme), and shows where transcription runs on this PC. **About**
-has the version, the source code and the third-party notices.
+to the files when subtitles go into the video, the theme, automatic updates), and shows where transcription runs on
+this PC. **About** has the version, "Check for updates", the source code and the third-party notices.
+
+**Updates**: once a day on start, Hushcue asks GitHub whether there is a newer release and offers to install it. The
+installer is checked against the release's `SHA256SUMS.txt`, Hushcue closes, updates and opens again. A portable copy
+is pointed at the release page instead. Turn it off in Settings.
 
 ## Install
 
@@ -97,5 +106,10 @@ powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Version 0.2.0 -Isc
 
 `tools/publish.ps1` makes a self-contained folder in `artifacts/publish/Hushcue`; `installer/build.ps1` turns it into
 an installer with Inno Setup 6. Pushing a `v*` tag runs the same steps on GitHub (`.github/workflows/release.yml`)
-and attaches the installer and a zip to a draft release. Details, measurements and the open ffmpeg/licence
-decisions: [docs/shipping.md](docs/shipping.md). Third-party licences: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+and publishes a release with the installer, a zip and `SHA256SUMS.txt`, which is what the app's updater looks for.
+Details, measurements and the ffmpeg and licence choices: [docs/shipping.md](docs/shipping.md).
+
+## Licence
+
+Hushcue is [MIT licensed](LICENSE), by Jatinjit Singh. It ships or downloads other people's work under their own
+licences: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
