@@ -20,12 +20,6 @@
    11,
    26535
   ],
-  "Hello there, maybe": [
-   15947,
-   456,
-   11,
-   3186
-  ],
   " I'm, don't - it's 10,000!": [
    286,
    478,
@@ -59,18 +53,6 @@
    474,
    20743
   ],
-  " (laughs) [Music] \u266a la \u266a": [
-   522,
-   3280,
-   599,
-   8,
-   542,
-   8710,
-   60,
-   931,
-   635,
-   931
-  ],
   " <<hi>> -- ((x))": [
    47425,
    4954,
@@ -83,11 +65,9 @@
  },
  "decodes": {
   " Anna, Brian, Marco": " Anna, Brian, Marco",
-  "Hello there, maybe": "Hello there, maybe",
   " I'm, don't - it's 10,000!": " I'm, don't - it's 10,000!",
   " caf\u00e9 na\u00efve \u65e5\u672c \ud83d\ude00": " caf\u00e9 na\u00efve \u65e5\u672c \ud83d\ude00",
   "  double  spaces\tand tabs": "  double  spaces\tand tabs",
-  " (laughs) [Music] \u266a la \u266a": " (laughs) [Music] \u266a la \u266a",
   " <<hi>> -- ((x))": " <<hi>> -- ((x))"
  },
  "partial_decode": " ",

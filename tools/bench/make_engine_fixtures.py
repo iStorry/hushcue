@@ -21,7 +21,7 @@ import tokenizers
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "tests" / "Hushcue.Core.Tests" / "Golden"
 
-TEXTS = [" Anna, Brian, Marco", "Hello there, maybe", " I'm, don't - it's 10,000!", " café naïve 日本 😀",
+TEXTS = [" Anna, Brian, Marco", "Hello there, friend", " I'm, don't - it's 10,000!", " café naïve 日本 😀",
          "  double  spaces\tand tabs", " (laughs) [Music] ♪ la ♪", " <<hi>> -- ((x))"]
 
 

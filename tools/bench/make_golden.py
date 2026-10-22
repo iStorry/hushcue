@@ -22,11 +22,11 @@ import pipeline as p  # noqa: E402
 SYNTHETIC = ROOT / "tests" / "Hushcue.Core.Tests" / "Golden"
 REAL = ROOT / "bench-out" / "golden"
 
-VOCAB = ["oh,", "yes", "maybe", "please", "mmm", "Mmmmmmmmmm", "Ahhhhh!", "10000", "(laughs)", "(heavy", "sighing)",
-         "[Music]", "[", "laughs]", "*sighs", "heavily*", "*", "♪", "la", "5*3", "...", "Okay.", "What?", "Stop!",
-         "café", "naïve", "😀", "Oh", "my", "God.", "right", "there", "Yeah,", "I'm", "don't", "it's", "ing", "-",
+VOCAB = ["oh,", "yes", "maybe", "please", "mmm", "Mmmmmmmmmm", "Ahhhhh!", "10000", "(laughs)", "(door", "creaks)",
+         "[Music]", "[", "applause]", "*sighs", "heavily*", "*", "♪", "la", "5*3", "...", "Okay.", "What?", "Stop!",
+         "café", "naïve", "😀", "Oh", "my", "word.", "right", "there", "Yeah,", "I'm", "don't", "it's", "ing", "-",
          " hey", "so", "good.", "come", "here", "now", "Thank", "you", "for", "watching."]
-LOOPS = [["mmm,"], ["oh,", "wow,"], ["yes", "maybe", "please"], ["Oh", "my", "God."], ["..."]]
+LOOPS = [["mmm,"], ["oh,", "wow,"], ["yes", "right", "here"], ["Oh", "my", "word."], ["..."]]
 JUNK = [["Thank", "you", "for", "watching."], ["Thanks", "for", "listening."], ["Please", "subscribe."]]
 
 

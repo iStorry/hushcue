@@ -74,7 +74,7 @@ public sealed class MediaTests : IDisposable
 
     private static string MakeSrt(string path)
     {
-        File.WriteAllText(path, "1\n00:00:01,000 --> 00:00:03,000\nHello there, maybe\n");
+        File.WriteAllText(path, "1\n00:00:01,000 --> 00:00:03,000\nHello there, friend\n");
         return path;
     }
 

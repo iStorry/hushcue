@@ -85,7 +85,7 @@ The finished subtitles amplify these differences:
   different audio, and everything decoded in that span can change (clip 2: SubGen re-decodes 4 spans covering 126 s,
   Hushcue 2 spans covering 102 s).
 - Whole segments are dropped on two thresholds (no-speech probability > 0.6 and average log-probability < −1.0). On
-  these clips, where much of the audio is sighing and laughing, a borderline segment can fall on either side.
+  these clips, where much of the audio is not speech, a borderline segment can fall on either side.
 
 These differences are not errors on either side. The reference word error rate is no worse with Hushcue's features
 (49.1% against 55.1%), and clip 1, the clip with the most ordinary speech, agrees on 93.6% of its finished words.

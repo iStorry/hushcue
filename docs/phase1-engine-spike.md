@@ -7,7 +7,7 @@ no fallback, no previous-text context, English, no VAD) on both sides.
 
 ## Results
 
-Four 3-minute clips from `../subgen/reference/` (clips 1 to 4), 470 reference words in total.
+Four 3-minute clips from `../subgen/reference/` (clips 1–4), 470 reference words in total.
 Every engine's words go through SubGen's own clean-up before scoring, so the comparison is like-for-like.
 
 | Run | WER vs reference | Words that differ from SubGen | Word timing vs SubGen, median / 90th pct | Speed |

@@ -109,7 +109,7 @@ public class CleanupTests
         Assert.Equal([.. Enumerable.Repeat(new[] { "oh,", "wow," }, 3).SelectMany(x => x)], Texts(Cleanup.CollapseRepeats(loop)));
         var three = Seq("oh wow oh wow oh wow"); // only 3 repeats: legitimate, untouched
         Assert.Equal(three, Cleanup.CollapseRepeats(three));
-        var tri = Seq(string.Concat(Enumerable.Repeat("yes maybe please ", 5))); // 3-word phrase x5 -> x3
+        var tri = Seq(string.Concat(Enumerable.Repeat("yes right here ", 5))); // 3-word phrase x5 -> x3
         Assert.Equal(9, Cleanup.CollapseRepeats(tri).Count);
         var mixed = Seq("hi oh, wow, oh, wow, oh, wow, oh, wow, bye");
         Assert.Equal(["hi", "oh,", "wow,", "oh,", "wow,", "oh,", "wow,", "bye"], Texts(Cleanup.CollapseRepeats(mixed)));
@@ -147,7 +147,7 @@ public class CleanupTests
     [Fact]
     public void ListeningHallucinationIsDropped()
     {
-        List<Cue> cues = [new(0, 2, "Thank you for listening to the show."), new(3, 4, "Thank you, maybe.")];
-        Assert.Equal(["Thank you, maybe."], Cleanup.DropJunk(cues).Select(c => c.Text));
+        List<Cue> cues = [new(0, 2, "Thank you for listening to the show."), new(3, 4, "Thank you, everyone.")];
+        Assert.Equal(["Thank you, everyone."], Cleanup.DropJunk(cues).Select(c => c.Text));
     }
 }

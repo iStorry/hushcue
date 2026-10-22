@@ -12,7 +12,7 @@ namespace Hushcue.Core.Tests;
 /// </summary>
 public sealed class JobTests : IDisposable
 {
-    private static readonly Word[] Hello = [new(" hello", 1.0, 1.4), new(" maybe", 1.5, 2.0)];
+    private static readonly Word[] Hello = [new(" hello", 1.0, 1.4), new(" there", 1.5, 2.0)];
     private readonly string _dir = Directory.CreateTempSubdirectory("hushcue_job_").FullName;
 
     public void Dispose()
@@ -99,7 +99,7 @@ public sealed class JobTests : IDisposable
         var run = await RunAsync([clip], new JobSettings(), Steps(new FakeTranscriber(Hello, duration: 4)));
         Assert.Equal(["clip.srt"], run.Outputs.Select(Path.GetFileName));
         Assert.Equal(["clip.mp4", "clip.srt"], Names());
-        Assert.Equal("1\r\n00:00:01,000 --> 00:00:02,000\r\nhello maybe\r\n", File.ReadAllText(run.Outputs[0]));
+        Assert.Equal("1\r\n00:00:01,000 --> 00:00:02,000\r\nhello there\r\n", File.ReadAllText(run.Outputs[0]));
     }
 
     [FfmpegFact]
@@ -421,7 +421,7 @@ public sealed class JobTests : IDisposable
         var run = await RunAsync([clip], new JobSettings(), Steps(new FakeTranscriber(Hello, duration: 4)));
         var live = Assert.Single(run.Events.OfType<CuesDecoded>()); // the fake decodes one segment
         Assert.Equal(clip, live.Path);
-        Assert.Equal([new Cue(1.0, 2.0, "hello maybe")], live.Cues);
+        Assert.Equal([new Cue(1.0, 2.0, "hello there")], live.Cues);
         Assert.True(run.Events.IndexOf(live) < run.Events.FindIndex(e => e is FileTranscribed));
     }
 
@@ -448,7 +448,7 @@ public sealed class JobTests : IDisposable
         Assert.Equal(new DeviceSelected("cpu", Reason: "No usable NVIDIA GPU found"), run.Events[0]);
         var done = Assert.Single(run.Events.OfType<FileTranscribed>());
         Assert.Equal(clip, done.Path);
-        Assert.Equal([new Cue(1.0, 2.0, "hello maybe")], done.Cues);
+        Assert.Equal([new Cue(1.0, 2.0, "hello there")], done.Cues);
         Assert.Equal(4.0, done.AudioSeconds, 1);
         Assert.True(done.Took > TimeSpan.Zero && done.Speed > 0);
         Assert.Equal(run.Outputs[0], done.Srt);
