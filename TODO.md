@@ -215,12 +215,17 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
 
 **Idea 2: review and edit before embedding** ([mock](docs/mocks/2-review-editor.png))
 
-Status: the Core side is merged (`src/Hushcue.Core/Review/`: cue editor with undo, flags, waveform envelope, re-run a
-part, review before embedding; `ReviewTests.cs`), and the job now reports stages and events as data, so the app no
-longer reads Core's log wording. The app side (Review page, live transcript, waveform timeline) is a work in progress
-on branch `review-editor`, unfinished and never run. Merged code builds; the test suite was not re-run after this
-merge (run `dotnet test Hushcue.slnx`).
+Status: merged into `main`, built but never run (the review agent was stopped mid-way; testing is with the user).
+Core: `src/Hushcue.Core/Review/` (cue editor with undo, flags, waveform envelope, re-run a part, review before
+embedding; `ReviewTests.cs`); the job reports stages and events as data, so the app no longer reads Core's log
+wording. App: Review page, live transcript, waveform timeline.
 
+- [x] Open existing subtitles in the editor without transcribing: "Edit subtitles" button (pick a video; its
+      `name.srt` / `name.en.srt` is found, or pick one), drop a video with its .srt, pass an .srt on the command line,
+      or Explorer's "Edit subtitles with Hushcue" on .srt files (installer). Pairing in `Subtitles/SubtitlePairs.cs`
+      (tested); app side built, not run
+- [ ] Subtitle tracks inside an .mkv: extract to edit, write back as a new file
+- [ ] Run and check every item below in the app
 - [ ] Show cues as they are transcribed in a side panel
 - [ ] Review page: video preview with the subtitles drawn live, editable and searchable cue list
 - [ ] Flag likely hallucinations (`DropJunk` list) and gaps (`CoverageWarnings`); "Re-run this part" re-decodes

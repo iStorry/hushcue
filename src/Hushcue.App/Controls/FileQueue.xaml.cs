@@ -68,6 +68,20 @@ public sealed partial class FileQueue : UserControl
         set => EmptyTitle.Text = value;
     }
 
+    /// <summary>Shows the "Edit subtitles" button, which raises <see cref="EditRequested"/>.</summary>
+    public bool CanEdit
+    {
+        get => EditButton.Visibility == Visibility.Visible;
+        set => EditButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public event EventHandler? EditRequested;
+
+    /// <summary>The queued file for <paramref name="path"/>, if it is in the list.</summary>
+    public QueuedFile? Get(string path) => Find(path);
+
+    private void OnEdit(object sender, RoutedEventArgs e) => EditRequested?.Invoke(this, EventArgs.Empty);
+
     /// <summary>Add paths that are not queued yet, in order; a finished file that is added again will run again.</summary>
     public void AddPaths(IEnumerable<string> paths)
     {

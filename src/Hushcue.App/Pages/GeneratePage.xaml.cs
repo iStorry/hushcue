@@ -3,6 +3,7 @@ using Hushcue.Controls;
 using Hushcue.Core;
 using Hushcue.Core.Media;
 using Hushcue.Core.Pipeline;
+using Hushcue.Core.Subtitles;
 using Hushcue.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -66,6 +67,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         Summary.Closed += (_, _) => ShowSummary(null);
         Summary.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
         Queue.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
+        Queue.CanEdit = true;
+        Queue.EditRequested += async (_, _) => await PickAndEditAsync();
         Review.Closed += (_, _) => ShowReview(false);
         Review.Embedded += (_, embedded) => Queue.Update(FileProgress.Done(embedded.File.Path, embedded.Result.Video));
         Review.IsJobRunning = () => IsRunning;
@@ -336,18 +339,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
                 : "None of these files can be used: they aren't video or audio files ffmpeg can read, or they have no sound.");
             return;
         }
-        var settings = new JobSettings
-        {
-            Preset = SelectedPreset,
-            Language = Presets.Languages.First(l => l.Name == (string)LanguageBox.SelectedItem).Code,
-            Enhance = EnhanceBox.IsChecked == true,
-            Vocabulary = VocabularyBox.Text,
-            SkipSilence = SkipSilenceBox.IsChecked == true,
-            Embed = SelectedEmbed,
-            KeepSrt = KeepSrtBox.IsChecked == true,
-            DeleteOriginal = DeleteBox.IsChecked == true,
-            ReviewBeforeEmbed = ReviewBox.IsChecked == true,
-        };
+        var settings = CurrentSettings();
         var srtOnly = new Func<QueuedFile, bool>(f => settings.Embed != EmbedMode.None && f.Info is { HasVideo: false });
         var recycling = settings.DeleteOriginal ? files.Count(f => !srtOnly(f)) : 0;
         if (recycling > 0 && !await Dialogs.ConfirmAsync(XamlRoot,
@@ -540,6 +532,89 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     {
         foreach (var each in new[] { OptionsCard, LiveCard, FinishedCard })
             each.Visibility = each == card ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private JobSettings CurrentSettings() => new()
+    {
+        Preset = SelectedPreset,
+        Language = Presets.Languages.First(l => l.Name == (string)LanguageBox.SelectedItem).Code,
+        Enhance = EnhanceBox.IsChecked == true,
+        Vocabulary = VocabularyBox.Text,
+        SkipSilence = SkipSilenceBox.IsChecked == true,
+        Embed = SelectedEmbed,
+        KeepSrt = KeepSrtBox.IsChecked == true,
+        DeleteOriginal = DeleteBox.IsChecked == true,
+        ReviewBeforeEmbed = ReviewBox.IsChecked == true,
+    };
+
+    /// <summary>"Edit subtitles": pick a video, then edit the .srt next to it (or one picked by hand).</summary>
+    private async Task PickAndEditAsync()
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker
+        {
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.VideosLibrary,
+        };
+        foreach (var extension in MediaFiles.Extensions)
+            picker.FileTypeFilter.Add(extension);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
+        if (await picker.PickSingleFileAsync() is { } video)
+            await OpenInEditorAsync(video.Path, null);
+    }
+
+    /// <summary>
+    /// Open a video and subtitles it already has in the editor, without transcribing: the .srt given, else the one next
+    /// to the video ("name.srt" or "name.en.srt"), else one the user picks. The video joins the list as done, so it can
+    /// be reopened, and the editor's Save and Embed work on that .srt.
+    /// </summary>
+    /// <param name="open">false only adds the video to the list, ready to review (for a second file dropped at once)</param>
+    public async Task OpenInEditorAsync(string video, string? srt, bool open = true)
+    {
+        if (open && IsReviewing && Review.Current is not null && !await Review.CloseAsync())
+            return;
+        srt ??= SubtitlePairs.FindSubtitles(video) ?? await PickSubtitlesAsync(video);
+        if (srt is null)
+            return;
+        List<Cue> cues;
+        try
+        {
+            cues = await Srt.LoadAsync(srt);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or OverflowException)
+        {
+            await Dialogs.ErrorAsync(XamlRoot, $"Could not read {Path.GetFileName(srt)}: {e.Message}");
+            return;
+        }
+        if (cues.Count == 0)
+        {
+            await Dialogs.InfoAsync(XamlRoot, $"{Path.GetFileName(srt)} has no subtitles in it.");
+            return;
+        }
+
+        Queue.AddPaths([video]);
+        if (Queue.Get(video) is not { } file)
+            return;
+        await file.Probing;
+        if (file.ProbeError is not null)
+        {
+            await Dialogs.ErrorAsync(XamlRoot, $"Could not open {file.Name}: {file.ProbeError}");
+            return;
+        }
+        file.Update(FileProgress.Done(file.Path, srt));
+        file.SetTranscript(new Transcript(cues, srt, CurrentSettings(), Output.FolderOrNull,
+                                          Math.Max(file.Duration, cues[^1].End)));
+        if (open)
+            await OpenReviewAsync(file);
+    }
+
+    private async Task<string?> PickSubtitlesAsync(string video)
+    {
+        if (!await Dialogs.ConfirmAsync(XamlRoot,
+                $"There is no .srt next to {Path.GetFileName(video)}. Pick the subtitles to edit?", "Pick an .srt"))
+            return null;
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+        picker.FileTypeFilter.Add(".srt");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
+        return (await picker.PickSingleFileAsync())?.Path;
     }
 
     private async Task OpenReviewAsync(QueuedFile file)

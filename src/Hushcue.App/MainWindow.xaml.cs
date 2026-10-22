@@ -1,5 +1,6 @@
 using Hushcue.Controls;
 using Hushcue.Core;
+using Hushcue.Core.Subtitles;
 using Hushcue.Pages;
 using Hushcue.Services;
 using Microsoft.UI;
@@ -53,7 +54,12 @@ public sealed partial class MainWindow : Window
         }
         Generate.DeviceChanged += (_, device) => ShowBadge(device);
         Setup.GpuChecked += (_, gpu) => OnGpuChecked(gpu);
-        Setup.Continued += (_, _) => ShowSetup(false);
+        Setup.Continued += (_, _) =>
+        {
+            ShowSetup(false);
+            OpenPendingEdits();
+        };
+        Root.Loaded += (_, _) => OpenPendingEdits();
         AppWindow.Closing += OnClosing;
         Root.ActualThemeChanged += (_, _) => ColorCaptionButtons();
         Root.Loaded += (_, _) => ColorCaptionButtons();
@@ -81,8 +87,44 @@ public sealed partial class MainWindow : Window
         bar.ButtonPressedBackgroundColor = dark ? Color.FromArgb(0x0B, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0A, 0x00, 0x00, 0x00);
     }
 
-    /// <summary>Queue files on the page that is showing.</summary>
-    public void AddFiles(IEnumerable<string> paths) => ActiveQueue.AddPaths(paths);
+    private readonly List<SubtitlePair> _pendingEdits = [];
+    private readonly List<string> _pendingOrphans = [];
+
+    /// <summary>
+    /// Queue files on the page that is showing. Subtitles (.srt) open in the editor with their video instead: dropped
+    /// together, passed on the command line, or chosen from Explorer's right-click menu.
+    /// </summary>
+    public void AddFiles(IEnumerable<string> paths)
+    {
+        var (pairs, orphans, others) = SubtitlePairs.Split(paths);
+        if (others.Count > 0)
+            ActiveQueue.AddPaths(others);
+        if (pairs.Count == 0 && orphans.Count == 0)
+            return;
+        _pendingEdits.AddRange(pairs);
+        _pendingOrphans.AddRange(orphans);
+        OpenPendingEdits();
+    }
+
+    /// <summary>Open what was asked for once the window is up and past the setup screen (editing needs no model).</summary>
+    private async void OpenPendingEdits()
+    {
+        if (Root.XamlRoot is null || Setup.Visibility == Visibility.Visible || (_pendingEdits.Count == 0 && _pendingOrphans.Count == 0))
+            return;
+        var pairs = _pendingEdits.ToList();
+        var orphans = _pendingOrphans.ToList();
+        _pendingEdits.Clear();
+        _pendingOrphans.Clear();
+        Modes.SelectedItem = GenerateItem;
+        for (var i = 0; i < pairs.Count; i++)
+            await Generate.OpenInEditorAsync(pairs[i].Video, pairs[i].Srt, open: i == 0);
+        if (orphans.Count > 0)
+        {
+            var names = string.Join(", ", orphans.Select(Path.GetFileName));
+            await Dialogs.InfoAsync(Root.XamlRoot, $"No video was found next to {names}. Keep the video in the same folder "
+                                                   + "with the same name (e.g. talk.mp4 and talk.srt), or use Edit subtitles.");
+        }
+    }
 
     private void ShowSetup(bool show, bool firstRun = false)
     {
@@ -171,7 +213,7 @@ public sealed partial class MainWindow : Window
         if (!e.DataView.Contains(StandardDataFormats.StorageItems) || Setup.Visibility == Visibility.Visible)
             return;
         var items = await e.DataView.GetStorageItemsAsync();
-        queue.AddPaths(items.OfType<StorageFile>().Select(f => f.Path).Where(p => p.Length > 0));
+        AddFiles(items.OfType<StorageFile>().Select(f => f.Path).Where(p => p.Length > 0));
     }
 
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)

@@ -46,6 +46,13 @@ clips, Balanced preset, RTX 4070 ([details](docs/phase7-results.md)):
 | `src/Hushcue.App` | The WinUI 3 desktop app. |
 | `tests/Hushcue.Core.Tests` | xUnit tests for Core. |
 
+## Editing subtitles you already have
+
+Select **Edit subtitles** above the file list and pick a video: Hushcue opens it in the editor with the `.srt` next
+to it (`talk.srt` or `talk.en.srt` for `talk.mp4`), or asks for one. Dropping a video together with its `.srt`, or
+right-clicking an `.srt` in Explorer and choosing **Edit subtitles with Hushcue**, does the same. Nothing is
+transcribed; Save writes the `.srt`, and Embed puts it into a copy of the video.
+
 ## Install
 
 Windows 10 (1809) or 11, x64. From a [release](https://github.com/iStorry/hushcue/releases):

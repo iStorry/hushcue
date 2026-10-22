@@ -69,8 +69,9 @@ LicenseFile=..\LICENSE
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-ContextMenu=Add "Generate subtitles with Hushcue" to the right-click menu of video and audio files
+ContextMenu=Add "Generate subtitles with Hushcue" to the right-click menu of video and audio files, and "Edit subtitles with Hushcue" to .srt files
 ContextMenuVerb=Generate subtitles with Hushcue
+EditMenuVerb=Edit subtitles with Hushcue
 RemoveData=Also remove the speech models and GPU libraries Hushcue downloaded (%1), and its settings?
 
 [Tasks]
@@ -101,6 +102,12 @@ Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\{#Ext[I]}\shell\{#Me
 #endsub
 #define I
 #for {I = 0; I < DimOf(Ext); I++} ContextMenuEntries
+; "Edit subtitles with Hushcue" on .srt files: opens them in the editor with the video next to them.
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.srt"; Flags: uninsdeletekeyifempty; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.srt\shell"; Flags: uninsdeletekeyifempty; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.srt\shell\Hushcue.Edit"; ValueType: string; ValueName: ""; ValueData: "{cm:EditMenuVerb}"; Flags: uninsdeletekey; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.srt\shell\Hushcue.Edit"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\{#AppExe}"",0"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.srt\shell\Hushcue.Edit\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""; Tasks: contextmenu
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
