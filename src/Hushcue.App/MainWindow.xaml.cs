@@ -147,18 +147,20 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// The minimize / maximize / close buttons are drawn by Windows in its own theme: match the app's, which can differ
-    /// (HUSHCUE_THEME), and keep their background see-through over the title bar.
+    /// (Settings or HUSHCUE_THEME). Windows only lets their colours change, not their shape, and a hover background is
+    /// a hard square against the rounded, flat title bar, so the background always stays see-through and hovering
+    /// brightens the symbol instead. (Close keeps Windows' own red hover.)
     /// </summary>
     private void ColorCaptionButtons()
     {
         var bar = AppWindow.TitleBar;
         var dark = Root.ActualTheme == ElementTheme.Dark;
-        var text = dark ? Colors.White : Colors.Black;
-        bar.ButtonForegroundColor = bar.ButtonHoverForegroundColor = bar.ButtonPressedForegroundColor = text;
-        bar.ButtonInactiveForegroundColor = dark ? Color.FromArgb(0xFF, 0x9A, 0x9A, 0x9A) : Color.FromArgb(0xFF, 0x80, 0x80, 0x80);
+        bar.ButtonForegroundColor = dark ? Color.FromArgb(0xFF, 0xC8, 0xC8, 0xC8) : Color.FromArgb(0xFF, 0x40, 0x40, 0x40);
+        bar.ButtonHoverForegroundColor = dark ? Colors.White : Colors.Black;
+        bar.ButtonPressedForegroundColor = dark ? Color.FromArgb(0xFF, 0xA0, 0xA0, 0xA0) : Color.FromArgb(0xFF, 0x60, 0x60, 0x60);
+        bar.ButtonInactiveForegroundColor = dark ? Color.FromArgb(0xFF, 0x7A, 0x7A, 0x7A) : Color.FromArgb(0xFF, 0x90, 0x90, 0x90);
         bar.ButtonBackgroundColor = bar.ButtonInactiveBackgroundColor = Colors.Transparent;
-        bar.ButtonHoverBackgroundColor = dark ? Color.FromArgb(0x15, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0F, 0x00, 0x00, 0x00);
-        bar.ButtonPressedBackgroundColor = dark ? Color.FromArgb(0x0B, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0A, 0x00, 0x00, 0x00);
+        bar.ButtonHoverBackgroundColor = bar.ButtonPressedBackgroundColor = Colors.Transparent;
     }
 
     private readonly List<SubtitlePair> _pendingEdits = [];
