@@ -19,13 +19,16 @@ internal sealed class JobProgress(IReadOnlyList<string> files, Action<double, st
 
     /// <param name="fraction">how far file <paramref name="index"/> is through the whole job, 0..1</param>
     /// <param name="text">what the stage is doing to the file</param>
-    public void Working(JobStage stage, int index, double fraction, string text) =>
-        Update(stage, index, fraction, text, FileProgress.Working(files[index], fraction, text));
+    /// <param name="step">what is being done, for the file's own state</param>
+    /// <param name="rate">while transcribing: the measured speed and time left</param>
+    public void Working(JobStage stage, int index, double fraction, string text, FileStage step, RateReading? rate = null) =>
+        Update(stage, index, fraction, text,
+               FileProgress.Working(files[index], fraction, text, step) with { Speed = rate?.Speed, TimeLeft = rate?.TimeLeft });
 
     /// <summary>The file is transcribed; the embed stage may still be busy with an earlier file.</summary>
     public void WaitingToEmbed(int index, double fraction) =>
         Update(JobStage.Transcribing, index, fraction, "",
-               FileProgress.Working(files[index], fraction, "Waiting to add the subtitles..."));
+               FileProgress.Working(files[index], fraction, "Waiting to add the subtitles...", FileStage.WaitingToEmbed));
 
     public void Done(JobStage stage, int index, string output) =>
         Update(stage, index, 1, "", FileProgress.Done(files[index], output));

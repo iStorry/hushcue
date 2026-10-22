@@ -66,7 +66,8 @@ public sealed class JobTests : IDisposable
                                              CancellationToken cancel) =>
         throw new MediaException("disk full");
 
-    private sealed record Run(List<string> Outputs, List<(double Fraction, string Text)> Seen, List<FileProgress> Files, List<string> Log);
+    private sealed record Run(List<string> Outputs, List<(double Fraction, string Text)> Seen, List<FileProgress> Files,
+                              List<string> Log, List<JobEvent> Events);
 
     private static async Task<Run> RunAsync(IReadOnlyList<string> files, JobSettings settings, JobSteps steps,
                                             CancellationToken cancel = default)
@@ -74,9 +75,11 @@ public sealed class JobTests : IDisposable
         var seen = new List<(double, string)>();
         var fileStates = new List<FileProgress>();
         var log = new List<string>();
+        var events = new List<JobEvent>();
         var outputs = await SubtitleJob.RunAsync(files, null, settings, (f, t) => seen.Add((f, t)),
-                                                 line => { lock (log) log.Add(line); }, fileStates.Add, steps, cancel);
-        return new Run(outputs, seen, fileStates, log);
+                                                 line => { lock (log) log.Add(line); }, fileStates.Add,
+                                                 e => { lock (events) events.Add(e); }, steps, cancel);
+        return new Run(outputs, seen, fileStates, log, events);
     }
 
     private static List<string> Done(IEnumerable<FileProgress> files) =>
@@ -229,7 +232,7 @@ public sealed class JobTests : IDisposable
         var videos = TwoVideos();
         var files = new List<FileProgress>();
         await Assert.ThrowsAsync<MediaException>(() => SubtitleJob.RunAsync(
-            videos, null, new JobSettings { Embed = EmbedMode.Soft }, (_, _) => { }, _ => { }, files.Add,
+            videos, null, new JobSettings { Embed = EmbedMode.Soft }, (_, _) => { }, _ => { }, files.Add, null,
             Steps(new FakeTranscriber(Hello), FailingEmbed), default));
         Assert.Empty(Done(files)); // stays in the queue to retry
         Assert.Equal(2, files.Count(f => f.State == FileState.Failed));
@@ -300,7 +303,7 @@ public sealed class JobTests : IDisposable
         var files = new List<FileProgress>();
         var temp = Directory.GetFiles(Path.GetTempPath(), "hushcue_*.srt").Length;
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => SubtitleJob.RunAsync(
-            videos, null, new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false }, (_, _) => { }, _ => { }, files.Add,
+            videos, null, new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false }, (_, _) => { }, _ => { }, files.Add, null,
             Steps(model), cancel.Token));
         Assert.Empty(Done(files));
         Assert.Equal(["a.mp4", "b.mp4"], Names());
@@ -335,7 +338,7 @@ public sealed class JobTests : IDisposable
 
         var files = new List<FileProgress>();
         var error = await Assert.ThrowsAsync<EngineException>(() => SubtitleJob.RunAsync(
-            videos, null, new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false }, (_, _) => { }, _ => { }, files.Add,
+            videos, null, new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false }, (_, _) => { }, _ => { }, files.Add, null,
             Steps(model, EmbedAfterTheFailure), default));
         Assert.Contains("broke the decoder", error.Message);
         Assert.Equal(["a.mkv", "a.mp4", "b.mp4"], Names());
@@ -364,6 +367,67 @@ public sealed class JobTests : IDisposable
         Assert.Equal(["cuda", "cpu"], loads);
         Assert.Equal(["clip.srt"], run.Outputs.Select(Path.GetFileName));
         Assert.Contains(run.Log, line => line.StartsWith("GPU failed (CUDA failed", StringComparison.Ordinal));
+        // the same facts as data, for the app's badge and speed hint
+        var devices = run.Events.OfType<DeviceSelected>().ToList();
+        Assert.Equal(["cuda", "cpu"], devices.Select(d => d.Device));
+        Assert.False(devices[0].Fallback);
+        Assert.True(devices[1].Fallback);
+        Assert.Contains("out of memory", devices[1].Reason);
+        Assert.Equal("cpu", Assert.Single(run.Events.OfType<FileTranscribed>()).Device);
+    }
+
+    // --- what the job reports as data (JobEvent, FileProgress.Stage), so front ends never read the log
+
+    [FfmpegFact]
+    public async Task EachFileGoesThroughItsStagesInOrder()
+    {
+        var clip = Clip();
+        var run = await RunAsync([clip], new JobSettings { Embed = EmbedMode.Soft }, Steps(new FakeTranscriber(Hello, duration: 4)));
+        var stages = run.Files.Select(f => f.Stage).Distinct().ToList();
+        Assert.Equal([FileStage.ReadingAudio, FileStage.LoadingModel, FileStage.Transcribing, FileStage.WritingSrt,
+                      FileStage.WaitingToEmbed, FileStage.Embedding, FileStage.None], stages);
+        Assert.True(run.Files[0].IsStarting);
+        Assert.Equal(FileState.Done, run.Files[^1].State);
+        Assert.Equal(Path.ChangeExtension(clip, ".mkv"), run.Files[^1].Output);
+    }
+
+    [FfmpegFact]
+    public async Task AFinishedTranscriptIsReportedWithItsCuesLengthAndSrt()
+    {
+        var clip = Clip();
+        var run = await RunAsync([clip], new JobSettings(), Steps(new FakeTranscriber(Hello, duration: 4)));
+        Assert.Equal(new DeviceSelected("cpu", Reason: "No usable NVIDIA GPU found"), run.Events[0]);
+        var done = Assert.Single(run.Events.OfType<FileTranscribed>());
+        Assert.Equal(clip, done.Path);
+        Assert.Equal([new Cue(1.0, 2.0, "hello maybe")], done.Cues);
+        Assert.Equal(4.0, done.AudioSeconds, 1);
+        Assert.True(done.Took > TimeSpan.Zero && done.Speed > 0);
+        Assert.Equal(run.Outputs[0], done.Srt);
+        Assert.Empty(done.Warnings);
+    }
+
+    [FfmpegFact]
+    public async Task CoverageWarningsAndTemporarySrtsAreReported()
+    {
+        var run = await RunAsync([Clip()], new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false },
+                                 Steps(new FakeTranscriber([], duration: 4)));
+        var done = Assert.Single(run.Events.OfType<FileTranscribed>());
+        Assert.Empty(done.Cues);
+        Assert.StartsWith("No speech was found", Assert.Single(done.Warnings));
+
+        run = await RunAsync([Clip()], new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false },
+                             Steps(new FakeTranscriber(Hello, duration: 4)));
+        Assert.Null(Assert.Single(run.Events.OfType<FileTranscribed>()).Srt); // only a temporary file, fed to ffmpeg
+    }
+
+    [FfmpegFact]
+    public async Task RecycledOriginalsAreReported()
+    {
+        var videos = TwoVideos();
+        var run = await RunAsync(videos, new JobSettings { Embed = EmbedMode.Soft, DeleteOriginal = true },
+                                 Steps(new FakeTranscriber(Hello), recycle: path => path == videos[0]));
+        Assert.Equal([new OriginalRecycled(videos[0], true), new OriginalRecycled(videos[1], false)],
+                     run.Events.OfType<OriginalRecycled>().OrderBy(e => e.Path));
     }
 
     [FfmpegFact]
@@ -394,6 +458,9 @@ public sealed class JobTests : IDisposable
         Assert.Equal(["large-v3-turbo"], downloads);
         Assert.Equal(1, loads);
         Assert.Contains(run.Seen, s => s.Text.StartsWith("Downloading the large-v3-turbo model... 50%", StringComparison.Ordinal));
+        Assert.Equal([new ModelDownloading("large-v3-turbo", 50, 100), new ModelDownloading("large-v3-turbo", 100, 100),
+                      new ModelDownloading("large-v3-turbo", 100, 100, Finished: true)],
+                     run.Events.OfType<ModelDownloading>());
         Assert.Equal(2, run.Outputs.Count);
     }
 }

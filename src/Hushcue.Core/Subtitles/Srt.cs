@@ -17,4 +17,8 @@ public static class Srt
         var blocks = cues.Select((c, i) => $"{i + 1}\n{Ts(c.Start)} --> {Ts(c.End)}\n{Cleanup.WrapLines(c.Text)}\n");
         return string.Join("\n", blocks);
     }
+
+    /// <summary>Write an .srt file with CRLF line endings, as SubGen's Python writes text files on Windows.</summary>
+    public static Task SaveAsync(string path, IEnumerable<Cue> cues, CancellationToken cancel = default) =>
+        File.WriteAllTextAsync(path, Write(cues).Replace("\n", "\r\n"), cancel);
 }
