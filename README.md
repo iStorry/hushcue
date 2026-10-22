@@ -24,6 +24,17 @@ Keyboard: Ctrl+O add files, Ctrl+Enter start, Delete remove the selected files, 
 within the quality and result choices. `HUSHCUE_THEME=Light` or `Dark` pins the theme and `HUSHCUE_SETUP=1` shows
 the setup screen as on a fresh PC (both for testing and screenshots).
 
+## How it compares with SubGen
+
+Same Whisper engine (CTranslate2) and model, called natively instead of through Python. On four 3-minute reference
+clips, Balanced preset, RTX 4070 ([details](docs/phase7-results.md)):
+
+| | SubGen (Python) | Hushcue |
+|---|---|---|
+| Full job, 12 min of audio | 28.9 s | 26.3 s |
+| Word error rate vs hand-made references | 55.1% | 49.1% |
+| Repeat runs | identical | identical |
+
 ## Layout
 
 | Project | What it is |

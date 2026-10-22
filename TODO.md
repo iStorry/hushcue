@@ -59,7 +59,8 @@ Full results: [docs/phase1b-ctranslate2.md](docs/phase1b-ctranslate2.md).
       (another app was using it during the runs)
 - [x] Removed the Whisper.net spike; `Hushcue.Cli transcribe` now runs the CTranslate2 engine
 - [x] Tests: features vs faster-whisper's (committed fixture), tokenizer vs faster-whisper's (skipped without the model)
-- [ ] Speed table on an idle GPU (Phase 7)
+- [x] Speed against SubGen, same conditions (Phase 7): Hushcue's full job is ~9% faster. An idle-GPU table is still
+      open: another app kept the GPU at ~40% load during every run
 - [x] Non-ASCII model paths: no workaround needed. CTranslate2 4.8.2 converts the UTF-8 path to UTF-16 before opening
       files (`src/filesystem.cc`), and the bridge passes UTF-8. `ModelPathTests` loads the model through junctions named
       `modèle` and `日本語 モデル` (ANSI-encoded paths fail, 8.3 short paths work, checked by hand)
@@ -240,8 +241,12 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
 
 ## Phase 7 — Measure and compare
 
-- [ ] Speed and WER on all reference clips vs SubGen (`tools/bench/compare.py`)
-- [ ] Publish the numbers in README
+Results: [docs/phase7-results.md](docs/phase7-results.md).
+
+- [x] Speed and WER on all reference clips vs SubGen, full job (`subgen_job.py`, `Hushcue.Cli job`, `compare_srt.py`):
+      26.3 s vs 28.9 s for 12 min of audio; WER vs references 49.1% vs 55.1%; repeat runs identical
+- [x] Publish the numbers in README
+- [ ] Repeat the speed table on an idle GPU
 
 ## Phase 8 — Ship
 
