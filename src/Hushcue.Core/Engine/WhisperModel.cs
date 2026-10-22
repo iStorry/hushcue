@@ -231,26 +231,24 @@ public sealed class EncodedWindow : IDisposable
 }
 
 /// <summary>
-/// Where the native libraries come from: hushcue_ct2.dll next to the app; CTranslate2, cuBLAS and cuDNN from a runtime
-/// folder (next to the app, or %LOCALAPPDATA%\Hushcue\runtime on a development machine), added to the DLL search path.
+/// Where the native libraries come from: hushcue_ct2.dll next to the app; CTranslate2 from the runtime folder next to
+/// the app (or %LOCALAPPDATA%\Hushcue\runtime on a development machine); cuBLAS from %LOCALAPPDATA%\Hushcue\runtime,
+/// where <see cref="Pipeline.RuntimeDownload"/> puts it. Both folders go on the DLL search path, the app's first.
 /// </summary>
 public static class RuntimeLibraries
 {
     private static int _registered;
 
+    /// <summary>The folder ctranslate2.dll loads from, or null if there is none.</summary>
     public static string? Folder { get; private set; }
 
     public static void Register()
     {
         if (Interlocked.Exchange(ref _registered, 1) == 1)
             return;
-        string[] candidates =
-        [
-            System.IO.Path.Combine(AppContext.BaseDirectory, "runtime"),
-            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Hushcue", "runtime"),
-        ];
+        string[] candidates = [Pipeline.RuntimeDownload.BundledFolder, Pipeline.RuntimeDownload.Folder];
         Folder = candidates.FirstOrDefault(dir => File.Exists(System.IO.Path.Combine(dir, "ctranslate2.dll")));
-        if (Folder is not null)
-            Environment.SetEnvironmentVariable("PATH", Folder + ";" + Environment.GetEnvironmentVariable("PATH"));
+        // both, even before the GPU libraries are downloaded: CTranslate2 only loads cuBLAS when it first needs it
+        Environment.SetEnvironmentVariable("PATH", string.Join(";", candidates) + ";" + Environment.GetEnvironmentVariable("PATH"));
     }
 }
