@@ -10,8 +10,11 @@ namespace Hushcue.Controls;
 /// <param name="Notes">coverage warnings and failures, one line each, with the file's name</param>
 /// <param name="Recycled">originals moved to the Recycle Bin, by their old paths</param>
 /// <param name="Outputs">the files written</param>
+/// <param name="Reviewable">files whose subtitles can be opened for review</param>
+/// <param name="ToReview">files waiting for a review before their subtitles go into the video</param>
 public sealed record RunSummary(int Done, int Failed, int Skipped, TimeSpan Video, TimeSpan Took, IReadOnlyList<string> Notes,
-                                IReadOnlyList<string> Recycled, IReadOnlyList<string> Outputs);
+                                IReadOnlyList<string> Recycled, IReadOnlyList<string> Outputs,
+                                IReadOnlyList<QueuedFile> Reviewable, int ToReview);
 
 /// <summary>
 /// The finished screen: how much video was done, how long it took and how fast, anything to check, and a way back for
@@ -26,13 +29,18 @@ public sealed partial class FinishedPanel : UserControl
     /// <summary>"Back to options".</summary>
     public event EventHandler? Closed;
 
+    /// <summary>One of the files' "Review" links.</summary>
+    public event EventHandler<QueuedFile>? ReviewRequested;
+
     public void Show(RunSummary summary)
     {
         _summary = summary;
         var files = summary.Done == 1 ? "1 file done" : $"{summary.Done} files done";
         string[] parts =
         [
-            files, summary.Failed > 0 ? $"{summary.Failed} failed" : "", summary.Skipped > 0 ? $"{summary.Skipped} skipped" : "",
+            summary.Done > 0 || summary.ToReview == 0 ? files : "",
+            summary.ToReview > 0 ? $"{summary.ToReview} ready to review" : "",
+            summary.Failed > 0 ? $"{summary.Failed} failed" : "", summary.Skipped > 0 ? $"{summary.Skipped} skipped" : "",
         ];
         HeadText.Text = string.Join(", ", parts.Where(p => p.Length > 0));
         HeadIcon.Glyph = summary.Failed > 0 ? "\uE7BA" : "\uE930";
@@ -42,7 +50,12 @@ public sealed partial class FinishedPanel : UserControl
         TookText.Text = Length(summary.Took);
         var speed = summary.Took.TotalSeconds > 0.5 ? summary.Video.TotalSeconds / summary.Took.TotalSeconds : 0;
         SpeedText.Text = speed > 0 ? $"{(speed >= 10 ? Math.Round(speed) : Math.Round(speed, 1))}×" : "–";
-        Tiles.Visibility = summary.Done > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Tiles.Visibility = summary.Done + summary.ToReview > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ReviewPanel.Visibility = summary.Reviewable.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ReviewHint.Text = summary.ToReview > 0
+            ? "Check and edit the subtitles, then embed each file from its review."
+            : "Check and edit the subtitles; a review can also make a new video with them.";
+        ReviewLinks.ItemsSource = summary.Reviewable;
         Notes.ItemsSource = summary.Notes;
 
         RecyclePanel.Visibility = summary.Recycled.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -83,4 +96,10 @@ public sealed partial class FinishedPanel : UserControl
     }
 
     private void OnBack(object sender, RoutedEventArgs e) => Closed?.Invoke(this, EventArgs.Empty);
+
+    private void OnReview(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: QueuedFile file })
+            ReviewRequested?.Invoke(this, file);
+    }
 }

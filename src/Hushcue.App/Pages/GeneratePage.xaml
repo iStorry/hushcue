@@ -22,7 +22,8 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid RowSpacing="16">
+    <Grid>
+    <Grid x:Name="Main" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -102,6 +103,8 @@
                                 <CheckBox x:Name="KeepSrtBox" Content="Also keep the .srt file" />
                                 <CheckBox x:Name="DeleteBox" Content="Move the original to the Recycle Bin"
                                           ToolTipService.ToolTip="Only after the new video has been written. You can put it back from the finished screen or the Recycle Bin." />
+                                <CheckBox x:Name="ReviewBox" Content="Review before embedding"
+                                          ToolTipService.ToolTip="Stop after the subtitles are made, so you can check and edit them, then embed each file from its review. The .srt is kept for your edits." />
                             </StackPanel>
                         </StackPanel>
 
@@ -134,8 +137,16 @@
             <Border x:Name="FinishedCard" Grid.Column="1" Style="{StaticResource Card}" Visibility="Collapsed">
                 <controls:FinishedPanel x:Name="Summary" />
             </Border>
+
+            <!-- While a batch runs, the subtitles of the file being transcribed, as they are heard -->
+            <Border x:Name="LiveCard" Grid.Column="1" Style="{StaticResource Card}" Padding="20,14,20,12" Visibility="Collapsed">
+                <controls:LiveTranscript x:Name="Live" />
+            </Border>
         </Grid>
 
         <controls:RunPanel x:Name="Run" Grid.Row="1" StartText="Generate subtitles" />
+    </Grid>
+
+    <pages:ReviewPage x:Name="Review" Visibility="Collapsed" />
     </Grid>
 </UserControl>

@@ -2,7 +2,8 @@
 <UserControl
     x:Class="Hushcue.Controls.FinishedPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Hushcue.Controls">
 
     <UserControl.Resources>
         <Style x:Key="Tile" TargetType="Border">
@@ -80,6 +81,24 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <StackPanel x:Name="ReviewPanel" Spacing="2" Visibility="Collapsed">
+                    <TextBlock Text="Review and edit" Style="{StaticResource BodyStrongTextBlockStyle}"
+                               AutomationProperties.HeadingLevel="Level3" />
+                    <TextBlock x:Name="ReviewHint" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ItemsControl x:Name="ReviewLinks" IsTabStop="False" Margin="-12,0,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="local:QueuedFile">
+                                <HyperlinkButton Click="OnReview" AutomationProperties.Name="{x:Bind ReviewName}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE70F;" FontSize="12" />
+                                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </HyperlinkButton>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
 
                 <StackPanel x:Name="RecyclePanel" Spacing="2" Visibility="Collapsed">
                     <TextBlock x:Name="RecycleText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"

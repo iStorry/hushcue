@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Hushcue.Pages.ReviewPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Hushcue.Controls"
+    xmlns:pages="using:Hushcue.Pages">
+
+    <UserControl.Resources>
+        <Style x:Key="ToolButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Padding" Value="10,5" />
+        </Style>
+        <Style x:Key="TimeBox" TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
+            <Setter Property="Width" Value="104" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid x:Name="Root" RowSpacing="12" PreviewKeyDown="OnPreviewKeyDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Which file, and the way back -->
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="BackButton" Click="OnBack" Style="{ThemeResource SubtleButtonStyle}" Padding="8,6"
+                    ToolTipService.ToolTip="Back to the files" AutomationProperties.Name="Back to the files">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE72B;" FontSize="14" />
+                    <TextBlock Text="Files" />
+                </StackPanel>
+            </Button>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock x:Name="FileTitle" Style="{StaticResource SubtitleTextBlockStyle}" TextTrimming="CharacterEllipsis"
+                           AutomationProperties.HeadingLevel="Level1" />
+                <TextBlock x:Name="FileFacts" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="2*" MinWidth="340" MaxWidth="620" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Video with the subtitle drawn over it, the controls, and the timeline -->
+            <Border Style="{StaticResource Card}" Padding="16,16,16,12">
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid x:Name="VideoArea" Background="Black" CornerRadius="6" MinHeight="120" Tapped="OnVideoTapped">
+                        <MediaPlayerElement x:Name="Player" AreTransportControlsEnabled="False" Stretch="Uniform"
+                                            AutomationProperties.Name="Video preview" />
+                        <TextBlock x:Name="VideoMessage" Foreground="#FFB0B0B0" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="24" />
+                        <Border x:Name="Overlay" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="24,0,24,20"
+                                Padding="12,5" CornerRadius="4" Background="#D0000000" Visibility="Collapsed">
+                            <TextBlock x:Name="OverlayText" Foreground="White" FontSize="18" TextWrapping="Wrap"
+                                       TextAlignment="Center" />
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="1" ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BackStep" Click="OnStepBack" Style="{StaticResource ToolButton}"
+                                ToolTipService.ToolTip="Back 5 seconds (J)" AutomationProperties.Name="Back 5 seconds"
+                                AutomationProperties.AcceleratorKey="J">
+                            <TextBlock Text="−5 s" />
+                        </Button>
+                        <Button x:Name="PlayButton" Grid.Column="1" Click="OnPlay" Style="{StaticResource ToolButton}"
+                                ToolTipService.ToolTip="Play (Space or K)" AutomationProperties.Name="Play"
+                                AutomationProperties.AcceleratorKey="Space">
+                            <FontIcon x:Name="PlayIcon" Glyph="&#xE768;" FontSize="14" />
+                        </Button>
+                        <Button x:Name="ForwardStep" Grid.Column="2" Click="OnStepForward" Style="{StaticResource ToolButton}"
+                                ToolTipService.ToolTip="Forward 5 seconds (L)" AutomationProperties.Name="Forward 5 seconds"
+                                AutomationProperties.AcceleratorKey="L">
+                            <TextBlock Text="+5 s" />
+                        </Button>
+                        <TextBlock x:Name="TimeText" Grid.Column="3" VerticalAlignment="Center" Margin="8,0,0,0"
+                                   FontFamily="Cascadia Mono, Consolas" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Button Grid.Column="5" Click="OnZoomOut" Style="{ThemeResource SubtleButtonStyle}" Padding="8"
+                                ToolTipService.ToolTip="Show more of the timeline (Ctrl+wheel)" AutomationProperties.Name="Zoom the timeline out">
+                            <FontIcon Glyph="&#xE71F;" FontSize="14" />
+                        </Button>
+                        <Button Grid.Column="6" Click="OnZoomIn" Style="{ThemeResource SubtleButtonStyle}" Padding="8"
+                                ToolTipService.ToolTip="Show less of the timeline, in more detail (Ctrl+wheel)"
+                                AutomationProperties.Name="Zoom the timeline in">
+                            <FontIcon Glyph="&#xE8A3;" FontSize="14" />
+                        </Button>
+                    </Grid>
+
+                    <controls:WaveformTimeline x:Name="Timeline" Grid.Row="2" />
+                    <TextBlock Grid.Row="3" Style="{StaticResource Hint}"
+                               Text="Drag the edges of a subtitle to fix its timing · click to play from there · wheel to scroll, Ctrl+wheel to zoom" />
+                </Grid>
+            </Border>
+
+            <!-- The subtitles: search, flags, the list, and the selected one's editor -->
+            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Padding="16,12,16,8" ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="SearchBox" PlaceholderText="Find in transcript (Ctrl+F)" TextChanged="OnSearchChanged"
+                                 KeyDown="OnSearchKeyDown" AutomationProperties.Name="Find in transcript"
+                                 AutomationProperties.AcceleratorKey="Control+F" />
+                        <Button x:Name="FlagsButton" Grid.Column="1" Click="OnNextFlag" Padding="10,5"
+                                Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                                ToolTipService.ToolTip="Go to the next thing to check (F8; Shift+F8 goes back)"
+                                AutomationProperties.AcceleratorKey="F8">
+                            <TextBlock x:Name="FlagsText" />
+                        </Button>
+                        <Button x:Name="PreviousFlagButton" Grid.Column="2" Click="OnPreviousFlag" Style="{ThemeResource SubtleButtonStyle}"
+                                Padding="8" ToolTipService.ToolTip="Previous thing to check (Shift+F8)"
+                                AutomationProperties.Name="Previous thing to check">
+                            <FontIcon Glyph="&#xE70E;" FontSize="12" />
+                        </Button>
+                    </Grid>
+
+                    <ListView x:Name="CueList" Grid.Row="1" SelectionMode="Extended" SelectionChanged="OnRowSelected"
+                              AutomationProperties.Name="Subtitles" Padding="0,0,0,8">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="pages:ReviewRow">
+                                <Grid Padding="0,7" ColumnSpacing="10" AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="{x:Bind MarkerBrush, Mode=OneWay}" CornerRadius="2" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Time, Mode=OneWay}" MinWidth="64" Margin="0,1,0,0"
+                                               FontFamily="Cascadia Mono, Consolas" FontWeight="{x:Bind TimeWeight, Mode=OneWay}"
+                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="{x:Bind Text, Mode=OneWay}" TextWrapping="Wrap"
+                                                   FontStyle="{x:Bind TextStyle, Mode=OneWay}" Foreground="{x:Bind TextBrush, Mode=OneWay}" />
+                                        <Border Visibility="{x:Bind FlagVisibility, Mode=OneWay}" HorizontalAlignment="Left"
+                                                Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                                                CornerRadius="4" Padding="6,1">
+                                            <TextBlock Text="{x:Bind FlagLabel, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Padding="16,12,16,14">
+                        <StackPanel Spacing="8">
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="EditorTitle" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBox x:Name="StartBox" Grid.Column="1" Style="{StaticResource TimeBox}"
+                                         KeyDown="OnTimeKeyDown" LostFocus="OnTimeLostFocus"
+                                         ToolTipService.ToolTip="Start (minutes:seconds)" AutomationProperties.Name="Start time" />
+                                <TextBlock Grid.Column="2" Text="→" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
+                                <TextBox x:Name="EndBox" Grid.Column="3" Style="{StaticResource TimeBox}"
+                                         KeyDown="OnTimeKeyDown" LostFocus="OnTimeLostFocus"
+                                         ToolTipService.ToolTip="End (minutes:seconds)" AutomationProperties.Name="End time" />
+                            </Grid>
+                            <TextBox x:Name="TextEditor" TextWrapping="Wrap" AcceptsReturn="False" MinHeight="56"
+                                     KeyDown="OnTextKeyDown" LostFocus="OnTextLostFocus"
+                                     PlaceholderText="Select a subtitle to edit it"
+                                     AutomationProperties.Name="Subtitle text (Enter to save the change, Esc to undo it)" />
+                            <Grid x:Name="FlagPanel" ColumnSpacing="8" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE7BA;" FontSize="14" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                <TextBlock x:Name="FlagMessage" Grid.Column="1" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"
+                                           AutomationProperties.LiveSetting="Polite" />
+                                <HyperlinkButton Grid.Column="2" Content="Looks fine" Click="OnDismissFlag" Padding="4,0"
+                                                 ToolTipService.ToolTip="Stop flagging this" AutomationProperties.Name="Looks fine: stop flagging this" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <Button x:Name="SplitButton" Click="OnSplit" Style="{StaticResource ToolButton}"
+                                        ToolTipService.ToolTip="Split in two at the cursor in the text"
+                                        AutomationProperties.Name="Split this subtitle in two">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE8C6;" FontSize="12" />
+                                        <TextBlock Text="Split" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="MergeButton" Click="OnMerge" Style="{StaticResource ToolButton}"
+                                        ToolTipService.ToolTip="Join with the next subtitle" AutomationProperties.Name="Join with the next subtitle">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE8C9;" FontSize="12" />
+                                        <TextBlock Text="Merge" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="AddButton" Click="OnAdd" Style="{StaticResource ToolButton}"
+                                        ToolTipService.ToolTip="Add a subtitle at the playhead" AutomationProperties.Name="Add a subtitle at the playhead">
+                                    <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                </Button>
+                                <Button x:Name="DeleteButton" Click="OnDelete" Style="{StaticResource ToolButton}"
+                                        ToolTipService.ToolTip="Delete the selected subtitles (Delete)"
+                                        AutomationProperties.Name="Delete the selected subtitles" AutomationProperties.AcceleratorKey="Delete">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                </Button>
+                                <Button x:Name="RerunButton" Click="OnRerun" Style="{StaticResource ToolButton}"
+                                        ToolTipService.ToolTip="Transcribe the selected stretch again and replace its subtitles (undo with Ctrl+Z)"
+                                        AutomationProperties.Name="Re-run this part">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon x:Name="RerunIcon" Glyph="&#xE72C;" FontSize="12" />
+                                        <TextBlock Text="Re-run this part" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Saving, and putting the subtitles into the video as the last step -->
+        <Grid Grid.Row="2" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4" VerticalAlignment="Center">
+                <TextBlock x:Name="StatusText" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                           AutomationProperties.LiveSetting="Polite" />
+                <ProgressBar x:Name="EmbedBar" Maximum="1000" Visibility="Collapsed" AutomationProperties.Name="Embedding progress" />
+                <StackPanel x:Name="ResultLinks" Orientation="Horizontal" Margin="-12,-4,0,0" Visibility="Collapsed">
+                    <HyperlinkButton x:Name="ShowOutputLink" Content="Show in folder" Click="OnShowOutput" />
+                    <HyperlinkButton x:Name="RestoreLink" Content="Put the original back" Click="OnRestore" Visibility="Collapsed" />
+                </StackPanel>
+            </StackPanel>
+            <Button x:Name="UndoButton" Grid.Column="1" Click="OnUndo" Style="{ThemeResource SubtleButtonStyle}" Padding="9"
+                    AutomationProperties.AcceleratorKey="Control+Z">
+                <FontIcon Glyph="&#xE7A7;" FontSize="14" />
+            </Button>
+            <Button x:Name="RedoButton" Grid.Column="2" Click="OnRedo" Style="{ThemeResource SubtleButtonStyle}" Padding="9"
+                    AutomationProperties.AcceleratorKey="Control+Y">
+                <FontIcon Glyph="&#xE7A6;" FontSize="14" />
+            </Button>
+            <Button x:Name="SaveButton" Grid.Column="3" Click="OnSave" ToolTipService.ToolTip="Save the .srt (Ctrl+S)"
+                    AutomationProperties.Name="Save" AutomationProperties.AcceleratorKey="Control+S">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE74E;" FontSize="14" />
+                    <TextBlock Text="Save" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="ExportButton" Grid.Column="4" Content="Export .srt" Click="OnExport"
+                    ToolTipService.ToolTip="Save a copy of the subtitles somewhere else" AutomationProperties.Name="Export .srt" />
+            <ComboBox x:Name="ModeBox" Grid.Column="5" MinWidth="200" VerticalAlignment="Center"
+                      AutomationProperties.Name="How to put the subtitles into the video">
+                <ComboBoxItem Content="Subtitle track (.mkv)" Tag="Soft" />
+                <ComboBoxItem Content="Burn into the picture (.mp4)" Tag="Burn" />
+            </ComboBox>
+            <Button x:Name="EmbedButton" Grid.Column="6" Click="OnEmbed" Style="{ThemeResource AccentButtonStyle}" Padding="18,6"
+                    AutomationProperties.Name="Embed into video">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE8B9;" FontSize="14" />
+                    <TextBlock Text="Embed into video" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="CancelEmbedButton" Grid.Column="7" Content="Cancel" Click="OnCancelEmbed" Visibility="Collapsed"
+                    AutomationProperties.Name="Cancel embedding" />
+        </Grid>
+    </Grid>
+</UserControl>

@@ -12,6 +12,7 @@ public sealed class AppSettings
     public EmbedMode Embed { get; set; } = EmbedMode.Soft;
     public bool KeepSrt { get; set; }
     public bool DeleteOriginal { get; set; }
+    public bool ReviewBeforeEmbed { get; set; }
     public bool Enhance { get; set; }
     public bool SkipSilence { get; set; }
     public string OutputFolder { get; set; } = "";

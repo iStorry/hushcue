@@ -1,6 +1,9 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Hushcue.Core;
 using Hushcue.Core.Media;
+using Hushcue.Core.Pipeline;
+using Hushcue.Core.Subtitles;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 
@@ -10,6 +13,13 @@ namespace Hushcue.Controls;
 /// <param name="Skip">the run leaves the file out (it can't be read, or has no sound)</param>
 public sealed record FileCheck(string Warning, bool Skip);
 
+/// <summary>A file's finished subtitles from a run, and what the run was asked to do, for reviewing them.</summary>
+/// <param name="Srt">the .srt written, or null when it was only a temporary file</param>
+/// <param name="Settings">the run's settings: re-running a part decodes as they say, embedding uses their result</param>
+/// <param name="OutDir">the run's output folder, or null for next to the file</param>
+/// <param name="Duration">the audio's length in seconds</param>
+public sealed record Transcript(IReadOnlyList<Cue> Cues, string? Srt, JobSettings Settings, string? OutDir, double Duration);
+
 /// <summary>A file in the queue and where it is: waiting, being worked on, done, or failed.</summary>
 public sealed class QueuedFile(string path) : INotifyPropertyChanged
 {
@@ -18,6 +28,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     private const string WorkingGlyph = "\uE768"; // play
     private const string DoneGlyph = "\uE73E"; // check mark
     private const string FailedGlyph = "\uE783";
+    private const string ReviewGlyph = "\uE70F"; // pencil
 
     private FileProgress _progress = FileProgress.Waiting(path);
     private bool _locked;
@@ -35,6 +46,15 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     public Task Probing { get; set; } = Task.CompletedTask;
     public FileCheck? Check { get; private set; }
 
+    /// <summary>The subtitles of the last run, once the file is transcribed.</summary>
+    public Transcript? Transcript { get; private set; }
+
+    /// <summary>The subtitles heard so far while the file is transcribed (provisional).</summary>
+    public ObservableCollection<CueLine> LiveCues { get; } = [];
+
+    /// <summary>Finished, or waiting for a review, with subtitles to look at.</summary>
+    public bool CanReview => State is FileState.Done or FileState.Review && Transcript is { Cues.Count: > 0 };
+
     /// <summary>Seconds, 0 until probed or when the file does not say.</summary>
     public double Duration => Info?.Duration ?? 0;
 
@@ -44,6 +64,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
         FileState.Working => _progress.Status,
         FileState.Done => Join("Done", Lower(_progress.Status), Length),
         FileState.Failed => _progress.Status,
+        FileState.Review => Join("Ready to review", Length),
         _ when Check is not null => Check.Warning,
         _ => Join(ProbeError is null && Info is null ? "Waiting · reading the file..." : "Waiting", Length),
     };
@@ -61,7 +82,8 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     public double Percent => _progress.Fraction * 100;
     public string PercentText => State == FileState.Working ? $"{Percent:F0}%" : "";
     public Visibility ProgressVisibility => VisibleIf(State == FileState.Working);
-    public Visibility OutputVisibility => VisibleIf(State == FileState.Done && Output is not null);
+    public Visibility OutputVisibility => VisibleIf(State is FileState.Done or FileState.Review && Output is not null);
+    public Visibility ReviewVisibility => VisibleIf(CanReview);
     public Visibility RemoveVisibility => VisibleIf(!_locked && State != FileState.Working);
 
     public string Glyph => State switch
@@ -69,6 +91,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
         FileState.Working => WorkingGlyph,
         FileState.Done => DoneGlyph,
         FileState.Failed => FailedGlyph,
+        FileState.Review => ReviewGlyph,
         _ => Check is not null ? WarningGlyph : WaitingGlyph,
     };
 
@@ -76,22 +99,41 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     {
         FileState.Done => ThemeBrushes.Success,
         FileState.Failed => ThemeBrushes.Critical,
-        FileState.Working => ThemeBrushes.Accent,
+        FileState.Working or FileState.Review => ThemeBrushes.Accent,
         _ => Check is not null ? ThemeBrushes.Caution : ThemeBrushes.Secondary,
     });
 
     /// <summary>What a screen reader says for the row.</summary>
     public string AccessibleName => State == FileState.Working ? $"{Name}, {PercentText}, {Detail}" : $"{Name}, {Detail}";
     public string RemoveName => $"Remove {Name} from the list";
+    public string ReviewName => $"Review and edit the subtitles of {Name}";
     public string ShowName => $"Show {System.IO.Path.GetFileName(Output ?? Name)} in its folder";
 
     public void Update(FileProgress progress)
     {
+        if (progress.Stage == FileStage.ReadingAudio && _progress.Stage != FileStage.ReadingAudio)
+        {
+            LiveCues.Clear(); // a new run of the file
+            Transcript = null;
+        }
         _progress = progress;
         Changed();
     }
 
     public void Requeue() => Update(FileProgress.Waiting(Path));
+
+    /// <summary>More of the subtitles heard while the file is transcribed.</summary>
+    public void AddLiveCues(IEnumerable<Cue> cues)
+    {
+        foreach (var cue in cues)
+            LiveCues.Add(new CueLine(cue));
+    }
+
+    public void SetTranscript(Transcript transcript)
+    {
+        Transcript = transcript;
+        Changed();
+    }
 
     public void SetProbe(MediaInfo? info, string? error)
     {

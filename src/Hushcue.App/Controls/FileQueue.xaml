@@ -84,6 +84,12 @@
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="{x:Bind PercentText, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,4,0"
                                            Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                <Button Visibility="{x:Bind ReviewVisibility, Mode=OneWay}" Click="OnReview"
+                                        Style="{ThemeResource SubtleButtonStyle}" Padding="8" VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Review and edit the subtitles"
+                                        AutomationProperties.Name="{x:Bind ReviewName, Mode=OneWay}">
+                                    <FontIcon Glyph="&#xE70F;" FontSize="14" />
+                                </Button>
                                 <Button Visibility="{x:Bind OutputVisibility, Mode=OneWay}" Click="OnShowOutput"
                                         Style="{ThemeResource SubtleButtonStyle}" Padding="8" VerticalAlignment="Center"
                                         ToolTipService.ToolTip="Show in folder"
