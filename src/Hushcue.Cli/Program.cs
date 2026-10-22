@@ -3,6 +3,8 @@ using Hushcue.Core;
 
 if (args.Length > 0 && args[0] == "transcribe")
     return await TranscribeCommand.RunAsync(args[1..]);
+if (args.Length > 0 && args[0] == "job")
+    return await JobCommand.RunAsync(args[1..]);
 if (args.Length == 4 && args[0] == "features")
 {
     // features MEDIA N_MELS OUT: raw float32 log-mel features (n_mels rows), for comparing with faster-whisper's
@@ -16,4 +18,5 @@ Console.WriteLine($"{Product.Name} {typeof(Product).Assembly.GetName().Version?.
 Console.WriteLine(Product.Tagline);
 Console.WriteLine();
 Console.WriteLine(TranscribeCommand.Usage);
+Console.WriteLine(JobCommand.Usage);
 return 0;

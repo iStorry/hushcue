@@ -2,17 +2,19 @@
 
     ..\\subgen\\.venv\\Scripts\\python tools\\bench\\fw_reference.py OUT_DIR [--language auto|CODE] [--prompt TEXT]
         [--repetition-penalty P] [--hallucination-silence SECONDS] [--seconds N]
-        [--vad] [--vad-threshold T] [--vad-min-silence MS]
+        [--vad] [--vad-threshold T] [--vad-min-silence MS] [--vad-speech-pad MS] [--features DIR]
 
-Writes OUT_DIR/CLIP.words.json and, so Hushcue.Cli can decode the very same input, bench-out/features-N/CLIP.f32
-(faster-whisper's own log-mel features). --seconds N uses only the first N seconds of each clip.
-Run Hushcue.Cli transcribe with the same options and --features bench-out/features-N, then compare the words.
-The features are of the whole clip, so with the --vad options run Hushcue.Cli with the same --vad options instead.
+Writes OUT_DIR/CLIP.words.json and, so Hushcue.Cli can decode the very same input, the log-mel features faster-whisper
+computed (fw_features.py; default folder bench-out/features). --seconds N uses only the first N seconds of each clip.
+Run Hushcue.Cli transcribe with the same options and --features DIR, then compare the words (compare_words.py).
+SubGen's VAD options are --vad-threshold 0.1 --vad-min-silence 1000 --vad-speech-pad 500.
+Set SUBGEN_DIR if SubGen is not checked out next to this repository.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -20,13 +22,15 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-CLIPS = sorted((ROOT.parent / "subgen" / "reference").glob("*.mp4"))
-sys.path.insert(0, str(ROOT.parent / "subgen"))
+SUBGEN = Path(os.environ.get("SUBGEN_DIR") or ROOT.parent / "subgen")
+CLIPS = sorted((SUBGEN / "reference").glob("*.mp4"))
+sys.path.insert(0, str(SUBGEN))
 import pipeline  # noqa: E402  (for its CUDA DLL setup)
 
 pipeline.setup_cuda_paths()
 from faster_whisper import WhisperModel  # noqa: E402
-from faster_whisper.feature_extractor import FeatureExtractor  # noqa: E402
+
+from fw_features import record_features  # noqa: E402
 
 
 def audio_of(path: Path, seconds: float | None) -> np.ndarray:
@@ -49,19 +53,20 @@ def main() -> int:
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--vad-threshold", type=float)
     parser.add_argument("--vad-min-silence", type=int)
+    parser.add_argument("--vad-speech-pad", type=int)
+    parser.add_argument("--features", default=str(ROOT / "bench-out" / "features"))
     args = parser.parse_args()
     vad_parameters = {key: value for key, value in [("threshold", args.vad_threshold),
-                                                    ("min_silence_duration_ms", args.vad_min_silence)]
+                                                    ("min_silence_duration_ms", args.vad_min_silence),
+                                                    ("speech_pad_ms", args.vad_speech_pad)]
                       if value is not None}
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    features_dir = ROOT / "bench-out" / f"features-{int(args.seconds or 0)}"
-    features_dir.mkdir(parents=True, exist_ok=True)
     model = WhisperModel("large-v3-turbo", device="cuda", compute_type="float16")
+    record_features(model, Path(args.features))
     for clip in CLIPS:
         audio = audio_of(clip, args.seconds)
-        FeatureExtractor(feature_size=128)(audio).astype(np.float32).tofile(features_dir / f"{clip.stem}.f32")
         segments, info = model.transcribe(
             audio, language=None if args.language == "auto" else args.language, beam_size=5, temperature=[0.0],
             condition_on_previous_text=False, vad_filter=args.vad or bool(vad_parameters),
@@ -71,7 +76,8 @@ def main() -> int:
         words = [{"word": w.word, "start": w.start, "end": w.end, "probability": w.probability}
                  for s in segments for w in (s.words or [])]
         (out / f"{clip.stem}.words.json").write_text(json.dumps(words, indent=1), encoding="utf-8")
-        print(f"{clip.stem}: {len(words)} words, language {info.language} ({info.language_probability:.4f})")
+        print(f"{clip.stem}: {len(words)} words, language {info.language} ({info.language_probability:.4f}), "
+              f"{info.duration_after_vad:.1f} of {info.duration:.1f} s decoded")
     return 0
 
 
