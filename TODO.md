@@ -215,6 +215,12 @@ idea 1 rearranges controls that mostly exist already; idea 2 is the feature that
 
 **Idea 2: review and edit before embedding** ([mock](docs/mocks/2-review-editor.png))
 
+Status: the Core side is merged (`src/Hushcue.Core/Review/`: cue editor with undo, flags, waveform envelope, re-run a
+part, review before embedding; `ReviewTests.cs`), and the job now reports stages and events as data, so the app no
+longer reads Core's log wording. The app side (Review page, live transcript, waveform timeline) is a work in progress
+on branch `review-editor`, unfinished and never run. Merged code builds; the test suite was not re-run after this
+merge (run `dotnet test Hushcue.slnx`).
+
 - [ ] Show cues as they are transcribed in a side panel
 - [ ] Review page: video preview with the subtitles drawn live, editable and searchable cue list
 - [ ] Flag likely hallucinations (`DropJunk` list) and gaps (`CoverageWarnings`); "Re-run this part" re-decodes
