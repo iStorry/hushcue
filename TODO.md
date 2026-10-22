@@ -34,8 +34,13 @@ a stronger language model, and the person reviewing a fast way to fix what is st
       are mostly right on this clean TTS speech (Balanced misses cum → come, brakes → breaks, principle →
       principal, site → side; Thorough only principle and sight). The names are the big miss: right in the first
       ~25 s, then Jackson, Ashley, Catherine, Michaela, "Hushq" (Balanced 15/38, Thorough 10/38)
-- [ ] The test set is too easy for the look-alike words: TTS is clear and the noise level (0.03) barely matters.
-      Add harder audio (more noise, faster speech, real recordings with permission) so context changes show up
+- [x] **Harder audio**: each passage now also comes as `.hard` (faster speech, loud pink noise, telephone
+      bandwidth) and `.pauses` (12 s of noise after every third sentence, where Whisper tends to invent text).
+      Whisper copes: with the vocabulary fix, Balanced is 1.4% WER and 345/372 scored words over all four
+      variants, Thorough 1.5% and 349/372. The look-alike misses are the same few words in every variant
+      (cum → come in "a gallery cum reading room", brakes → breaks, principle → principal, site → side,
+      sight → site), so they come from the language model, not the audio: the review swaps and spelling
+      preferences below are the fix for them. Still worth adding: real recordings (with permission)
 - [x] **Fixed: the vocabulary only reached the first 30 seconds.** It went in as Whisper's initial prompt, and with
       `ConditionOnPreviousText = false` the prompt is dropped after the first window (`Transcriber.cs`,
       `promptResetSince`). Now it goes in as hotwords, which go into every window. Names: Balanced 15/38 → 31/38,
@@ -45,9 +50,17 @@ a stronger language model, and the person reviewing a fast way to fix what is st
 - [ ] **"Thank you" over noise**: Balanced writes "Thank you" / "you" over pink noise, silence and plain tones
       (4–5 cues in 2 minutes, with or without a vocabulary); Thorough writes nothing. Drop a lone "Thank you" /
       "you" cue when the audio under it has no speech (VAD probability), or flag it in the review
-- [ ] **Context across windows**: try `ConditionOnPreviousText = true` (each 30 s window sees the text before it).
-      It was off to stop loops spreading; the loop recovery and prompt reset on a fallback may now cover that.
-      Switch only if the test set gets better and no loops appear
+- [x] **Context across windows: tried, staying off.** `JobSettings.PreviousText` (off; `eval --previous-text`)
+      lets each window see the text before it. Balanced: 345 → 350 scored words right, but WER 1.4% → 1.6%;
+      Thorough: 349 → 349, WER 1.5% → 2.0%. The extra errors are invented text carried over from the context:
+      "please write them in the comments", "feel free to ask", "If you have any questions" (Thorough), and on
+      an earlier run "Thank you for watching. Please subscribe to the channel and press the bell icon" in a
+      pause. The prompt reset that is meant to stop this never fires, because every preset decodes at
+      temperature 0 only
+- [ ] **Punctuation lost after a pause**: without context, a window that starts after a pause can come out
+      without capitals or full stops ("the help pages thank you all now, a few details", Balanced,
+      team-names.pauses). Try a short punctuated style prompt in every window (with the hotwords), measured
+      with eval; also put a space back into run-together sentences ("notes.Ashleigh"), which fast speech causes
 - [ ] **Balanced vs Thorough on look-alike words**: large-v3-turbo has 4 decoder layers, large-v3 has 32. The
       decoder is the part that picks between words that sound the same. Measure the gap; if it is large, say so in
       the quality descriptions

@@ -59,6 +59,9 @@ public sealed record JobSettings
     /// <summary>Re-decode passages where Whisper looped, each on its own (<see cref="FileTranscription.RecoverLoops"/>);
     /// on by default.</summary>
     public bool RecoverLoops { get; init; } = true;
+    /// <summary>Let each 30 s window see the text decoded before it (Whisper's condition_on_previous_text). Off by
+    /// default: a window that goes wrong can pass its mistake on to the next.</summary>
+    public bool PreviousText { get; init; }
     public EmbedMode Embed { get; init; } = EmbedMode.None;
     /// <summary>When embedding: also leave the .srt next to the video.</summary>
     public bool KeepSrt { get; init; } = true;

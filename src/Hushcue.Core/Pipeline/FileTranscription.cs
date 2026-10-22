@@ -45,7 +45,7 @@ internal static class FileTranscription
             Task = "transcribe",
             BeamSize = preset.BeamSize,
             Temperatures = preset.Temperatures,
-            ConditionOnPreviousText = false, // stops hallucination loops from propagating
+            ConditionOnPreviousText = settings.PreviousText,
             RepetitionPenalty = repetitionPenalty,
             Vad = Presets.Vad(preset, settings),
             NoSpeechThreshold = 0.6,

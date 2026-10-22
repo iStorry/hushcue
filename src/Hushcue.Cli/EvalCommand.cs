@@ -3,6 +3,7 @@ using System.Text.Json;
 using Hushcue.Core.Engine;
 using Hushcue.Core.Evaluation;
 using Hushcue.Core.Pipeline;
+using Hushcue.Core.Review;
 using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Cli;
@@ -16,8 +17,8 @@ internal static class EvalCommand
 {
     public const string Usage =
         """
-        usage: Hushcue.Cli eval [--set DIR] [--preset NAME]... [--only TEXT] [--no-vocabulary] [--out DIR]
-                                [--device cuda|cpu]
+        usage: Hushcue.Cli eval [--set DIR] [--preset NAME]... [--only TEXT] [--no-vocabulary] [--previous-text]
+                                [--out DIR] [--device cuda|cpu]
         """;
 
     private sealed record Passage(string Name, string Text, string? Vocabulary);
@@ -26,7 +27,7 @@ internal static class EvalCommand
     {
         string? setDir = null, outDir = null, device = null, only = null;
         var presets = new List<string>();
-        var useVocabulary = true;
+        bool useVocabulary = true, previousText = false;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -37,6 +38,7 @@ internal static class EvalCommand
                 case "--out" when i + 1 < args.Length: outDir = args[++i]; break;
                 case "--device" when i + 1 < args.Length: device = args[++i]; break;
                 case "--no-vocabulary": useVocabulary = false; break;
+                case "--previous-text": previousText = true; break;
                 default: Console.Error.WriteLine(Usage); return 2;
             }
         }
@@ -66,29 +68,36 @@ internal static class EvalCommand
             var clock = Stopwatch.StartNew();
             foreach (var group in files.GroupBy(f => useVocabulary ? f.Passage.Vocabulary ?? "" : ""))
             {
-                var settings = new JobSettings { Preset = preset, Vocabulary = group.Key };
+                var settings = new JobSettings { Preset = preset, Vocabulary = group.Key, PreviousText = previousText };
                 await SubtitleJob.RunAsync([.. group.Select(f => f.File)], dir, settings, (_, _) => { }, _ => { }, null, null,
                                            steps, CancellationToken.None);
             }
             var seconds = clock.Elapsed.TotalSeconds;
 
-            Console.WriteLine($"{preset} ({Presets.Get(preset).Model}{(useVocabulary ? "" : ", no vocabulary")}), {seconds:F0} s");
-            Console.WriteLine($"  {"file",-22} {"words",5} {"WER",6}  {"scored words",12}  misses");
-            int words = 0, errors = 0, scored = 0, right = 0;
+            Console.WriteLine($"{preset} ({Presets.Get(preset).Model}{(useVocabulary ? "" : ", no vocabulary")}"
+                              + $"{(previousText ? ", previous text" : "")}), {seconds:F0} s");
+            Console.WriteLine($"  {"file",-22} {"words",5} {"WER",6}  {"scored words",12}  {"flags",5}  misses");
+            var totals = new Dictionary<string, (int Words, int Errors, int Scored, int Right, int Flags)>();
             foreach (var (file, passage) in files)
             {
                 var name = Path.GetFileNameWithoutExtension(file);
                 var cues = await Srt.LoadAsync(Path.Combine(dir, name + ".srt"));
                 var transcript = cues.SelectMany(c => WordScoring.Words(c.Text).Select(w => (w, c.Start))).ToList();
                 var score = WordScoring.Compare(WordScoring.Reference(passage.Text), transcript);
-                words += score.Words;
-                errors += score.Errors;
-                scored += score.Scored;
-                right += score.ScoredRight;
+                // likely hallucinations and repeats, as the review page would flag them
+                var flags = CueFlags.Find(cues, cues.Count > 0 ? cues[^1].End : 0)
+                                    .Count(f => f.Kind is FlagKind.Hallucination or FlagKind.Repeat);
                 var misses = string.Join(", ", score.Misses.Select(m => $"{m.Expected} → {m.Got ?? "(none)"}{At(m.At)}"));
-                Console.WriteLine($"  {name,-22} {score.Words,5} {score.ErrorRate,6:P1}  {$"{score.ScoredRight}/{score.Scored}",12}  {misses}");
+                Console.WriteLine($"  {name,-22} {score.Words,5} {score.ErrorRate,6:P1}  {$"{score.ScoredRight}/{score.Scored}",12}  {flags,5}  {misses}");
+                foreach (var key in new[] { "total", name.Contains('.') ? name[(name.IndexOf('.') + 1)..] : "clean" })
+                {
+                    var t = totals.GetValueOrDefault(key);
+                    totals[key] = (t.Words + score.Words, t.Errors + score.Errors, t.Scored + score.Scored,
+                                   t.Right + score.ScoredRight, t.Flags + flags);
+                }
             }
-            Console.WriteLine($"  {"total",-22} {words,5} {(words == 0 ? 0 : (double)errors / words),6:P1}  {$"{right}/{scored}",12}");
+            foreach (var (key, t) in totals.OrderBy(t => t.Key == "total").ThenBy(t => t.Key))
+                Console.WriteLine($"  {key,-22} {t.Words,5} {(t.Words == 0 ? 0 : (double)t.Errors / t.Words),6:P1}  {$"{t.Right}/{t.Scored}",12}  {t.Flags,5}");
             Console.WriteLine();
         }
         Console.WriteLine($"Subtitles: {outDir}");
