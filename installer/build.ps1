@@ -29,9 +29,9 @@ if (-not $Iscc) {
     }
 }
 if (-not $Iscc -or -not (Test-Path $Iscc)) { throw "ISCC.exe (Inno Setup 6) not found; pass -Iscc" }
-$PublishDir = [IO.Path]::GetFullPath($PublishDir)
+$PublishDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($PublishDir)
 if (-not (Test-Path (Join-Path $PublishDir "Hushcue.exe"))) { throw "No Hushcue.exe in ${PublishDir}: run tools\publish.ps1 first" }
-$OutputDir = [IO.Path]::GetFullPath($OutputDir)
+$OutputDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputDir)
 
 # Windows version resources take numbers only: 1.2.3-beta.1 -> 1.2.3
 $fileVersion = ($Version -split '[-+]')[0]

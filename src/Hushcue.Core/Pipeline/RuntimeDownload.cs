@@ -118,7 +118,9 @@ public static class RuntimeDownload
             if (!Directory.EnumerateFileSystemEntries(staging).Any())
                 Directory.Delete(staging);
         }
-        catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException
+                                   // HttpClient's own timeout, not the caller cancelling
+                                   or OperationCanceledException && !cancel.IsCancellationRequested)
         {
             throw new RuntimeDownloadException(
                 $"Could not download the GPU libraries: {e.Message} Try again; the download continues where it stopped.", e);

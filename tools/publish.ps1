@@ -53,7 +53,7 @@ if (-not $crt) { throw "The Visual C++ redistributable files were not found unde
 $crtDlls = @("msvcp140.dll", "msvcp140_1.dll", "vcruntime140.dll", "vcruntime140_1.dll") | ForEach-Object { Join-Path $crt.FullName $_ }
 
 # --- publish
-$Output = [IO.Path]::GetFullPath($Output)
+$Output = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Output)
 if (Test-Path $Output) { Remove-Item -Recurse -Force $Output }
 $dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
 if (-not $dotnet) { $dotnet = Join-Path $env:ProgramFiles "dotnet\dotnet.exe" }
