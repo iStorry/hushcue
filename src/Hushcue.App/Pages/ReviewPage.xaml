@@ -10,6 +10,14 @@
         <Style x:Key="ToolButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
             <Setter Property="Padding" Value="10,5" />
         </Style>
+        <!-- the player's buttons: one size, whatever they show -->
+        <Style x:Key="TransportButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Width" Value="52" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
         <Style x:Key="TimeBox" TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
             <Setter Property="Width" Value="104" />
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
@@ -76,32 +84,54 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Button x:Name="BackStep" Click="OnStepBack" Style="{StaticResource ToolButton}"
+                        <Button x:Name="BackStep" Click="OnStepBack" Style="{StaticResource TransportButton}"
                                 ToolTipService.ToolTip="Back 5 seconds (J)" AutomationProperties.Name="Back 5 seconds"
                                 AutomationProperties.AcceleratorKey="J">
                             <TextBlock Text="−5 s" />
                         </Button>
-                        <Button x:Name="PlayButton" Grid.Column="1" Click="OnPlay" Style="{StaticResource ToolButton}"
+                        <Button x:Name="PlayButton" Grid.Column="1" Click="OnPlay" Style="{StaticResource TransportButton}"
                                 ToolTipService.ToolTip="Play (Space or K)" AutomationProperties.Name="Play"
                                 AutomationProperties.AcceleratorKey="Space">
                             <FontIcon x:Name="PlayIcon" Glyph="&#xE768;" FontSize="14" />
                         </Button>
-                        <Button x:Name="ForwardStep" Grid.Column="2" Click="OnStepForward" Style="{StaticResource ToolButton}"
+                        <Button x:Name="ForwardStep" Grid.Column="2" Click="OnStepForward" Style="{StaticResource TransportButton}"
                                 ToolTipService.ToolTip="Forward 5 seconds (L)" AutomationProperties.Name="Forward 5 seconds"
                                 AutomationProperties.AcceleratorKey="L">
                             <TextBlock Text="+5 s" />
                         </Button>
-                        <TextBlock x:Name="TimeText" Grid.Column="3" VerticalAlignment="Center" Margin="8,0,0,0"
+                        <Button x:Name="VolumeButton" Grid.Column="3" Style="{StaticResource TransportButton}"
+                                ToolTipService.ToolTip="Volume (M mutes)" AutomationProperties.Name="Volume"
+                                AutomationProperties.AcceleratorKey="M">
+                            <FontIcon x:Name="VolumeIcon" Glyph="&#xE995;" FontSize="14" />
+                            <Button.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="MuteButton" Click="OnMute" Style="{ThemeResource SubtleButtonStyle}" Padding="8"
+                                                ToolTipService.ToolTip="Mute (M)" AutomationProperties.Name="Mute">
+                                            <FontIcon x:Name="MuteIcon" Glyph="&#xE74F;" FontSize="14" />
+                                        </Button>
+                                        <Slider x:Name="VolumeSlider" Width="160" Minimum="0" Maximum="100" StepFrequency="1"
+                                                VerticalAlignment="Center" ValueChanged="OnVolumeChanged"
+                                                AutomationProperties.Name="Volume" />
+                                        <TextBlock x:Name="VolumeText" Width="36" VerticalAlignment="Center" TextAlignment="Right"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <TextBlock x:Name="TimeText" Grid.Column="4" VerticalAlignment="Center" Margin="8,0,0,0"
                                    FontFamily="Cascadia Mono, Consolas" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <Button Grid.Column="5" Click="OnZoomOut" Style="{ThemeResource SubtleButtonStyle}" Padding="8"
+                        <Button Grid.Column="6" Click="OnZoomOut" Style="{ThemeResource SubtleButtonStyle}" Padding="8"
                                 ToolTipService.ToolTip="Show more of the timeline (Ctrl+wheel)" AutomationProperties.Name="Zoom the timeline out">
                             <FontIcon Glyph="&#xE71F;" FontSize="14" />
                         </Button>
-                        <Button Grid.Column="6" Click="OnZoomIn" Style="{ThemeResource SubtleButtonStyle}" Padding="8"
+                        <Button Grid.Column="7" Click="OnZoomIn" Style="{ThemeResource SubtleButtonStyle}" Padding="8"
                                 ToolTipService.ToolTip="Show less of the timeline, in more detail (Ctrl+wheel)"
                                 AutomationProperties.Name="Zoom the timeline in">
                             <FontIcon Glyph="&#xE8A3;" FontSize="14" />

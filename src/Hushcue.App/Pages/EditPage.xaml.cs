@@ -42,6 +42,7 @@ public sealed partial class EditPage : UserControl
     public void Load(AppSettings settings)
     {
         _settings = settings;
+        Review.UseSettings(settings);
         RefreshRecent();
     }
 

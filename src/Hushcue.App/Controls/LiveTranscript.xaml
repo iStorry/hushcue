@@ -21,6 +21,10 @@
                    HorizontalAlignment="Center" TextAlignment="Center"
                    Text="Subtitles appear here as the file is transcribed." />
         <ListView x:Name="List" Grid.Row="1" SelectionMode="None" Margin="-12,0" AutomationProperties.Name="Subtitles heard so far">
+            <!-- no fade-in per line: with lines arriving every few seconds it made the list blink -->
+            <ListView.ItemContainerTransitions>
+                <TransitionCollection />
+            </ListView.ItemContainerTransitions>
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="local:CueLine">
                     <Grid Padding="0,6" ColumnSpacing="12" AutomationProperties.Name="{x:Bind AccessibleName}">

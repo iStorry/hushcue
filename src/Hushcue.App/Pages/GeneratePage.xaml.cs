@@ -100,6 +100,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     public void Load(AppSettings settings)
     {
         _settings = settings;
+        Review.UseSettings(settings);
         var preset = Presets.Get(settings.Preset).Name;
         Check<string>(PresetChoices, name => name == preset);
         Check<ResultChoice>(ResultChoices, choice => choice.Mode == settings.Embed);

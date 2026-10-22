@@ -2,8 +2,10 @@ using System.Collections.Specialized;
 using Hushcue.Core;
 using Hushcue.Core.Review;
 using Hushcue.Core.Subtitles;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace Hushcue.Controls;
 
@@ -21,12 +23,30 @@ public sealed class CueLine(Cue cue)
 /// </summary>
 public sealed partial class LiveTranscript : UserControl
 {
+    /// <summary>Within this many pixels of the end counts as reading the newest lines.</summary>
+    private const double EndSlack = 48;
+
     private QueuedFile? _file;
     private Transcript? _shown;
+    private ScrollViewer? _scroller;
+
+    /// <summary>Keep the newest lines in view; off while the user has scrolled up to read.</summary>
+    private bool _follow = true;
 
     public LiveTranscript()
     {
         InitializeComponent();
+        List.Loaded += (_, _) =>
+        {
+            if (_scroller is not null || FindScroller(List) is not { } scroller)
+                return;
+            _scroller = scroller;
+            _scroller.ViewChanged += (_, e) =>
+            {
+                if (!e.IsIntermediate)
+                    _follow = _scroller.VerticalOffset >= _scroller.ScrollableHeight - EndSlack;
+            };
+        };
         Refresh();
     }
 
@@ -45,7 +65,8 @@ public sealed partial class LiveTranscript : UserControl
             file.PropertyChanged += OnFileChanged;
         }
         Fill();
-        ScrollToEnd();
+        _follow = true;
+        ScrollToEnd(animate: false);
     }
 
     /// <summary>The finished subtitles, or those heard so far.</summary>
@@ -59,7 +80,8 @@ public sealed partial class LiveTranscript : UserControl
     private void OnCuesAdded(object? sender, NotifyCollectionChangedEventArgs e)
     {
         Refresh();
-        ScrollToEnd();
+        if (_follow)
+            ScrollToEnd(animate: true);
     }
 
     private void OnFileChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -81,9 +103,32 @@ public sealed partial class LiveTranscript : UserControl
             : _file.Name;
     }
 
-    private void ScrollToEnd()
+    /// <summary>Scroll to the newest line once the list has laid it out (scrolling the viewer, not ScrollIntoView,
+    /// which jumped and blanked the list for a moment on every new line).</summary>
+    private void ScrollToEnd(bool animate)
     {
-        if (_shown is null && List.Items.Count > 0)
-            List.ScrollIntoView(List.Items[List.Items.Count - 1]);
+        if (_shown is not null || List.Items.Count == 0)
+            return;
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (_scroller is null)
+            {
+                List.ScrollIntoView(List.Items[^1]);
+                return;
+            }
+            List.UpdateLayout();
+            _scroller.ChangeView(null, _scroller.ScrollableHeight, null, disableAnimation: !animate);
+        });
+    }
+
+    private static ScrollViewer? FindScroller(DependencyObject parent)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if ((child as ScrollViewer ?? FindScroller(child)) is { } found)
+                return found;
+        }
+        return null;
     }
 }

@@ -35,6 +35,10 @@ public sealed class AppSettings
     /// <summary>"System" follows Windows; "Light" or "Dark" pins the app's theme.</summary>
     public string Theme { get; set; } = "System";
 
+    /// <summary>The review player's volume, 0..1, and whether it is muted.</summary>
+    public double Volume { get; set; } = 1;
+    public bool Muted { get; set; }
+
     /// <summary>Videos and subtitles opened in the editor, most recent first (at most <see cref="MaxRecentEdits"/>).</summary>
     public List<SubtitlePair> RecentEdits { get; set; } = [];
 

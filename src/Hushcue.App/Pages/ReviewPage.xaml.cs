@@ -51,6 +51,7 @@ public sealed partial class ReviewPage : UserControl
     private int _current = -1;
     private bool _syncing;
     private bool _busy;
+    private AppSettings _settings = new();
 
     public ReviewPage()
     {
@@ -94,6 +95,42 @@ public sealed partial class ReviewPage : UserControl
 
     /// <summary>The selected subtitles' indices, in order.</summary>
     private List<int> SelectedCues => [.. CueList.SelectedItems.OfType<ReviewRow>().Where(r => !r.IsGap).Select(r => r.Cue).Order()];
+
+    /// <summary>The app's settings: the player's volume is kept there, so it is the same next time.</summary>
+    public void UseSettings(AppSettings settings)
+    {
+        _settings = settings;
+        SetVolume(settings.Volume, settings.Muted);
+    }
+
+    /// <param name="volume">0..1</param>
+    private void SetVolume(double volume, bool muted)
+    {
+        volume = Math.Clamp(volume, 0, 1);
+        (_settings.Volume, _settings.Muted) = (volume, muted);
+        _player.Volume = volume;
+        _player.IsMuted = muted;
+        var percent = (int)Math.Round(volume * 100);
+        if ((int)VolumeSlider.Value != percent)
+            VolumeSlider.Value = percent;
+        VolumeText.Text = $"{percent}%";
+        VolumeIcon.Glyph = muted || percent == 0 ? "" // mute
+            : percent < 34 ? "" : percent < 67 ? "" : "";
+        MuteIcon.Glyph = muted ? "" : "";
+        var name = muted ? "Volume, muted" : $"Volume {percent}%";
+        ToolTipService.SetToolTip(VolumeButton, $"{name} (M {(muted ? "unmutes" : "mutes")})");
+        AutomationProperties.SetName(VolumeButton, name);
+        ToolTipService.SetToolTip(MuteButton, muted ? "Unmute (M)" : "Mute (M)");
+        AutomationProperties.SetName(MuteButton, muted ? "Unmute" : "Mute");
+    }
+
+    private void OnVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if ((int)Math.Round(_settings.Volume * 100) != (int)e.NewValue)
+            SetVolume(e.NewValue / 100, muted: false); // moving the slider unmutes, as in most players
+    }
+
+    private void OnMute(object sender, RoutedEventArgs e) => SetVolume(_settings.Volume, !_settings.Muted);
 
     public async Task OpenAsync(QueuedFile file)
     {
@@ -985,6 +1022,9 @@ public sealed partial class ReviewPage : UserControl
                 break;
             case VirtualKey.L:
                 Seek(Position + StepSeconds);
+                break;
+            case VirtualKey.M:
+                SetVolume(_settings.Volume, !_settings.Muted);
                 break;
             case VirtualKey.Up when !onButton:
                 MoveSelection(-1);
