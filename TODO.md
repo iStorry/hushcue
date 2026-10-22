@@ -64,9 +64,18 @@ a stronger language model, and the person reviewing a fast way to fix what is st
 - [ ] **Balanced vs Thorough on look-alike words**: large-v3-turbo has 4 decoder layers, large-v3 has 32. The
       decoder is the part that picks between words that sound the same. Measure the gap; if it is large, say so in
       the quality descriptions
-- [ ] **"Not sure" in the review**: keep each word's probability (the engine has it; `Subtitles.Word` drops it),
-      flag words below a threshold, and for words in a look-alike list offer the others as one-click swaps
-      (calm / come / cum). Later: the alternatives the beam search actually considered (`NumHypotheses`)
+- [x] **"Not sure" in the review**: words keep Whisper's probability (`Subtitles.Word.Probability`) through the
+      job; `Review/LookAlikes` lists ~75 groups of words that sound alike; `Review/UnsureWords` flags a look-alike
+      below 0.9 (below 0.5 for the most common words, "to / two", "one / won", where Whisper's doubt is mostly
+      digits or not). The review shows a "not sure" flag ("Whisper wasn't sure of “come”: it could be “calm” or
+      “cum”") and one-click swaps under the text, which clear the flag and undo with Ctrl+Z. The unsure words are
+      kept per .srt in %LOCALAPPDATA%\Hushcue\unsure, so reopening a file later still flags them; each is tied to
+      the words around it, so a second "come" in the same subtitle is not mistaken for it. Measured with
+      `eval --confidence`: Balanced flags 28 of 559 look-alike words, 13 of them wrong, and catches 13 of the 14
+      wrong ones; Thorough flags 35, catches 6 of 10. On ordinary speech (the README sample) no flags on
+      Balanced, one on Thorough. A general "any low-probability word" flag is not worth it: of the words below
+      0.5 only 1 in 10 is wrong
+- [ ] Later: the alternatives the beam search actually considered (`NumHypotheses`) as swaps for any word
 - [ ] **Spelling preferences in Settings**: "Words Whisper should never write" become suppressed tokens, so the
       decoder picks its next best word for the same sound in its context (better than find-and-replace, which
       can't tell "come" from "calm"). "Always write X as Y" for names and brands, applied after the clean-up

@@ -209,6 +209,9 @@
                                 <HyperlinkButton Grid.Column="2" Content="Looks fine" Click="OnDismissFlag" Padding="4,0"
                                                  ToolTipService.ToolTip="Stop flagging this" AutomationProperties.Name="Looks fine: stop flagging this" />
                             </Grid>
+                            <!-- one-click swaps for words that sound like others: "calm → come  cum" (ShowSwaps) -->
+                            <StackPanel x:Name="SwapPanel" Spacing="4" Visibility="Collapsed"
+                                        AutomationProperties.Name="Words that sound like others" />
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <Button x:Name="SplitButton" Click="OnSplit" Style="{StaticResource ToolButton}"
                                         ToolTipService.ToolTip="Split in two at the cursor in the text"

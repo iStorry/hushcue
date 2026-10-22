@@ -46,7 +46,10 @@ running (all for testing and screenshots).
 The sidebar holds the three tools:
 
 - **Generate subtitles**: drop videos or audio, pick a quality and what you get (an `.srt`, a subtitle track, or
-  text burned into the picture), and run.
+  text burned into the picture), and run. **Review and edit** then goes through what is worth checking: phrases
+  Whisper invents over silence, loops, long gaps, and words it was **not sure** of that sound like other words
+  (calm / come / cum, their / there, principle / principal, ...). Those come with one-click swaps to the other
+  spellings; "Looks fine" keeps the word.
 - **Edit subtitles**: open a video with subtitles it already has (`talk.srt` or `talk.en.srt` next to `talk.mp4`
   is found by name), check them against the picture, fix text and timing, then save the `.srt` or put it into a copy
   of the video. Dropping a video with its `.srt`, or right-clicking an `.srt` in Explorer and choosing **Edit

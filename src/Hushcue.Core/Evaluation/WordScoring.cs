@@ -12,7 +12,9 @@ public sealed record WordMiss(string Expected, string? Got, double? At);
 /// <param name="Errors">substitutions, deletions and insertions against it</param>
 /// <param name="Scored">scored reference words</param>
 /// <param name="ScoredRight">scored words the transcript has, spelled the same</param>
-public sealed record WordScore(int Words, int Errors, int Scored, int ScoredRight, IReadOnlyList<WordMiss> Misses)
+/// <param name="Aligned">for each reference word, the transcript word lined up with it (null: none)</param>
+public sealed record WordScore(int Words, int Errors, int Scored, int ScoredRight, IReadOnlyList<WordMiss> Misses,
+                               IReadOnlyList<int?> Aligned)
 {
     public double ErrorRate => Words == 0 ? 0 : (double)Errors / Words;
 }
@@ -78,7 +80,7 @@ public static class WordScoring
                 continue;
             misses.Add(new WordMiss(reference[i].Text, matched[i] is { } k ? transcript[k].Word : null, NearestTime(matched, transcript, i)));
         }
-        return new WordScore(n, cost[n, m], scored, scored - misses.Count, misses);
+        return new WordScore(n, cost[n, m], scored, scored - misses.Count, misses, matched);
     }
 
     private static double? NearestTime(int?[] matched, IReadOnlyList<(string Word, double At)> transcript, int i)

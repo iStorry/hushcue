@@ -21,7 +21,7 @@ public static class PartTranscription
     /// whose middle is in [<paramref name="start"/>, <paramref name="end"/>).
     /// </summary>
     public static List<Word> MapWords(IEnumerable<Word> clipWords, double offset, double start, double end) =>
-        [.. clipWords.Select(w => new Word(w.Text, w.Start + offset, w.End + offset))
+        [.. clipWords.Select(w => w with { Start = w.Start + offset, End = w.End + offset })
                      .Where(w => (w.Start + w.End) / 2 is var middle && middle >= start && middle < end)];
 
     /// <summary>The finished cues of the words, kept inside [<paramref name="start"/>, <paramref name="end"/>].</summary>

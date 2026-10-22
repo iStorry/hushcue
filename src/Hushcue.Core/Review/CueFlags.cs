@@ -12,6 +12,8 @@ public enum FlagKind
     Gap,
     /// <summary>The whole file looks empty or cut short (<see cref="Cleanup.CoverageWarnings"/>).</summary>
     Coverage,
+    /// <summary>Whisper was not sure of a word that sounds like others (<see cref="UnsureWords"/>).</summary>
+    Unsure,
 }
 
 /// <summary>Something worth checking in the subtitles.</summary>
@@ -26,6 +28,7 @@ public sealed record CueFlag(FlagKind Kind, double Start, double End, int? Cue, 
         FlagKind.Hallucination => "likely hallucination",
         FlagKind.Repeat => "repeat",
         FlagKind.Gap => "gap",
+        FlagKind.Unsure => "not sure",
         _ => "check",
     };
 }
@@ -45,7 +48,8 @@ public static class CueFlags
     private static readonly int[] MinRepeats = [0, 4, 3, 3];
 
     /// <param name="duration">the file's length in seconds</param>
-    public static List<CueFlag> Find(IReadOnlyList<Cue> cues, double duration)
+    /// <param name="unsure">look-alike words Whisper was not sure of; each cue that still says one is flagged</param>
+    public static List<CueFlag> Find(IReadOnlyList<Cue> cues, double duration, IReadOnlyList<UnsureWord>? unsure = null)
     {
         var flags = new List<CueFlag>();
         string? previous = null;
@@ -61,6 +65,8 @@ public static class CueFlags
             else if (text.Length > 0 && text == previous)
                 flags.Add(new CueFlag(FlagKind.Repeat, cue.Start, cue.End, i, "Says the same as the subtitle before it"));
             previous = text;
+            if (unsure is { Count: > 0 } && UnsureWords.Occurrences(cue, unsure) is { Count: > 0 } words)
+                flags.Add(new CueFlag(FlagKind.Unsure, words[0].Unsure.Start, cue.End, i, UnsureMessage([.. words.Select(w => w.Unsure)])));
         }
 
         var coverage = Cleanup.CoverageWarnings(cues, duration);
@@ -79,6 +85,16 @@ public static class CueFlags
         foreach (var warning in coverage)
             flags.Add(new CueFlag(FlagKind.Coverage, lastEnd, Math.Max(duration, lastEnd), null, warning));
         return [.. flags.OrderBy(f => f.Start)];
+    }
+
+    /// <summary>"Whisper wasn't sure of “calm”: it could be “come” or “cum”."</summary>
+    private static string UnsureMessage(List<UnsureWord> words)
+    {
+        var names = words.Select(w => w.Text).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return names is [var only]
+            ? $"Whisper wasn't sure of “{only}”: it could be {string.Join(" or ", LookAlikes.Others(only).Select(o => $"“{o}”"))}"
+            : $"Whisper wasn't sure of {string.Join(", ", names.SkipLast(1).Select(n => $"“{n}”"))} and “{names[^1]}”: "
+              + "check them below";
     }
 
     /// <summary>A known hallucination phrase is the whole cue or part of it (at word boundaries).</summary>

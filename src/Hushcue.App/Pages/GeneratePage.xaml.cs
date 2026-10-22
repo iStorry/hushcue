@@ -3,6 +3,7 @@ using Hushcue.Controls;
 using Hushcue.Core;
 using Hushcue.Core.Media;
 using Hushcue.Core.Pipeline;
+using Hushcue.Core.Review;
 using Hushcue.Core.Subtitles;
 using Hushcue.Services;
 using Microsoft.UI.Xaml;
@@ -454,8 +455,11 @@ public sealed partial class GeneratePage : UserControl, IRunPage
                 break;
             case FileTranscribed file:
                 batch.Speed.Observe(file);
+                var unsure = UnsureWords.Find(file.Words);
+                if (file.Srt is not null)
+                    UnsureWords.Save(file.Srt, unsure); // so a review opened later flags them too
                 batch.Files.FirstOrDefault(f => f.Path == file.Path)
-                     ?.SetTranscript(new Transcript(file.Cues, file.Srt, settings, outDir, file.AudioSeconds));
+                     ?.SetTranscript(new Transcript(file.Cues, file.Srt, settings, outDir, file.AudioSeconds, unsure));
                 var name = Path.GetFileName(file.Path);
                 batch.Notes.AddRange(file.Warnings.Select(warning => $"{name}: {warning}"));
                 break;

@@ -102,7 +102,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         var audio = await steps.ReadAudio(src, settings.Enhance || _preset.Enhance, cancel);
         var seconds = audio.Length / (double)Audio.SampleRate;
         var rate = new TranscribeRate(seconds, TimeProvider.System);
-        var (cues, took) = TranscribeWithFallback(audio, Report, f =>
+        var (cues, words, took) = TranscribeWithFallback(audio, Report, f =>
         {
             var reading = rate.Measure(f);
             Report(0.08 + 0.9 * f, reading.Describe(), FileStage.Transcribing, reading);
@@ -125,7 +125,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
             log("WARNING: " + warning);
         if (settings.Embed != EmbedMode.None && cues.Count == 0)
             log("No subtitles were found, so nothing was embedded in the video.");
-        onEvent(new FileTranscribed(src, cues, seconds, took, _device, tempSrt ? null : srt, warnings));
+        onEvent(new FileTranscribed(src, cues, seconds, took, _device, tempSrt ? null : srt, warnings, words));
 
         if (review)
         {
@@ -145,8 +145,8 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
     }
 
     /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>
-    /// <returns>the cues, and the time taken from the start of decoding</returns>
-    private (List<Cue> Cues, TimeSpan Took) TranscribeWithFallback(
+    /// <returns>the cues, the words they were made from, and the time taken from the start of decoding</returns>
+    private (List<Cue> Cues, List<Word> Words, TimeSpan Took) TranscribeWithFallback(
         float[] audio, Action<double, string, FileStage, RateReading?> report, Action<double> onFraction,
         Action<IReadOnlyList<Word>> onWords, CancellationToken cancel)
     {
@@ -161,8 +161,8 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
                 });
                 report(0.08, "Transcribing...", FileStage.Transcribing, null);
                 var clock = Stopwatch.StartNew();
-                var cues = FileTranscription.Transcribe(model, audio, settings, _preset, onFraction, log, cancel, onWords);
-                return (cues, clock.Elapsed);
+                var words = FileTranscription.TranscribeWords(model, audio, settings, _preset, onFraction, log, cancel, onWords);
+                return (Cleanup.ToCues(words), words, clock.Elapsed);
             }
             catch (EngineException e) when (_device == "cuda" && attempt == 0 && IsGpuError(e))
             {

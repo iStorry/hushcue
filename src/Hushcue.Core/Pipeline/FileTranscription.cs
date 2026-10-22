@@ -23,12 +23,18 @@ internal static class FileTranscription
     /// <param name="onWords">each decoded segment's words as they come, before loop recovery and the clean-up</param>
     public static List<Cue> Transcribe(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
                                        Action<double> onFraction, Action<string> log, CancellationToken cancel,
-                                       Action<IReadOnlyList<Word>>? onWords = null)
+                                       Action<IReadOnlyList<Word>>? onWords = null) =>
+        Cleanup.ToCues(TranscribeWords(model, audio, settings, preset, onFraction, log, cancel, onWords)); // collapse_repeats, then the cues
+
+    /// <summary>The words <see cref="Transcribe"/> makes its cues from: decoded, with looped passages re-decoded.</summary>
+    public static List<Word> TranscribeWords(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
+                                             Action<double> onFraction, Action<string> log, CancellationToken cancel,
+                                             Action<IReadOnlyList<Word>>? onWords = null)
     {
         var words = DecodeWords(model, audio, settings, preset, cancel, onFraction, log: log, onWords: onWords);
         if (settings.RecoverLoops)
             words = RecoverLoops(model, audio, words, settings, preset, log, cancel);
-        return Cleanup.ToCues(words); // collapse_repeats, then the cues
+        return words;
     }
 
     /// <summary>Run Whisper on 16 kHz audio and return its words without non-speech markers or stretched letters.</summary>
@@ -69,7 +75,7 @@ internal static class FileTranscription
             if (segment.NoSpeechProb > 0.6 && segment.AvgLogprob < -1.0)
                 continue;
             var segmentWords = segment.Words is { Count: > 0 }
-                ? segment.Words.Select(w => new Word(w.Text, w.Start, w.End))
+                ? segment.Words.Select(w => new Word(w.Text, w.Start, w.End, w.Probability))
                 : [new Word(segment.Text, segment.Start, segment.End)];
             var kept = Cleanup.StripMarkers(segmentWords);
             words.AddRange(kept);
@@ -123,7 +129,7 @@ internal static class FileTranscription
                 continue;
             // a stable sort, as Python's list.sort
             words = [.. words.Where(w => !(lo <= w.Start && w.Start < hi))
-                             .Concat(fixedWords.Select(w => new Word(w.Text, w.Start + lo, w.End + lo)))
+                             .Concat(fixedWords.Select(w => w with { Start = w.Start + lo, End = w.End + lo }))
                              .OrderBy(w => w.Start)];
         }
         return words;

@@ -112,7 +112,8 @@ public sealed partial class ReviewPage : UserControl
             }
         }
         _srtPath = transcript.Srt;
-        _editor = new CueEditor(cues, Math.Max(transcript.Duration, file.Duration));
+        var unsure = transcript.Unsure ?? (transcript.Srt is { } saved ? UnsureWords.Load(saved) : []);
+        _editor = new CueEditor(cues, Math.Max(transcript.Duration, file.Duration), unsure);
         _editor.Changed += OnEdited;
 
         FileTitle.Text = file.Name;
@@ -468,6 +469,68 @@ public sealed partial class ReviewPage : UserControl
         var flag = row?.Flag;
         FlagPanel.Visibility = flag is null ? Visibility.Collapsed : Visibility.Visible;
         FlagMessage.Text = flag?.Message ?? "";
+        ShowSwaps();
+    }
+
+    /// <summary>At most this many words of a subtitle get swap buttons, the unsure ones first.</summary>
+    private const int MaxSwapWords = 3;
+
+    /// <summary>
+    /// One-click swaps for the selected subtitle's look-alike words ("calm → come · cum"): always for words Whisper
+    /// was not sure of, and for the less common look-alikes ("principle", not "come" or "to") even when it was.
+    /// </summary>
+    private void ShowSwaps()
+    {
+        SwapPanel.Children.Clear();
+        var words = new List<(TextWord Word, bool Unsure)>();
+        if (_editor is not null && _editing >= 0)
+        {
+            var cue = _editor.Cues[_editing];
+            var unsure = UnsureWords.Occurrences(cue, _editor.Unsure).Select(o => o.Word).ToList();
+            words = [.. LookAlikes.Words(cue.Text)
+                                  .Select(w => (Word: w, Unsure: unsure.Contains(w)))
+                                  .Where(w => LookAlikes.IsLookAlike(w.Word.Text) && (w.Unsure || !LookAlikes.IsCommon(w.Word.Text)))
+                                  .OrderByDescending(w => w.Unsure)
+                                  .Take(MaxSwapWords)
+                                  .OrderBy(w => w.Word.Index)];
+        }
+        foreach (var (word, unsure) in words)
+        {
+            var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+            line.Children.Add(new TextBlock
+            {
+                Text = $"{word.Text} →",
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+                Foreground = ThemeBrushes.Get(unsure ? ThemeBrushes.Caution : ThemeBrushes.Secondary),
+            });
+            foreach (var other in LookAlikes.Others(word.Text))
+            {
+                var button = new Button { Content = other, Style = (Style)Resources["ToolButton"] };
+                var what = $"Change “{word.Text}” to “{other}”";
+                ToolTipService.SetToolTip(button, what);
+                AutomationProperties.SetName(button, what);
+                button.Click += (_, _) => Swap(word, other);
+                line.Children.Add(button);
+            }
+            SwapPanel.Children.Add(line);
+        }
+        SwapPanel.Visibility = words.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void Swap(TextWord word, string replacement)
+    {
+        if (_editor is null || _editing < 0)
+            return;
+        var text = _editor.Cues[_editing].Text;
+        // the text may have changed since the buttons were made (typed, then committed when the button took focus)
+        if (word.Index + word.Length > text.Length || text.Substring(word.Index, word.Length) != word.Text)
+        {
+            LoadEditor();
+            return;
+        }
+        _editor.SetText(_editing, LookAlikes.Replace(text, word, replacement));
+        StatusText.Text = $"Changed “{word.Text}” to “{replacement}” (undo with Ctrl+Z)";
     }
 
     /// <summary>Save what is typed in the text and time boxes as edits (before saving, leaving, or another edit).</summary>
@@ -698,9 +761,11 @@ public sealed partial class ReviewPage : UserControl
             StatusText.Text = "Could not save the subtitles: " + e.Message;
             return false;
         }
+        if (_srtPath != path)
+            UnsureWords.Save(path, _editor.Unsure);
         _srtPath = path;
         _editor.MarkSaved();
-        _transcript = _transcript with { Cues = [.. _editor.Cues], Srt = path };
+        _transcript = _transcript with { Cues = [.. _editor.Cues], Srt = path, Unsure = _editor.Unsure };
         _file.SetTranscript(_transcript);
         StatusText.Text = $"Saved {Path.GetFileName(path)}";
         UpdateCommands();

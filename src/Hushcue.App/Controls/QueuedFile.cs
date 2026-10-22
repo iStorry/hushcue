@@ -18,7 +18,9 @@ public sealed record FileCheck(string Warning, bool Skip);
 /// <param name="Settings">the run's settings: re-running a part decodes as they say, embedding uses their result</param>
 /// <param name="OutDir">the run's output folder, or null for next to the file</param>
 /// <param name="Duration">the audio's length in seconds</param>
-public sealed record Transcript(IReadOnlyList<Cue> Cues, string? Srt, JobSettings Settings, string? OutDir, double Duration);
+/// <param name="Unsure">look-alike words Whisper was not sure of; null: look them up for <paramref name="Srt"/></param>
+public sealed record Transcript(IReadOnlyList<Cue> Cues, string? Srt, JobSettings Settings, string? OutDir, double Duration,
+                                IReadOnlyList<Hushcue.Core.Review.UnsureWord>? Unsure = null);
 
 /// <summary>A file in the queue and where it is: waiting, being worked on, done, or failed.</summary>
 public sealed class QueuedFile(string path) : INotifyPropertyChanged

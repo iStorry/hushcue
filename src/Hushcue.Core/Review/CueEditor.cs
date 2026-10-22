@@ -33,12 +33,16 @@ public sealed class CueEditor
     private sealed record Step(Cue[] Cues, string Name, int Select);
 
     /// <param name="duration">the file's length in seconds (0 if not known yet)</param>
-    public CueEditor(IEnumerable<Cue> cues, double duration)
+    /// <param name="unsure">look-alike words Whisper was not sure of, flagged while a cue still says them</param>
+    public CueEditor(IEnumerable<Cue> cues, double duration, IReadOnlyList<UnsureWord>? unsure = null)
     {
         _cues = [.. cues.OrderBy(c => c.Start)];
         _saved = _cues;
         _duration = duration;
+        Unsure = unsure ?? [];
     }
+
+    public IReadOnlyList<UnsureWord> Unsure { get; }
 
     public event EventHandler<CueEdit>? Changed;
 
@@ -67,7 +71,7 @@ public sealed class CueEditor
 
     /// <summary>Things to check (<see cref="CueFlags"/>), without the ones dismissed.</summary>
     public IReadOnlyList<CueFlag> Flags =>
-        _flags ??= [.. CueFlags.Find(_cues, Duration).Where(f => !_dismissed.Contains(Key(f)))];
+        _flags ??= [.. CueFlags.Find(_cues, Duration, Unsure).Where(f => !_dismissed.Contains(Key(f)))];
 
     /// <summary>Hide a flag the user has checked; it stays hidden while the same thing is at the same time.</summary>
     public void Dismiss(CueFlag flag)
