@@ -1,0 +1,26 @@
+{
+  "about": "Spoken passages for Hushcue.Cli eval. Words in *stars* are the ones scored on their own: words that sound like other words, so only the context (or the vocabulary) can decide the spelling. Each passage runs past 30 seconds, Whisper's window, so later windows are tested too. Audio: tools/bench/make_lookalike.ps1.",
+  "passages": [
+    {
+      "name": "exam-day",
+      "voice": "Microsoft David Desktop",
+      "text": "Good morning, and welcome back. Before we start, take a deep breath and stay *calm*. The exam results *came* out last night, and I know some of you are nervous. *Come* in, sit down, and let me explain. First, the good news. Maria graduated summa *cum* laude, which means she finished at the very top of her class. Her brother graduated magna *cum* laude two years ago, so the whole family stayed *calm* about it. If you did not pass, please *come* and see me after class. There is no need to panic. *Come* on, everyone, *calm* down and listen. The sea was *calm* this morning, so the boat trip will go ahead as planned. The bus will *come* at nine, and we will *come* back before dinner. If the weather turns, keep *calm* and follow the guide. Next week the dean will *come* to talk about the new library, a gallery *cum* reading room on the ground floor. Thank you, and I will see you all there."
+    },
+    {
+      "name": "moving-house",
+      "voice": "Microsoft Zira Desktop",
+      "text": "*Their* house is just over *there*, past the old bakery. *They're* moving out next month, because *their* landlord wants to sell. I told them *there* is no rush, but *they're* already packing boxes. *Your* sister called, by the way. She said *you're* invited to the party on Saturday, and *your* cousins will be *there* too. If *you're* bringing food, bring something sweet. The new flat is small, but *it's* bright, and *its* kitchen faces the park. *It's* only a short walk from the station. We should help them carry *their* things, because *they're* not as young as they used to be. *Two* of us can take the sofa, and the other *two* can bring the chairs. I want *to* go *too*, if *there* is room in the van. *Whose* van is it, anyway? *Who's* driving? If *you're* free on Sunday, *your* help would mean a lot to them."
+    },
+    {
+      "name": "notes-to-self",
+      "voice": "Microsoft David Desktop",
+      "text": "I would rather walk *than* drive, and *then* we can stop for coffee. The new bridge is longer *than* the old one. First we pack, *then* we leave. I *knew* the *new* manager would change things. Can you *hear* me from over *here*? Please *write* your name on the *right* side of the page. I ate the *whole* pie, and now *there* is a *hole* in my plan. Let me know *whether* the *weather* will hold for the weekend. I *accept* every point *except* the last one. The noise did not *affect* the result, but the *effect* on the team was huge. I would like a *piece* of cake and some *peace* and quiet. Take a *break*, and check the *brakes* before you drive home. I will *buy* the tickets *by* Friday. She *threw* the ball *through* the window. We *passed* the station and walked *past* the school. The *principal* explained the *principle* behind the new rule. Turn *right*, and you will see the *site* of the old mill. What a *sight*."
+    },
+    {
+      "name": "team-names",
+      "voice": "Microsoft Zira Desktop",
+      "vocabulary": "Kathryn, Jaxon, Ashleigh, Stephen, Makayla, Hushcue",
+      "text": "Welcome to the weekly team update. This week *Kathryn* is leading the meeting, and *Jaxon* is taking notes. *Ashleigh* finished the new subtitle tool, which we are calling *Hushcue*. *Stephen* tested it on the old training videos, and *Makayla* wrote the help pages. Thank you all. Now, a few details. *Kathryn* wants every video to have subtitles by the end of the month. *Jaxon* will collect the list of videos from each team. If a video is longer than an hour, send it to *Stephen* first. *Ashleigh* says *Hushcue* runs on your own computer, so nothing is uploaded. *Makayla* will add a page about the keyboard shortcuts. Next week *Stephen* is on holiday, so *Jaxon* will run the tests instead. *Kathryn* and *Ashleigh* will meet the design team on Thursday to talk about the next version of *Hushcue*. If you have questions, ask *Makayla* or *Kathryn*. That is all for this week. Thank you, everyone, and see you on Monday."
+    }
+  ]
+}

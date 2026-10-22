@@ -111,7 +111,8 @@ public class TranscriptionTests
         Assert.Equal((0.6, -1.0, 2.4, 2.0), (options.NoSpeechThreshold, options.LogProbThreshold,
                                              options.CompressionRatioThreshold, options.HallucinationSilenceThreshold));
         Assert.True(options.WordTimestamps);
-        Assert.Equal("Anna", options.InitialPrompt);
+        Assert.Equal("Anna", options.Hotwords);
+        Assert.Null(options.InitialPrompt);
         Assert.Null(options.Vad);
     }
 

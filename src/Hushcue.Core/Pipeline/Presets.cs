@@ -52,7 +52,7 @@ public sealed record JobSettings
     public string? Language { get; init; } = "en";
     /// <summary>Extra audio clean-up on top of the preset.</summary>
     public bool Enhance { get; init; }
-    /// <summary>Names or words to spell correctly, passed to Whisper as a prompt.</summary>
+    /// <summary>Names or words to spell correctly, given to Whisper as hotwords in every 30 s window.</summary>
     public string Vocabulary { get; init; } = "";
     /// <summary>Force voice activity detection on: faster, but can drop quiet or breathy speech.</summary>
     public bool SkipSilence { get; init; }

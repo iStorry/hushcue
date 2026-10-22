@@ -53,7 +53,9 @@ internal static class FileTranscription
             CompressionRatioThreshold = 2.4,
             WordTimestamps = true,
             HallucinationSilenceThreshold = 2.0,
-            InitialPrompt = Py.Strip(settings.Vocabulary) is { Length: > 0 } vocabulary ? vocabulary : null,
+            // hotwords, not the initial prompt: without previous-text context the initial prompt only reaches the
+            // first 30 s window, hotwords go into every window
+            Hotwords = Py.Strip(settings.Vocabulary) is { Length: > 0 } vocabulary ? vocabulary : null,
         };
         var (segments, info) = model.Transcribe(audio, options, cancel);
         if (options.Vad is not null && log is not null)

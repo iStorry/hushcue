@@ -24,13 +24,27 @@ knew / new, weather / whether, here / hear. "come" and "cum" sound the same, so 
 decide; "calm" differs in its vowel, which many accents blur. So the work is about giving the decoder more context,
 a stronger language model, and the person reviewing a fast way to fix what is still wrong. Measure first, then change.
 
-- [ ] **Test set for words that sound alike** (`tools/bench`): short spoken sentences where the context decides
-      ("Stay calm and come inside", "Come on, calm down", "Their dog is over there", ...), neutral TTS like the
-      README sample, with exact reference text, committed. A CLI command `Hushcue.Cli eval` prints the word error
-      rate and the share of look-alike words right, per preset, so every change below is measured
-- [ ] **Bug: the vocabulary only reaches the first 30 seconds.** It goes in as Whisper's initial prompt, and with
+- [x] **Test set for words that sound alike** (`eval/lookalike`): four passages of 55–65 s (so later 30 s windows
+      are tested too) with 93 scored words: calm / come / cum (incl. "summa cum laude"), their / there / they're,
+      your / you're, its / it's, then / than, brake / break, site / sight, principal / principle, ... and six
+      names with a vocabulary. Spoken by Windows' David and Zira voices (`tools/bench/make_lookalike.ps1`), clean
+      and with pink noise, 1.7 MB of Opus. `Hushcue.Cli eval [--preset NAME]...` runs the app's job on them and
+      prints the word error rate and the scored words right, with each miss ("cum → come (0:54)")
+- [x] **Baseline** (v0.1.0): Balanced 2.5% WER, 156/186 scored words; Thorough 2.9%, 155/186. Look-alike words
+      are mostly right on this clean TTS speech (Balanced misses cum → come, brakes → breaks, principle →
+      principal, site → side; Thorough only principle and sight). The names are the big miss: right in the first
+      ~25 s, then Jackson, Ashley, Catherine, Michaela, "Hushq" (Balanced 15/38, Thorough 10/38)
+- [ ] The test set is too easy for the look-alike words: TTS is clear and the noise level (0.03) barely matters.
+      Add harder audio (more noise, faster speech, real recordings with permission) so context changes show up
+- [x] **Fixed: the vocabulary only reached the first 30 seconds.** It went in as Whisper's initial prompt, and with
       `ConditionOnPreviousText = false` the prompt is dropped after the first window (`Transcriber.cs`,
-      `promptResetSince`). Pass it as hotwords instead, which go into every window
+      `promptResetSince`). Now it goes in as hotwords, which go into every window. Names: Balanced 15/38 → 31/38,
+      Thorough 10/38 → 30/38; total WER Balanced 2.5% → 1.3%, Thorough 2.9% → 1.3%; nothing else changed. Still
+      missed: Jaxon → Jackson (Balanced), Kathryn → Catherine (Thorough). Checked on 2 minutes of noise, silence
+      and tones: the names never appear there
+- [ ] **"Thank you" over noise**: Balanced writes "Thank you" / "you" over pink noise, silence and plain tones
+      (4–5 cues in 2 minutes, with or without a vocabulary); Thorough writes nothing. Drop a lone "Thank you" /
+      "you" cue when the audio under it has no speech (VAD probability), or flag it in the review
 - [ ] **Context across windows**: try `ConditionOnPreviousText = true` (each 30 s window sees the text before it).
       It was off to stop loops spreading; the loop recovery and prompt reset on a fallback may now cover that.
       Switch only if the test set gets better and no loops appear

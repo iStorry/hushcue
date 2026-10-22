@@ -37,6 +37,7 @@ running (all for testing and screenshots).
 | `src/Hushcue.Cli` | Console front end, used for benchmarks and scripting. |
 | `native/hushcue_ct2` | C interface over CTranslate2's Whisper model, built by `native/build.ps1`. |
 | `tools/bench` | Scripts that check the C# engine against faster-whisper and write the test fixtures. |
+| `eval/lookalike` | Spoken test passages for `Hushcue.Cli eval`: words that sound alike, and names with a vocabulary. |
 | `src/Hushcue.App` | The WinUI 3 desktop app. |
 | `tests/Hushcue.Core.Tests` | xUnit tests for Core. |
 
