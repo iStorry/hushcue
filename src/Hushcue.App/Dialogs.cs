@@ -13,6 +13,12 @@ internal static class Dialogs
     public static Task ErrorAsync(XamlRoot root, string message) =>
         ShowAsync(root, $"{Core.Product.Name} - error", message, "OK", null);
 
+    /// <summary>An unexpected error: its message, or what it was when it has none (WinUI's errors often come without).</summary>
+    public static Task ErrorAsync(XamlRoot root, Exception error) =>
+        ErrorAsync(root, string.IsNullOrWhiteSpace(error.Message)
+            ? $"Something went wrong ({error.GetType().Name}, 0x{error.HResult:X8})."
+            : error.Message);
+
     /// <returns>true when the user chose <paramref name="confirm"/>; false if they did not, or another dialog is open.</returns>
     public static async Task<bool> ConfirmAsync(XamlRoot root, string message, string confirm, string cancel = "Cancel") =>
         await ShowAsync(root, Core.Product.Name, message, confirm, cancel) == ContentDialogResult.Primary;

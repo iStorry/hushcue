@@ -13,6 +13,8 @@ shows: keep each section short and plain.
   dropping it.
 - For developers: `Hushcue.Cli rerun --from S --to S [--preset NAME]... FILE` runs a stretch through each preset
   and prints the words that differ.
+- Fixed: MKV to MP4 stopped at once with an empty error message, for every file.
+- An error with no message of its own now says what kind of error it was, instead of showing an empty box.
 
 ## 0.2.0 — 2026-10-23
 
