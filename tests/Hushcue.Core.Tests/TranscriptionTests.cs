@@ -207,3 +207,43 @@ public class UnheardCuesTests
     public void CuesPastTheAudioDoNotThrow() =>
         Assert.Empty(UnheardCues.Drop([new Cue(12, 13, "you")], SpeechAt2To4()));
 }
+
+public class WordEdgesTests
+{
+    private const double Window = 512.0 / 16000;
+
+    /// <summary>10 s of probabilities: speech (0.9) only in [2, 4) s.</summary>
+    private static float[] SpeechAt2To4() =>
+        [.. Enumerable.Range(0, (int)(10 / Window)).Select(i => i * Window is >= 2 and < 4 ? 0.9f : 0.01f)];
+
+    [Fact]
+    public void EdgesInSilenceMoveToTheSpeech()
+    {
+        // "Hello" stretched back over a second of silence, "there" running a second past the speech
+        var words = WordEdges.Trim([new Word(" Hello", 1.0, 2.5), new Word(" there.", 3.5, 5.0)], SpeechAt2To4());
+        Assert.InRange(words[0].Start, 2 - 2 * WordEdges.PadSeconds, 2); // to the window grid, less the pad
+        Assert.Equal(2.5, words[0].End);
+        Assert.Equal(3.5, words[1].Start);
+        Assert.Equal(4 + WordEdges.PadSeconds, words[1].End, 2);
+    }
+
+    [Fact]
+    public void WordsWithoutSpeechOrTooShortAreLeftAlone()
+    {
+        List<Word> words = [new(" um", 6, 7), new(" a", 1.95, 2.02)];
+        Assert.Equal(words, WordEdges.Trim(words, SpeechAt2To4()));
+    }
+
+    [Fact]
+    public void TrimmedWordsKeepAMinimumLength()
+    {
+        var word = Assert.Single(WordEdges.Trim([new Word(" so", 3.98, 5)], SpeechAt2To4()));
+        Assert.True(word.End - word.Start >= WordEdges.MinWordSeconds - 1e-9);
+        Assert.Equal(3.98, word.Start);
+    }
+
+    [Fact]
+    public void ProbabilitiesCanStartLaterThanTheWords() =>
+        Assert.InRange(WordEdges.Trim([new Word(" Hi", 101, 102.5)], SpeechAt2To4(), origin: 100)[0].Start,
+                       102 - 2 * WordEdges.PadSeconds, 102);
+}

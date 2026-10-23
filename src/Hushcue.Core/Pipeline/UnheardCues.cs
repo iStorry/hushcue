@@ -1,4 +1,3 @@
-using Hushcue.Core.Engine;
 using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Core.Pipeline;
@@ -18,8 +17,6 @@ public static class UnheardCues
     public const float SpeechProbability = 0.2f;
     public const float ClearSpeechProbability = 0.5f;
 
-    private const double WindowSeconds = (double)SileroVad.WindowSamples / Media.Audio.SampleRate;
-
     /// <summary>The cues worth keeping, given one speech probability per 512-sample window of audio that starts
     /// <paramref name="origin"/> seconds into the cues' time.</summary>
     public static List<Cue> Drop(IReadOnlyList<Cue> cues, ReadOnlySpan<float> speechProbabilities, double origin = 0)
@@ -27,20 +24,13 @@ public static class UnheardCues
         var kept = new List<Cue>(cues.Count);
         foreach (var cue in cues)
         {
-            var under = Under(cue.Start - origin, cue.End - origin, speechProbabilities);
+            var under = speechProbabilities[SpeechWindows.Under(cue.Start - origin, cue.End - origin, speechProbabilities.Length)];
             var unheard = Py.Split(cue.Text).Length <= MaxWords && !ContainsAtLeast(under, SpeechProbability);
             var invented = Cleanup.Hallucinations.Contains(Cleanup.Normalize(cue.Text)) && Mean(under) < ClearSpeechProbability;
             if (!unheard && !invented)
                 kept.Add(cue);
         }
         return kept;
-    }
-
-    private static ReadOnlySpan<float> Under(double start, double end, ReadOnlySpan<float> speechProbabilities)
-    {
-        var first = Math.Clamp((int)(start / WindowSeconds), 0, speechProbabilities.Length);
-        var last = Math.Clamp((int)Math.Ceiling(end / WindowSeconds), first, speechProbabilities.Length);
-        return speechProbabilities[first..last];
     }
 
     private static bool ContainsAtLeast(ReadOnlySpan<float> probabilities, float threshold)

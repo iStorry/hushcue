@@ -65,6 +65,9 @@ public sealed record JobSettings
     /// <summary>Start every 30 s window from a short punctuated sentence (<see cref="FileTranscription.PunctuationPrompt"/>),
     /// whose style Whisper copies: without it, windows after the first often lose their capitals and full stops.</summary>
     public bool PunctuationPrompt { get; init; } = true;
+    /// <summary>Trim each word to the speech Silero hears in it (<see cref="WordEdges"/>), so subtitles do not appear
+    /// before the speech after a pause.</summary>
+    public bool TrimWordEdges { get; init; } = true;
     public EmbedMode Embed { get; init; } = EmbedMode.None;
     /// <summary>When embedding: also leave the .srt next to the video.</summary>
     public bool KeepSrt { get; init; } = true;

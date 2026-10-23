@@ -14,7 +14,7 @@ internal static class TimingCommand
 {
     public const string Usage =
         """
-        usage: Hushcue.Cli timing --reference SRT [--preset NAME] [--device cuda|cpu] [--out DIR] MEDIA
+        usage: Hushcue.Cli timing --reference SRT [--preset NAME] [--device cuda|cpu] [--out DIR] [--no-word-edges] MEDIA
         """;
 
     private const int WorstShown = 5;
@@ -32,6 +32,7 @@ internal static class TimingCommand
                 case "--preset" when i + 1 < args.Length: settings = settings with { Preset = args[++i] }; break;
                 case "--device" when i + 1 < args.Length: device = args[++i]; break;
                 case "--out" when i + 1 < args.Length: outDir = args[++i]; break;
+                case "--no-word-edges": settings = settings with { TrimWordEdges = false }; break;
                 default: media = args[i]; break;
             }
         }

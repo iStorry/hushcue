@@ -56,9 +56,11 @@ public static class PartTranscription
                 var model = steps.Cache.Get(modelPath, device, steps.LoadModel,
                                             () => log($"Loading '{preset.Model}' on {(device == "cuda" ? "GPU" : "CPU")}..."));
                 var clip = FileTranscription.Slice(audio, lo, hi);
-                var words = FileTranscription.DecodeWords(model, clip, settings, preset, cancel,
-                                                          repetitionPenalty: FileTranscription.LoopRepetitionPenalty);
-                return UnheardCues.Drop(ToCues(MapWords(words, lo, start, end), start, end), steps.SpeechProbabilities(clip, cancel), lo);
+                var decoded = FileTranscription.DecodeWords(model, clip, settings, preset, cancel,
+                                                            repetitionPenalty: FileTranscription.LoopRepetitionPenalty);
+                var speech = steps.SpeechProbabilities(clip, cancel);
+                var words = settings.TrimWordEdges ? WordEdges.Trim(decoded, speech) : decoded;
+                return UnheardCues.Drop(ToCues(MapWords(words, lo, start, end), start, end), speech, lo);
             }
             catch (EngineException e) when (device == "cuda" && attempt == 0 && JobRun.IsGpuError(e))
             {
