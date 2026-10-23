@@ -27,7 +27,8 @@ public static partial class Cleanup
     private const int MinSplitChars = 20;
     private const double ShortSplitPenalty = 30;
 
-    /// <summary>Whisper habitually emits these when it "hears" silence or noise.</summary>
+    /// <summary>Whisper habitually emits these when it "hears" silence or noise; people also say them, so they are
+    /// dropped only when little speech is heard under them (Pipeline.UnheardCues) and flagged in the review.</summary>
     public static readonly IReadOnlySet<string> Hallucinations = new HashSet<string>
     {
         "thank you for watching", "thanks for watching", "thank you so much for watching",
@@ -272,7 +273,8 @@ public static partial class Cleanup
         return output;
     }
 
-    /// <summary>Remove known hallucination phrases and runaway repetition (at most two identical cues in a row).</summary>
+    /// <summary>Remove empty cues and runaway repetition (at most two identical cues in a row). Known hallucination
+    /// phrases are checked later, against the audio (Pipeline.UnheardCues).</summary>
     public static List<Cue> DropJunk(IEnumerable<Cue> cues)
     {
         var output = new List<Cue>();
@@ -281,7 +283,7 @@ public static partial class Cleanup
         foreach (var c in cues)
         {
             var n = Normalize(c.Text);
-            if (n.Length == 0 || Hallucinations.Contains(n))
+            if (n.Length == 0)
                 continue;
             if (n == runText)
             {

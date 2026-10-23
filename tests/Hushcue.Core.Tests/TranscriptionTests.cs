@@ -184,6 +184,19 @@ public class UnheardCuesTests
     }
 
     [Fact]
+    public void KnownPhrasesAreDroppedUnlessClearlySpoken()
+    {
+        List<Cue> cues = [new(2, 3.5, "Thank you for listening to the show."), new(6, 8, "Thanks for watching!"),
+                          new(8.5, 9.5, "Thank you, everyone.")];
+        Assert.Equal(["Thank you for listening to the show."], UnheardCues.Drop(cues, SpeechAt2To4()).Select(c => c.Text));
+    }
+
+    [Fact]
+    public void ProbabilitiesCanStartLaterThanTheCues() =>
+        Assert.Equal(["Yes."], UnheardCues.Drop([new Cue(102.2, 103.5, "Yes."), new Cue(106, 107, "you")], SpeechAt2To4(), origin: 100)
+                               .Select(c => c.Text));
+
+    [Fact]
     public void CuesPastTheAudioDoNotThrow() =>
         Assert.Empty(UnheardCues.Drop([new Cue(12, 13, "you")], SpeechAt2To4()));
 }

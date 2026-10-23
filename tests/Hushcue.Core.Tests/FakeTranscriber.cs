@@ -3,6 +3,13 @@ using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Core.Tests;
 
+/// <summary>Silero's verdict faked: speech everywhere, so a fake model's words over test tones or silence are heard.</summary>
+internal static class FakeSpeech
+{
+    public static float[] Everywhere(float[] audio, CancellationToken cancel) =>
+        [.. Enumerable.Repeat(1f, audio.Length / SileroVad.WindowSamples + 1)];
+}
+
 /// <summary>
 /// A Whisper stand-in: a decode of the whole file (audio of
 /// <paramref name="wholeSamples"/> samples, or any audio when that is null) returns <paramref name="whole"/> as one

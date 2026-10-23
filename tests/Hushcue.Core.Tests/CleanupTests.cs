@@ -35,7 +35,7 @@ public class CleanupTests
     {
         List<Cue> cues = [new(0, 1, "Thank you for watching!"), new(2, 3, "ok"), new(4, 5, "ok"),
                           new(6, 7, "Ok."), new(8, 9, "real line")];
-        Assert.Equal(["ok", "ok", "real line"], Cleanup.DropJunk(cues).Select(c => c.Text));
+        Assert.Equal(["Thank you for watching!", "ok", "ok", "real line"], Cleanup.DropJunk(cues).Select(c => c.Text));
     }
 
     [Fact]
@@ -142,13 +142,6 @@ public class CleanupTests
             Assert.All(output.Zip(output.Skip(1)), p => Assert.True(p.First.End <= p.Second.Start + 1e-9));
             Assert.All(output, c => Assert.True(c.End > c.Start));
         }
-    }
-
-    [Fact]
-    public void ListeningHallucinationIsDropped()
-    {
-        List<Cue> cues = [new(0, 2, "Thank you for listening to the show."), new(3, 4, "Thank you, everyone.")];
-        Assert.Equal(["Thank you, everyone."], Cleanup.DropJunk(cues).Select(c => c.Text));
     }
 
     [Theory]
