@@ -20,11 +20,16 @@ public static class SileroVad
     private static readonly Lazy<InferenceSession> Session = new(CreateSession);
 
     /// <summary>get_speech_timestamps: where the 16 kHz <paramref name="audio"/> contains speech.</summary>
-    public static List<SpeechChunk> SpeechChunks(float[] audio, VadOptions options, CancellationToken cancel = default)
+    public static List<SpeechChunk> SpeechChunks(float[] audio, VadOptions options, CancellationToken cancel = default) =>
+        SpeechTimestamps.FromProbabilities(SpeechProbabilities(audio, cancel), audio.Length, options);
+
+    /// <summary>The speech probability of each 512-sample window of the 16 kHz <paramref name="audio"/>, the last
+    /// window padded with silence.</summary>
+    public static float[] SpeechProbabilities(float[] audio, CancellationToken cancel = default)
     {
         var padded = new float[audio.Length + WindowSamples - audio.Length % WindowSamples];
         audio.CopyTo(padded, 0);
-        return SpeechTimestamps.FromProbabilities(Probabilities(padded, cancel), audio.Length, options);
+        return Probabilities(padded, cancel);
     }
 
     /// <summary>The speech probability of each window of <paramref name="padded"/>, whose length is a multiple of 512.</summary>

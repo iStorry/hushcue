@@ -161,6 +161,9 @@ public class CleanupTests
     [InlineData(" don’t", " know", Breaks.Splits)]
     [InlineData(" Maria", " Garcia", Breaks.Splits)]
     [InlineData(" 10", " minutes", Breaks.Splits)]
+    [InlineData(" half", " past", Breaks.Splits)]
+    [InlineData(" station", " The", Breaks.ClauseEnd)]
+    [InlineData(" thought", " I", Breaks.Neutral)]
     [InlineData(" quickly", " walked", Breaks.Neutral)]
     public void BreakCosts(string before, string after, int cost) => Assert.Equal(cost, Breaks.Cost(before, after));
 

@@ -160,3 +160,30 @@ public class TranscriptionTests
         Assert.Empty(FileTranscription.Slice(audio, 5, 9));
     }
 }
+
+public class UnheardCuesTests
+{
+    private const double Window = 512.0 / 16000; // seconds per speech probability
+
+    /// <summary>10 s of probabilities: speech (0.9) only in [2, 4) s.</summary>
+    private static float[] SpeechAt2To4() =>
+        [.. Enumerable.Range(0, (int)(10 / Window)).Select(i => i * Window is >= 2 and < 4 ? 0.9f : 0.01f)];
+
+    [Fact]
+    public void ShortCueWithNoSpeechUnderItIsDropped()
+    {
+        List<Cue> cues = [new(2.2, 3.5, "Yes."), new(6, 7, "Thank you."), new(8, 9.5, "you")];
+        Assert.Equal(["Yes."], UnheardCues.Drop(cues, SpeechAt2To4()).Select(c => c.Text));
+    }
+
+    [Fact]
+    public void LongerCuesAndCuesTouchingSpeechAreKept()
+    {
+        List<Cue> cues = [new(3.9, 5, "Okay."), new(6, 9, "and then we went back to the house")];
+        Assert.Equal(cues, UnheardCues.Drop(cues, SpeechAt2To4()));
+    }
+
+    [Fact]
+    public void CuesPastTheAudioDoNotThrow() =>
+        Assert.Empty(UnheardCues.Drop([new Cue(12, 13, "you")], SpeechAt2To4()));
+}

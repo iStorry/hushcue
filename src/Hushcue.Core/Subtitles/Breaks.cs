@@ -42,6 +42,13 @@ public static class Breaks
         "they'd", "he'd", "she'd", "very", "too", "so-called",
     ];
 
+    /// <summary>Numbers in words, which belong with what they count or tell ("two miles", "half past nine").</summary>
+    private static readonly HashSet<string> NumberWords =
+    [
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "twenty",
+        "thirty", "forty", "fifty", "hundred", "thousand", "million", "billion", "half", "quarter",
+    ];
+
     private static readonly char[] Closers = ['"', '\'', ')', ']', '”', '’', '»'];
 
     /// <summary>The cost of breaking between <paramref name="before"/> and <paramref name="after"/> (words as
@@ -59,9 +66,25 @@ public static class Breaks
         var rightKey = Key(after);
         if (Conjunctions.Contains(rightKey) && !BindsForward.Contains(leftKey))
             return BeforeConjunction;
-        if (BindsForward.Contains(leftKey) || Prepositions.Contains(leftKey) || char.IsDigit(left[^1]) || IsNamePair(left, after))
+        if (BindsForward.Contains(leftKey) || Prepositions.Contains(leftKey) || NumberWords.Contains(leftKey)
+            || char.IsDigit(left[^1]) || IsNamePair(left, after))
+        {
             return Splits;
+        }
+        if (StartsUnpunctuatedSentence(left, after))
+            return ClauseEnd;
         return Prepositions.Contains(rightKey) ? BeforePreposition : Neutral;
+    }
+
+    /// <summary>
+    /// A capital after a lower-case word with no punctuation between them ("the petrol station When I was young"):
+    /// Whisper sometimes drops the full stop but keeps the capital, so this is most likely a new sentence.
+    /// </summary>
+    private static bool StartsUnpunctuatedSentence(string left, string after)
+    {
+        var right = Py.Strip(after);
+        return char.IsLower(left[^1]) && right.Length > 0 && char.IsUpper(right[0])
+               && Key(right) is not ("i" or "i'm" or "i've" or "i'll" or "i'd");
     }
 
     /// <summary>Two capitalised words in a row ("Maria Garcia"), where the first is not "I".</summary>

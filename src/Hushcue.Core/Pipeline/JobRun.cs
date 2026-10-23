@@ -162,7 +162,12 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
                 report(0.08, "Transcribing...", FileStage.Transcribing, null);
                 var clock = Stopwatch.StartNew();
                 var words = FileTranscription.TranscribeWords(model, audio, settings, _preset, onFraction, log, cancel, onWords);
-                return (Cleanup.ToCues(words), words, clock.Elapsed);
+                var built = Cleanup.ToCues(words);
+                var cues = UnheardCues.Drop(built, steps.SpeechProbabilities(audio, cancel));
+                if (cues.Count < built.Count)
+                    log($"Dropped {built.Count - cues.Count} short subtitle(s) with no speech under them: " +
+                        string.Join(", ", built.Except(cues).Select(c => $"“{c.Text}” at {Review.CueTime.Range(c.Start, c.End)}")));
+                return (cues, words, clock.Elapsed);
             }
             catch (EngineException e) when (_device == "cuda" && attempt == 0 && IsGpuError(e))
             {

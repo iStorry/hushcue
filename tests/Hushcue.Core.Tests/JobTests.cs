@@ -46,6 +46,10 @@ public sealed class JobTests : IDisposable
 
     private List<string> Names() => [.. Directory.EnumerateFiles(_dir).Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal)];
 
+    /// <summary>Speech everywhere: the test videos are tones, under which the fake model's words would be unheard.</summary>
+    private static float[] AllSpeech(float[] audio, CancellationToken cancel) =>
+        [.. Enumerable.Repeat(1f, audio.Length / Engine.SileroVad.WindowSamples + 1)];
+
     /// <summary>Real audio extraction and embedding (x264, so the test does not depend on the GPU), the given model.</summary>
     private static JobSteps Steps(ITranscriber model, Func<string, string, string?, EmbedMode, Action<double>, CancellationToken, Task<string>>? embed = null,
                                   Func<string, bool>? recycle = null) =>
@@ -54,6 +58,7 @@ public sealed class JobTests : IDisposable
             CudaDeviceCount = () => 0,
             FindModel = _ => "fake-model",
             LoadModel = (_, _) => model,
+            SpeechProbabilities = AllSpeech,
             Embed = embed ?? RealEmbed,
             Recycle = recycle ?? (_ => throw new InvalidOperationException("recycled without asking")),
         };
@@ -261,6 +266,7 @@ public sealed class JobTests : IDisposable
         steps = new JobSteps
         {
             CudaDeviceCount = steps.CudaDeviceCount, FindModel = steps.FindModel, LoadModel = steps.LoadModel,
+            SpeechProbabilities = steps.SpeechProbabilities,
             ReadAudio = (path, enhance, cancel) =>
             {
                 read.Add(Path.GetFileName(path));
@@ -282,7 +288,7 @@ public sealed class JobTests : IDisposable
         var steps = Steps(model);
         steps = new JobSteps
         {
-            CudaDeviceCount = steps.CudaDeviceCount, LoadModel = steps.LoadModel,
+            CudaDeviceCount = steps.CudaDeviceCount, LoadModel = steps.LoadModel, SpeechProbabilities = steps.SpeechProbabilities,
             FindModel = name => { wanted.Add(name); return "fake-model"; },
         };
         var run = await RunAsync(videos[..1], new JobSettings { Preset = "Best" }, steps);
