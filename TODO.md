@@ -48,9 +48,10 @@ a stronger language model, and the person reviewing a fast way to fix what is st
       Thorough 10/38 → 30/38; total WER Balanced 2.5% → 1.3%, Thorough 2.9% → 1.3%; nothing else changed. Still
       missed: Jaxon → Jackson (Balanced), Kathryn → Catherine (Thorough). Checked on 2 minutes of noise, silence
       and tones: the names never appear there
-- [ ] **"Thank you" over noise**: Balanced writes "Thank you" / "you" over pink noise, silence and plain tones
-      (4–5 cues in 2 minutes, with or without a vocabulary); Thorough writes nothing. Drop a lone "Thank you" /
-      "you" cue when the audio under it has no speech (VAD probability), or flag it in the review
+- [x] **"Thank you" over noise**: Balanced writes "Thank you" / "you" over pink noise, silence and plain tones
+      (4–5 cues in 2 minutes, with or without a vocabulary); Thorough writes nothing. Fixed on the
+      `subtitle-quality` branch: `Pipeline/UnheardCues` drops a cue of up to three words with no Silero window
+      at 0.2 or above under it (2 minutes of noise, silence and tones: 2 cues → 0)
 - [x] **Context across windows: tried, staying off.** `JobSettings.PreviousText` (off; `eval --previous-text`)
       lets each window see the text before it. Balanced: 345 → 350 scored words right, but WER 1.4% → 1.6%;
       Thorough: 349 → 349, WER 1.5% → 2.0%. The extra errors are invented text carried over from the context:
@@ -58,10 +59,11 @@ a stronger language model, and the person reviewing a fast way to fix what is st
       an earlier run "Thank you for watching. Please subscribe to the channel and press the bell icon" in a
       pause. The prompt reset that is meant to stop this never fires, because every preset decodes at
       temperature 0 only
-- [ ] **Punctuation lost after a pause**: without context, a window that starts after a pause can come out
+- [x] **Punctuation lost after a pause**: without context, a window that starts after a pause can come out
       without capitals or full stops ("the help pages thank you all now, a few details", Balanced,
-      team-names.pauses). Try a short punctuated style prompt in every window (with the hotwords), measured
-      with eval; also put a space back into run-together sentences ("notes.Ashleigh"), which fast speech causes
+      team-names.pauses). Fixed on the `subtitle-quality` branch with a punctuated prompt in every window
+      (`JobSettings.PunctuationPrompt`): eval WER 1.2% → 0.9%, scored words 348 → 356 of 372
+- [ ] Put a space back into run-together sentences ("notes.Ashleigh"), which fast speech causes
 - [ ] **Balanced vs Thorough on look-alike words**: large-v3-turbo has 4 decoder layers, large-v3 has 32. The
       decoder is the part that picks between words that sound the same. Measure the gap; if it is large, say so in
       the quality descriptions
@@ -84,3 +86,34 @@ a stronger language model, and the person reviewing a fast way to fix what is st
       version's section first in the GitHub release, so the update dialog shows it), tag `v0.1.1`
 - [ ] Check the v0.1.1 release run on GitHub Actions, and that an installed v0.1.0 offers the update (needs the
       repository to be public)
+
+## v0.1.2 — Subtitle quality, part 2: cues, timing and silence (branch `subtitle-quality`)
+
+Research and measurements: `docs/subtitle-quality-research.md`. Done on the branch: cues to Netflix's rules
+(`Subtitles/Breaks`, reading speed, durations), short cues with no speech dropped and the phrase list checked
+against the audio (`Pipeline/UnheardCues`), the punctuation prompt, word edges trimmed to speech
+(`Pipeline/WordEdges`: phrase starts 0.38 s → 0.03 s off), and `Hushcue.Cli timing` to score word timing.
+
+- [ ] **Pick the punctuation prompt and decide on chunking, on an NVIDIA GPU** (stopped on the Mac's CPU after the
+      first of eight runs). `JobSettings.ChunkOnSilence` (off; `Pipeline/SpeechClips`) decodes only the speech, in
+      clips of up to 30 s cut in silences, as WhisperX does. On speaking-styles it lost one whole sentence
+      ("The train to Mumbai leaves…"): decoded from the start of its clip, the prompt made Whisper skip it;
+      without the prompt, or with some other wordings, the clip decodes in full. So the prompt's wording and
+      chunking must be chosen together. Run each of these (`--device cuda`, Balanced, then Thorough) and compare
+      WER, scored words, phrases heard and start/end error:
+
+      ```
+      Hushcue.Cli eval [--chunk-on-silence] --punctuation-prompt TEXT
+      Hushcue.Cli timing --reference eval/speaking-styles/speaking-styles.srt [--chunk-on-silence] --punctuation-prompt TEXT eval/speaking-styles/speaking-styles.mp4
+      ```
+
+      with TEXT each of "Hi, how are you? I'm fine, thanks. Well, see you later." (the default), "Hello, welcome.
+      Today, we'll talk about the plan, and then we'll take questions.", "Hi, how are you? I'm fine, thanks.",
+      and `--no-punctuation-prompt` in place of `--punctuation-prompt`. Make speaking-styles first with
+      `python3 tools/bench/make_speaking_styles.py` (macOS). Done so far, default prompt without chunking (CPU):
+      eval 0.9% WER, 356/372; timing 42 of 43 phrases, WER 8.6%, starts 0.029 s median, 95% within 0.1 s
+- [ ] **Enhance off on Thorough**: Thorough always runs ffmpeg's `afftdn` + `dynaudnorm`; no source found that
+      denoising helps Whisper. Measure `eval --preset Thorough` with and without it
+- [ ] **Shot-change snapping** for video: snap cue edges within ~11 frames of a cut onto it (ffmpeg scene detection)
+- [ ] **Real recordings** with careful human subtitles for `timing` and `eval`, and a SubER score
+- [ ] **Spikes**: wav2vec2 forced alignment in ONNX Runtime (Apache-2.0 `wav2vec2-base-960h`), Parakeet TDT v3

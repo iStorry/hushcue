@@ -15,6 +15,10 @@ internal static class FileTranscription
     /// <summary>Applied only when re-decoding a passage that looped.</summary>
     public const float LoopRepetitionPenalty = 1.3f;
 
+    /// <summary>A short sentence in the style subtitles want (capitals, commas, question marks, full stops), which
+    /// Whisper copies: the default <see cref="JobSettings.PunctuationPrompt"/>.</summary>
+    public const string PunctuationPrompt = "Hi, how are you? I'm fine, thanks. Well, see you later.";
+
     /// <summary>
     /// Decode, re-decode looped passages (when <see cref="JobSettings.RecoverLoops"/>), cap what still loops, and
     /// build the cues.
@@ -27,11 +31,22 @@ internal static class FileTranscription
         Cleanup.ToCues(TranscribeWords(model, audio, settings, preset, onFraction, log, cancel, onWords)); // collapse_repeats, then the cues
 
     /// <summary>The words <see cref="Transcribe"/> makes its cues from: decoded, with looped passages re-decoded.</summary>
+    /// <param name="speechProbabilities">Silero's, for <see cref="JobSettings.ChunkOnSilence"/>; null decodes the whole audio</param>
     public static List<Word> TranscribeWords(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
                                              Action<double> onFraction, Action<string> log, CancellationToken cancel,
-                                             Action<IReadOnlyList<Word>>? onWords = null)
+                                             Action<IReadOnlyList<Word>>? onWords = null, float[]? speechProbabilities = null)
     {
-        var words = DecodeWords(model, audio, settings, preset, cancel, onFraction, log: log, onWords: onWords);
+        var clips = settings.ChunkOnSilence && speechProbabilities is not null
+            ? SpeechClips.CutAndMerge(speechProbabilities, audio.Length)
+            : null;
+        if (clips is { Count: > 0 })
+        {
+            var speech = Enumerable.Range(0, clips.Count / 2).Sum(i => clips[2 * i + 1] - clips[2 * i]);
+            log($"Decoding {clips.Count / 2} stretch(es) of speech cut in silences: {Py.F0(speech)} s of "
+                + $"{Py.F0(audio.Length / (double)Audio.SampleRate)} s");
+        }
+        var words = DecodeWords(model, audio, settings, preset, cancel, onFraction, log: log, onWords: onWords,
+                                clips: clips is { Count: > 0 } ? clips : null);
         if (settings.RecoverLoops)
             words = RecoverLoops(model, audio, words, settings, preset, log, cancel);
         return words;
@@ -40,10 +55,11 @@ internal static class FileTranscription
     /// <summary>Run Whisper on 16 kHz audio and return its words without non-speech markers or stretched letters.</summary>
     /// <param name="log">where to say how much speech voice activity detection kept; null says nothing</param>
     /// <param name="onWords">each kept segment's words, as soon as it is decoded</param>
+    /// <param name="clips">only these stretches, each decoded on its own (start, end, ... seconds); null: all of it</param>
     public static List<Word> DecodeWords(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
                                          CancellationToken cancel, Action<double>? onFraction = null,
                                          float repetitionPenalty = 1, Action<string>? log = null,
-                                         Action<IReadOnlyList<Word>>? onWords = null)
+                                         Action<IReadOnlyList<Word>>? onWords = null, IReadOnlyList<double>? clips = null)
     {
         var options = new TranscribeOptions
         {
@@ -53,15 +69,14 @@ internal static class FileTranscription
             Temperatures = preset.Temperatures,
             ConditionOnPreviousText = settings.PreviousText,
             RepetitionPenalty = repetitionPenalty,
-            Vad = Presets.Vad(preset, settings),
+            Vad = clips is null ? Presets.Vad(preset, settings) : null,
+            ClipTimestamps = clips,
             NoSpeechThreshold = 0.6,
             LogProbThreshold = -1.0,
             CompressionRatioThreshold = 2.4,
             WordTimestamps = true,
             HallucinationSilenceThreshold = 2.0,
-            // hotwords, not the initial prompt: without previous-text context the initial prompt only reaches the
-            // first 30 s window, hotwords go into every window
-            Hotwords = Py.Strip(settings.Vocabulary) is { Length: > 0 } vocabulary ? vocabulary : null,
+            Hotwords = Hotwords(settings),
         };
         var (segments, info) = model.Transcribe(audio, options, cancel);
         if (options.Vad is not null && log is not null)
@@ -83,6 +98,17 @@ internal static class FileTranscription
                 onWords(Cleanup.SquashStretched(kept));
         }
         return Cleanup.SquashStretched(words);
+    }
+
+    /// <summary>
+    /// The punctuation prompt and the vocabulary, as hotwords. Hotwords, not the initial prompt: without previous-text
+    /// context the initial prompt only reaches the first 30 s window, hotwords go into every window. Null for none.
+    /// </summary>
+    internal static string? Hotwords(JobSettings settings)
+    {
+        string[] parts = [Py.Strip(settings.PunctuationPrompt ?? ""), Py.Strip(settings.Vocabulary)];
+        var hotwords = string.Join(' ', parts.Where(p => p.Length > 0));
+        return hotwords.Length > 0 ? hotwords : null;
     }
 
     /// <summary>

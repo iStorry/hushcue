@@ -62,6 +62,15 @@ public sealed record JobSettings
     /// <summary>Let each 30 s window see the text decoded before it (Whisper's condition_on_previous_text). Off by
     /// default: a window that goes wrong can pass its mistake on to the next.</summary>
     public bool PreviousText { get; init; }
+    /// <summary>A short punctuated sentence every 30 s window starts from, whose style Whisper copies: without it,
+    /// windows after the first often lose their capitals and full stops. Null: none.</summary>
+    public string? PunctuationPrompt { get; init; } = FileTranscription.PunctuationPrompt;
+    /// <summary>Trim each word to the speech Silero hears in it (<see cref="WordEdges"/>), so subtitles do not appear
+    /// before the speech after a pause.</summary>
+    public bool TrimWordEdges { get; init; } = true;
+    /// <summary>Decode only the speech, in clips of up to 30 s cut in silences (<see cref="SpeechClips"/>), instead
+    /// of the whole audio in Whisper's own 30 s steps.</summary>
+    public bool ChunkOnSilence { get; init; }
     public EmbedMode Embed { get; init; } = EmbedMode.None;
     /// <summary>When embedding: also leave the .srt next to the video.</summary>
     public bool KeepSrt { get; init; } = true;

@@ -35,7 +35,7 @@ public class CleanupTests
     {
         List<Cue> cues = [new(0, 1, "Thank you for watching!"), new(2, 3, "ok"), new(4, 5, "ok"),
                           new(6, 7, "Ok."), new(8, 9, "real line")];
-        Assert.Equal(["ok", "ok", "real line"], Cleanup.DropJunk(cues).Select(c => c.Text));
+        Assert.Equal(["Thank you for watching!", "ok", "ok", "real line"], Cleanup.DropJunk(cues).Select(c => c.Text));
     }
 
     [Fact]
@@ -144,10 +144,56 @@ public class CleanupTests
         }
     }
 
+    [Theory]
+    [InlineData(" now.", " The", Breaks.SentenceEnd)]
+    [InlineData(" office,", " cancel", Breaks.ClauseEnd)]
+    [InlineData(" tired", " because", Breaks.BeforeConjunction)]
+    [InlineData(" sat", " on", Breaks.BeforePreposition)]
+    [InlineData(" the", " meeting", Breaks.Splits)]
+    [InlineData(" on", " Monday", Breaks.Splits)]
+    [InlineData(" don’t", " know", Breaks.Splits)]
+    [InlineData(" Maria", " Garcia", Breaks.Splits)]
+    [InlineData(" 10", " minutes", Breaks.Splits)]
+    [InlineData(" half", " past", Breaks.Splits)]
+    [InlineData(" station", " The", Breaks.ClauseEnd)]
+    [InlineData(" thought", " I", Breaks.Neutral)]
+    [InlineData(" quickly", " walked", Breaks.Neutral)]
+    public void BreakCosts(string before, string after, int cost) => Assert.Equal(cost, Breaks.Cost(before, after));
+
+    [Theory]
+    [InlineData("I need you to call the office, cancel the meeting, and book a table.",
+                "I need you to call the office,\ncancel the meeting, and book a table.")]
+    [InlineData("Please read all of the instructions carefully before you begin the test.",
+                "Please read all of the instructions\ncarefully before you begin the test.")]
+    [InlineData("She told me that the new manager would change everything about the team.",
+                "She told me that the new manager\nwould change everything about the team.")]
+    public void LinesBreakAtTheBestPlace(string text, string expected) => Assert.Equal(expected, Cleanup.WrapLines(text));
+
     [Fact]
-    public void ListeningHallucinationIsDropped()
+    public void LinesStayWithinTheLimit()
     {
-        List<Cue> cues = [new(0, 2, "Thank you for listening to the show."), new(3, 4, "Thank you, everyone.")];
-        Assert.Equal(["Thank you, everyone."], Cleanup.DropJunk(cues).Select(c => c.Text));
+        var text = string.Join(' ', Enumerable.Repeat("the", 20)); // 79 characters, nothing but bad breaks
+        Assert.All(Cleanup.WrapLines(text).Split('\n'), line => Assert.True(Py.Len(line) <= Cleanup.MaxLine));
+    }
+
+    [Fact]
+    public void FullCueIsCutAtAClause()
+    {
+        var words = Seq("Honestly, I can't believe how quickly the whole weekend went by, and now it is already Monday " +
+                        "morning again for all of us", step: .2);
+        var cues = Cleanup.BuildCues(words);
+        Assert.Equal("Honestly, I can't believe how quickly the whole weekend went by,", cues[0].Text);
+        Assert.All(cues, c => Assert.True(Py.Len(c.Text) <= Cleanup.MaxCueChars));
+    }
+
+    [Fact]
+    public void CuesStayLongEnoughToRead()
+    {
+        // 63 characters spoken in 1.5 s need 3.15 s at 20 characters per second; the next cue is far enough away
+        var cues = Cleanup.FixTiming([new Cue(0, 1.5, "Where did you put the keys? Were they on the kitchen table?"),
+                                      new Cue(10, 10.3, "No."), new Cue(10.9, 12, "Then where?")]);
+        Assert.Equal(Py.Len(cues[0].Text) / Cleanup.MaxCharsPerSecond, cues[0].End, 3);
+        Assert.Equal(10.9 - Cleanup.CueGapSeconds, cues[1].End, 3); // held for 5/6 s, but not into the next cue
+        Assert.Equal(12, cues[2].End);
     }
 }

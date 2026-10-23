@@ -5,7 +5,9 @@ counterpart of make_lookalike.ps1:
 
   eval/speaking-styles/speaking-styles.mp4   each phrase on a title card naming its style, voice and speed, with 1 s
                                              of silence after it, and 12 s of noise with no speech partway through
-  eval/speaking-styles/speaking-styles.srt   the spoken words and their exact times, to compare subtitles against
+  eval/speaking-styles/speaking-styles.srt   the spoken words and their exact times (from the first to the last
+                                             sample of each phrase's voice above SPEECH_FLOOR_DB, measured before
+                                             noise is added), to compare subtitles against
   eval/speaking-styles/speaking-styles.json  the same cues with each one's style, voice, rate, filter and noise
 
 Styles: speeds from very slow to very fast, whisper to shouting, high and low pitch, five accents, elderly, child-like,
@@ -15,6 +17,7 @@ and a quick two-voice dialogue. Needs ffmpeg on PATH and Pillow. The output is n
 from __future__ import annotations
 
 import json
+from array import array
 import subprocess
 import tempfile
 import textwrap
@@ -29,6 +32,7 @@ OUT = ROOT / "eval" / "speaking-styles"
 NAME = "speaking-styles"
 SAMPLE_RATE = 48000
 GAP_SECONDS = 1.0
+SPEECH_FLOOR_DB = -35  # below the phrase's peak: where its speech starts and ends
 
 VIDEO_SIZE = (1280, 720)
 FONT_PATH = "/System/Library/Fonts/Helvetica.ttc"
@@ -66,6 +70,8 @@ class Speech:
 class Cue:
     start: float
     end: float
+    clip_start: float
+    clip_end: float
     speech: Speech
 
 
@@ -143,16 +149,29 @@ def to_wav(out: Path) -> list[str]:
     return ["-ac", "1", "-ar", str(SAMPLE_RATE), "-sample_fmt", "s16", str(out)]
 
 
-def render_speech(item: Speech, out: Path) -> None:
+def render_speech(item: Speech, out: Path) -> tuple[float, float]:
+    """Speaks the phrase into out and returns where its voice starts and ends, in seconds into the clip."""
     spoken = out.with_suffix(".aiff")
+    voice = out.with_name(out.stem + "-voice.wav")
     run("say", "-v", item.voice, "-r", str(item.rate), "-o", str(spoken), item.text)
     shape = ",".join(filter(None, [f"aresample={SAMPLE_RATE}", item.audio_filter]))
+    run("ffmpeg", "-y", "-i", str(spoken), "-af", shape, *to_wav(voice))
+    bounds = speech_bounds(read_pcm(voice))
     if not item.noise:
-        run("ffmpeg", "-y", "-i", str(spoken), "-af", shape, *to_wav(out))
-        return
-    graph = (f"[0:a]{shape},apad=pad_dur=0.3[s];anoisesrc=c=pink:r={SAMPLE_RATE}:a={item.noise}[n];"
+        voice.replace(out)
+        return bounds
+    graph = (f"[0:a]apad=pad_dur=0.3[s];anoisesrc=c=pink:r={SAMPLE_RATE}:a={item.noise}[n];"
              "[s][n]amix=inputs=2:duration=first:normalize=0[a]")
-    run("ffmpeg", "-y", "-i", str(spoken), "-filter_complex", graph, "-map", "[a]", *to_wav(out))
+    run("ffmpeg", "-y", "-i", str(voice), "-filter_complex", graph, "-map", "[a]", *to_wav(out))
+    return bounds
+
+
+def speech_bounds(pcm: bytes) -> tuple[float, float]:
+    """The first and last moment the voice is within SPEECH_FLOOR_DB of its peak."""
+    samples = array("h", pcm)
+    floor = max(abs(s) for s in samples) * 10 ** (SPEECH_FLOOR_DB / 20)
+    loud = [i for i, s in enumerate(samples) if abs(s) >= floor]
+    return loud[0] / SAMPLE_RATE, (loud[-1] + 1) / SAMPLE_RATE
 
 
 def render_no_speech(item: NoSpeech, out: Path) -> None:
@@ -232,8 +251,9 @@ def main() -> int:
         Image.new("RGB", VIDEO_SIZE, BACKGROUND).save(blank)
         for index, item in enumerate(SCRIPT, start=1):
             clip = work / f"{index:02}.wav"
+            bounds = None
             if isinstance(item, Speech):
-                render_speech(item, clip)
+                bounds = render_speech(item, clip)
             else:
                 render_no_speech(item, clip)
             frames = read_pcm(clip)
@@ -242,15 +262,17 @@ def main() -> int:
             draw_card(card, f"{index}/{len(SCRIPT)}  {item.style}", *card_lines(item))
             cards += [(card, length), (blank, GAP_SECONDS)]
             pcm += frames + gap
-            if isinstance(item, Speech):
-                cues.append(Cue(start, start + length, item))
+            if isinstance(item, Speech) and bounds is not None:
+                cues.append(Cue(start + bounds[0], start + bounds[1], start, start + length, item))
         audio = work / "audio.wav"
         write_wav(audio, bytes(pcm))
         write_video(work, cards, audio)
 
     srt = "\n".join(f"{n}\n{srt_time(cue.start)} --> {srt_time(cue.end)}\n{cue.speech.text}\n"
                     for n, cue in enumerate(cues, start=1))
-    timings = [{"start": round(cue.start, 3), "end": round(cue.end, 3)} | asdict(cue.speech) for cue in cues]
+    timings = [{"start": round(cue.start, 3), "end": round(cue.end, 3),
+                "clip_start": round(cue.clip_start, 3), "clip_end": round(cue.clip_end, 3)} | asdict(cue.speech)
+               for cue in cues]
     (OUT / f"{NAME}.srt").write_text(srt, encoding="utf-8")
     (OUT / f"{NAME}.json").write_text(json.dumps(timings, indent=1), encoding="utf-8")
     print(f"wrote {OUT / f'{NAME}.mp4'}: {seconds_of(pcm):.1f} s, {len(cues)} spoken phrases")

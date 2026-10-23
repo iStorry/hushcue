@@ -269,7 +269,11 @@ public class ReviewTests
         var audio = new float[20 * 16000];
         Word[] clip = [new(" outside", 0.2, 0.6), new(" new", 2.5, 2.9), new(" words.", 3.0, 3.5)]; // the clip starts at 3 s
         var model = new FakeTranscriber([], clip, audio.Length);
-        var steps = new JobSteps { CudaDeviceCount = () => 0, FindModel = _ => "fake-model", LoadModel = (_, _) => model };
+        var steps = new JobSteps
+        {
+            CudaDeviceCount = () => 0, FindModel = _ => "fake-model", LoadModel = (_, _) => model,
+            SpeechProbabilities = FakeSpeech.Everywhere,
+        };
         var log = new List<string>();
 
         var cues = PartTranscription.Run(audio, 5, 9, new JobSettings(), steps, log.Add, default);

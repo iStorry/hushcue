@@ -102,11 +102,13 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         var audio = await steps.ReadAudio(src, settings.Enhance || _preset.Enhance, cancel);
         var seconds = audio.Length / (double)Audio.SampleRate;
         var rate = new TranscribeRate(seconds, TimeProvider.System);
-        var (cues, words, took) = TranscribeWithFallback(audio, Report, f =>
+        var speech = steps.SpeechProbabilities(audio, cancel);
+        var (cues, words, took) = TranscribeWithFallback(audio, speech, Report, f =>
         {
             var reading = rate.Measure(f);
             Report(0.08 + 0.9 * f, reading.Describe(), FileStage.Transcribing, reading);
-        }, words => onEvent(new CuesDecoded(src, Cleanup.DropJunk(Cleanup.BuildCues(Cleanup.CollapseRepeats(words))))), cancel);
+        }, words => onEvent(new CuesDecoded(src, UnheardCues.Drop(Cleanup.DropJunk(Cleanup.BuildCues(Cleanup.CollapseRepeats(words))), speech))),
+           cancel);
 
         Report(0.99, "Writing SRT...", FileStage.WritingSrt);
         var destDir = outDir ?? Path.GetDirectoryName(src) ?? "";
@@ -146,8 +148,9 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
 
     /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>
     /// <returns>the cues, the words they were made from, and the time taken from the start of decoding</returns>
+    /// <param name="speech">Silero's speech probabilities for <paramref name="audio"/>, for <see cref="UnheardCues"/></param>
     private (List<Cue> Cues, List<Word> Words, TimeSpan Took) TranscribeWithFallback(
-        float[] audio, Action<double, string, FileStage, RateReading?> report, Action<double> onFraction,
+        float[] audio, float[] speech, Action<double, string, FileStage, RateReading?> report, Action<double> onFraction,
         Action<IReadOnlyList<Word>> onWords, CancellationToken cancel)
     {
         for (var attempt = 0; ; attempt++)
@@ -161,8 +164,15 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
                 });
                 report(0.08, "Transcribing...", FileStage.Transcribing, null);
                 var clock = Stopwatch.StartNew();
-                var words = FileTranscription.TranscribeWords(model, audio, settings, _preset, onFraction, log, cancel, onWords);
-                return (Cleanup.ToCues(words), words, clock.Elapsed);
+                var decoded = FileTranscription.TranscribeWords(model, audio, settings, _preset, onFraction, log, cancel, onWords,
+                                                               speech);
+                var words = settings.TrimWordEdges ? WordEdges.Trim(decoded, speech) : decoded;
+                var built = Cleanup.ToCues(words);
+                var cues = UnheardCues.Drop(built, speech);
+                if (cues.Count < built.Count)
+                    log($"Dropped {built.Count - cues.Count} subtitle(s) with little or no speech under them: " +
+                        string.Join(", ", built.Except(cues).Select(c => $"“{c.Text}” at {Review.CueTime.Range(c.Start, c.End)}")));
+                return (cues, words, clock.Elapsed);
             }
             catch (EngineException e) when (_device == "cuda" && attempt == 0 && IsGpuError(e))
             {

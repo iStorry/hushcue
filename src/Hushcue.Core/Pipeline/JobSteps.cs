@@ -26,6 +26,9 @@ internal sealed class JobSteps
     /// <summary>A file's audio as 16 kHz mono samples (path, enhance).</summary>
     public Func<string, bool, CancellationToken, Task<float[]>> ReadAudio { get; init; } = Audio.ReadAsync;
 
+    /// <summary>Silero's speech probability for each 512-sample window of 16 kHz audio, for <see cref="UnheardCues"/>.</summary>
+    public Func<float[], CancellationToken, float[]> SpeechProbabilities { get; init; } = SileroVad.SpeechProbabilities;
+
     /// <summary>Put the subtitles into the video (video, srt, output folder, mode, progress) and return the new file.</summary>
     public Func<string, string, string?, EmbedMode, Action<double>, CancellationToken, Task<string>> Embed { get; init; } =
         (video, srt, outDir, mode, onFraction, cancel) => Media.Embed.SubtitlesAsync(video, srt, outDir, mode, onFraction, cancel: cancel);

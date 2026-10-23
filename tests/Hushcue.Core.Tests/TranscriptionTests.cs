@@ -111,9 +111,33 @@ public class TranscriptionTests
         Assert.Equal((0.6, -1.0, 2.4, 2.0), (options.NoSpeechThreshold, options.LogProbThreshold,
                                              options.CompressionRatioThreshold, options.HallucinationSilenceThreshold));
         Assert.True(options.WordTimestamps);
-        Assert.Equal("Anna", options.Hotwords);
+        Assert.Equal(FileTranscription.PunctuationPrompt + " Anna", options.Hotwords);
         Assert.Null(options.InitialPrompt);
         Assert.Null(options.Vad);
+    }
+
+    [Theory]
+    [InlineData(FileTranscription.PunctuationPrompt, "", FileTranscription.PunctuationPrompt)]
+    [InlineData(null, " Anna ", "Anna")]
+    [InlineData(" Hi. ", "Anna", "Hi. Anna")]
+    [InlineData(null, "", null)]
+    public void HotwordsAreThePunctuationPromptAndTheVocabulary(string? punctuationPrompt, string vocabulary, string? hotwords) =>
+        Assert.Equal(hotwords, FileTranscription.Hotwords(new JobSettings { PunctuationPrompt = punctuationPrompt, Vocabulary = vocabulary }));
+
+    [Fact]
+    public void ChunkingOnSilenceDecodesOnlyTheSpeechClips()
+    {
+        float[] speech = [.. Enumerable.Range(0, Silence.Length / 512 + 1).Select(i => i * 512.0 / Rate is >= 2 and < 4 ? 0.9f : 0f)];
+        var model = new FakeTranscriber([W(" hi", 2, 3)]);
+        FileTranscription.TranscribeWords(model, Silence, new JobSettings { ChunkOnSilence = true }, Balanced, _ => { }, _ => { },
+                                          default, speechProbabilities: speech);
+        FileTranscription.TranscribeWords(model, Silence, new JobSettings(), Balanced, _ => { }, _ => { }, default,
+                                          speechProbabilities: speech);
+        var clips = Assert.IsAssignableFrom<IReadOnlyList<double>>(model.Calls[0].Options.ClipTimestamps);
+        Assert.Equal(2, clips.Count);
+        Assert.InRange(clips[0], 0.5, 2);
+        Assert.Null(model.Calls[0].Options.Vad);
+        Assert.Null(model.Calls[1].Options.ClipTimestamps);
     }
 
     [Fact]
@@ -159,4 +183,124 @@ public class TranscriptionTests
         Assert.Equal(Rate, FileTranscription.Slice(audio, 2, 9).Length);
         Assert.Empty(FileTranscription.Slice(audio, 5, 9));
     }
+}
+
+public class UnheardCuesTests
+{
+    private const double Window = 512.0 / 16000; // seconds per speech probability
+
+    /// <summary>10 s of probabilities: speech (0.9) only in [2, 4) s.</summary>
+    private static float[] SpeechAt2To4() =>
+        [.. Enumerable.Range(0, (int)(10 / Window)).Select(i => i * Window is >= 2 and < 4 ? 0.9f : 0.01f)];
+
+    [Fact]
+    public void ShortCueWithNoSpeechUnderItIsDropped()
+    {
+        List<Cue> cues = [new(2.2, 3.5, "Yes."), new(6, 7, "Thank you."), new(8, 9.5, "you")];
+        Assert.Equal(["Yes."], UnheardCues.Drop(cues, SpeechAt2To4()).Select(c => c.Text));
+    }
+
+    [Fact]
+    public void LongerCuesAndCuesTouchingSpeechAreKept()
+    {
+        List<Cue> cues = [new(3.9, 5, "Okay."), new(6, 9, "and then we went back to the house")];
+        Assert.Equal(cues, UnheardCues.Drop(cues, SpeechAt2To4()));
+    }
+
+    [Fact]
+    public void KnownPhrasesAreDroppedUnlessClearlySpoken()
+    {
+        List<Cue> cues = [new(2, 3.5, "Thank you for listening to the show."), new(6, 8, "Thanks for watching!"),
+                          new(8.5, 9.5, "Thank you, everyone.")];
+        Assert.Equal(["Thank you for listening to the show."], UnheardCues.Drop(cues, SpeechAt2To4()).Select(c => c.Text));
+    }
+
+    [Fact]
+    public void ProbabilitiesCanStartLaterThanTheCues() =>
+        Assert.Equal(["Yes."], UnheardCues.Drop([new Cue(102.2, 103.5, "Yes."), new Cue(106, 107, "you")], SpeechAt2To4(), origin: 100)
+                               .Select(c => c.Text));
+
+    [Fact]
+    public void CuesPastTheAudioDoNotThrow() =>
+        Assert.Empty(UnheardCues.Drop([new Cue(12, 13, "you")], SpeechAt2To4()));
+}
+
+public class WordEdgesTests
+{
+    private const double Window = 512.0 / 16000;
+
+    /// <summary>10 s of probabilities: speech (0.9) only in [2, 4) s.</summary>
+    private static float[] SpeechAt2To4() =>
+        [.. Enumerable.Range(0, (int)(10 / Window)).Select(i => i * Window is >= 2 and < 4 ? 0.9f : 0.01f)];
+
+    [Fact]
+    public void EdgesInSilenceMoveToTheSpeech()
+    {
+        // "Hello" stretched back over a second of silence, "there" running a second past the speech
+        var words = WordEdges.Trim([new Word(" Hello", 1.0, 2.5), new Word(" there.", 3.5, 5.0)], SpeechAt2To4());
+        Assert.InRange(words[0].Start, 2 - 2 * WordEdges.PadSeconds, 2); // to the window grid, less the pad
+        Assert.Equal(2.5, words[0].End);
+        Assert.Equal(3.5, words[1].Start);
+        Assert.Equal(4 + WordEdges.PadSeconds, words[1].End, 2);
+    }
+
+    [Fact]
+    public void WordsWithoutSpeechOrTooShortAreLeftAlone()
+    {
+        List<Word> words = [new(" um", 6, 7), new(" a", 1.95, 2.02)];
+        Assert.Equal(words, WordEdges.Trim(words, SpeechAt2To4()));
+    }
+
+    [Fact]
+    public void TrimmedWordsKeepAMinimumLength()
+    {
+        var word = Assert.Single(WordEdges.Trim([new Word(" so", 3.98, 5)], SpeechAt2To4()));
+        Assert.True(word.End - word.Start >= WordEdges.MinWordSeconds - 1e-9);
+        Assert.Equal(3.98, word.Start);
+    }
+
+    [Fact]
+    public void ProbabilitiesCanStartLaterThanTheWords() =>
+        Assert.InRange(WordEdges.Trim([new Word(" Hi", 101, 102.5)], SpeechAt2To4(), origin: 100)[0].Start,
+                       102 - 2 * WordEdges.PadSeconds, 102);
+}
+
+public class SpeechClipsTests
+{
+    private const int Rate = 16000;
+    private const double Window = 512.0 / Rate;
+
+    /// <summary>Probabilities for <paramref name="seconds"/> of audio with speech (0.9) in the given stretches.</summary>
+    private static float[] Speech(double seconds, params (double Start, double End)[] stretches) =>
+        [.. Enumerable.Range(0, (int)Math.Ceiling(seconds / Window))
+                      .Select(i => stretches.Any(s => i * Window >= s.Start && i * Window < s.End) ? 0.9f : 0f)];
+
+    private static List<(double Start, double End)> Clips(double seconds, params (double, double)[] stretches)
+    {
+        var flat = SpeechClips.CutAndMerge(Speech(seconds, stretches), (int)(seconds * Rate));
+        return [.. Enumerable.Range(0, flat.Count / 2).Select(i => (flat[2 * i], flat[2 * i + 1]))];
+    }
+
+    [Fact]
+    public void NearbySpeechIsMergedAndALongSilenceIsSkipped()
+    {
+        var clips = Clips(60, (1, 5), (6, 10), (40, 45));
+        Assert.Equal(2, clips.Count);
+        Assert.Equal(0, clips[0].Start);
+        Assert.InRange(clips[0].End, 10, 10.5);
+        Assert.InRange(clips[1].Start, 40 - SpeechClips.LeadInSeconds - 0.5, 40 - SpeechClips.LeadInSeconds); // lead-in
+        Assert.InRange(clips[1].End, 45, 45.5);
+    }
+
+    [Fact]
+    public void ClipsStayWithinThirtySecondsAndTouchAcrossShortGaps()
+    {
+        var clips = Clips(60, (1, 20), (21, 40), (41, 55));
+        Assert.All(clips, c => Assert.True(c.End - c.Start <= SpeechClips.MaxClipSeconds));
+        Assert.All(clips.Zip(clips.Skip(1)), p => Assert.Equal(p.First.End, p.Second.Start)); // nothing between them lost
+        Assert.InRange(clips[1].Start, 20, 21); // cut in the silence before the speech
+    }
+
+    [Fact]
+    public void NoSpeechNoClips() => Assert.Empty(Clips(30));
 }

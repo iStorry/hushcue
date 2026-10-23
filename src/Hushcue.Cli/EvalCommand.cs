@@ -19,6 +19,7 @@ internal static class EvalCommand
     public const string Usage =
         """
         usage: Hushcue.Cli eval [--set DIR] [--preset NAME]... [--only TEXT] [--no-vocabulary] [--previous-text]
+                                [--no-punctuation-prompt | --punctuation-prompt TEXT] [--chunk-on-silence]
                                 [--confidence] [--out DIR] [--device cuda|cpu]
         """;
 
@@ -27,8 +28,9 @@ internal static class EvalCommand
     public static async Task<int> RunAsync(string[] args)
     {
         string? setDir = null, outDir = null, device = null, only = null;
+        var punctuationPrompt = new JobSettings().PunctuationPrompt;
         var presets = new List<string>();
-        bool useVocabulary = true, previousText = false, showConfidence = false;
+        bool useVocabulary = true, previousText = false, showConfidence = false, chunkOnSilence = false;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -40,6 +42,9 @@ internal static class EvalCommand
                 case "--device" when i + 1 < args.Length: device = args[++i]; break;
                 case "--no-vocabulary": useVocabulary = false; break;
                 case "--previous-text": previousText = true; break;
+                case "--no-punctuation-prompt": punctuationPrompt = null; break;
+                case "--punctuation-prompt" when i + 1 < args.Length: punctuationPrompt = args[++i]; break;
+                case "--chunk-on-silence": chunkOnSilence = true; break;
                 case "--confidence": showConfidence = true; break;
                 default: Console.Error.WriteLine(Usage); return 2;
             }
@@ -71,7 +76,11 @@ internal static class EvalCommand
             var decoded = new Dictionary<string, IReadOnlyList<Word>>();
             foreach (var group in files.GroupBy(f => useVocabulary ? f.Passage.Vocabulary ?? "" : ""))
             {
-                var settings = new JobSettings { Preset = preset, Vocabulary = group.Key, PreviousText = previousText };
+                var settings = new JobSettings
+                {
+                    Preset = preset, Vocabulary = group.Key, PreviousText = previousText, PunctuationPrompt = punctuationPrompt,
+                    ChunkOnSilence = chunkOnSilence,
+                };
                 await SubtitleJob.RunAsync([.. group.Select(f => f.File)], dir, settings, (_, _) => { }, _ => { }, null,
                                            e => { if (e is FileTranscribed t) decoded[t.Path] = t.Words; },
                                            steps, CancellationToken.None);
@@ -79,7 +88,8 @@ internal static class EvalCommand
             var seconds = clock.Elapsed.TotalSeconds;
 
             Console.WriteLine($"{preset} ({Presets.Get(preset).Model}{(useVocabulary ? "" : ", no vocabulary")}"
-                              + $"{(previousText ? ", previous text" : "")}), {seconds:F0} s");
+                              + $"{(previousText ? ", previous text" : "")}{(chunkOnSilence ? ", chunked on silence" : "")}"
+                              + $", punctuation prompt: {punctuationPrompt ?? "none"}), {seconds:F0} s");
             Console.WriteLine($"  {"file",-22} {"words",5} {"WER",6}  {"scored words",12}  {"flags",5}  misses");
             var totals = new Dictionary<string, (int Words, int Errors, int Scored, int Right, int Flags)>();
             foreach (var (file, passage) in files)

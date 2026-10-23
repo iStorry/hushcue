@@ -54,6 +54,7 @@ public sealed class JobTests : IDisposable
             CudaDeviceCount = () => 0,
             FindModel = _ => "fake-model",
             LoadModel = (_, _) => model,
+            SpeechProbabilities = FakeSpeech.Everywhere,
             Embed = embed ?? RealEmbed,
             Recycle = recycle ?? (_ => throw new InvalidOperationException("recycled without asking")),
         };
@@ -261,6 +262,7 @@ public sealed class JobTests : IDisposable
         steps = new JobSteps
         {
             CudaDeviceCount = steps.CudaDeviceCount, FindModel = steps.FindModel, LoadModel = steps.LoadModel,
+            SpeechProbabilities = steps.SpeechProbabilities,
             ReadAudio = (path, enhance, cancel) =>
             {
                 read.Add(Path.GetFileName(path));
@@ -282,7 +284,7 @@ public sealed class JobTests : IDisposable
         var steps = Steps(model);
         steps = new JobSteps
         {
-            CudaDeviceCount = steps.CudaDeviceCount, LoadModel = steps.LoadModel,
+            CudaDeviceCount = steps.CudaDeviceCount, LoadModel = steps.LoadModel, SpeechProbabilities = steps.SpeechProbabilities,
             FindModel = name => { wanted.Add(name); return "fake-model"; },
         };
         var run = await RunAsync(videos[..1], new JobSettings { Preset = "Best" }, steps);
