@@ -3,7 +3,7 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
-## Unreleased
+## 0.2.1 — 2026-10-23
 
 - Try another model on part of a file while reviewing: select subtitles (or a gap), choose **Try another model**,
   and pick Fast, Balanced or Thorough. What that model heard shows next to the subtitles there now, with the words
