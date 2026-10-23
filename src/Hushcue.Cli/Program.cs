@@ -7,6 +7,8 @@ if (args.Length > 0 && args[0] == "job")
     return await JobCommand.RunAsync(args[1..]);
 if (args.Length > 0 && args[0] == "eval")
     return await EvalCommand.RunAsync(args[1..]);
+if (args.Length > 0 && args[0] == "timing")
+    return await TimingCommand.RunAsync(args[1..]);
 if (args.Length == 4 && args[0] == "features")
 {
     // features MEDIA N_MELS OUT: raw float32 log-mel features (n_mels rows), for comparing with faster-whisper's
@@ -22,4 +24,5 @@ Console.WriteLine();
 Console.WriteLine(TranscribeCommand.Usage);
 Console.WriteLine(JobCommand.Usage);
 Console.WriteLine(EvalCommand.Usage);
+Console.WriteLine(TimingCommand.Usage);
 return 0;
