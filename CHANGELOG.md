@@ -3,6 +3,11 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
+## Unreleased
+
+- Fixed: MKV to MP4 stopped at once with an empty error message, for every file.
+- An error with no message of its own now says what kind of error it was, instead of showing an empty box.
+
 ## 0.2.0 — 2026-10-23
 
 - Subtitles read like professional ones: lines and subtitles break where the sentence does (after a comma, before

@@ -96,7 +96,10 @@ public sealed partial class ConvertPage : UserControl, IRunPage
         Queue.SetLocked(true);
         _cancel = new CancellationTokenSource();
         var ui = DispatcherQueue;
-        var job = Task.Run(() => Embed.ConvertFilesAsync(files, Output.FolderOrNull, SaveSrtBox.IsChecked == true, delete,
+        // read the controls here: inside Task.Run they would be touched off the UI thread, which WinUI refuses
+        var outDir = Output.FolderOrNull;
+        var saveSrt = SaveSrtBox.IsChecked == true;
+        var job = Task.Run(() => Embed.ConvertFilesAsync(files, outDir, saveSrt, delete,
             (fraction, text) => ui.TryEnqueue(() =>
             {
                 Run.SetProgress(fraction);
@@ -121,7 +124,7 @@ public sealed partial class ConvertPage : UserControl, IRunPage
         catch (Exception e)
         {
             Run.SetStatus("Finished with problems", StatusKind.Error);
-            await Dialogs.ErrorAsync(XamlRoot, e.Message);
+            await Dialogs.ErrorAsync(XamlRoot, e);
         }
         finally
         {
