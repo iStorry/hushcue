@@ -5,6 +5,14 @@ shows: keep each section short and plain.
 
 ## Unreleased
 
+- Try another model on part of a file while reviewing: select subtitles (or a gap), choose **Try another model**,
+  and pick Fast, Balanced or Thorough. What that model heard shows next to the subtitles there now, with the words
+  that differ marked; play it over the video, then use it (Ctrl+Z puts the old ones back) or keep the current
+  ones. A model not on the PC yet (Thorough's large-v3, 3.1 GB) downloads first, if you agree, and can be stopped.
+- "Re-run this part" keeps a word another model times just before or after the selected subtitles, instead of
+  dropping it.
+- For developers: `Hushcue.Cli rerun --from S --to S [--preset NAME]... FILE` runs a stretch through each preset
+  and prints the words that differ.
 - Fixed: MKV to MP4 stopped at once with an empty error message, for every file.
 - An error with no message of its own now says what kind of error it was, instead of showing an empty box.
 

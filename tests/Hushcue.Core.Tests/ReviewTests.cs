@@ -264,7 +264,7 @@ public class ReviewTests
     // --- re-run mapping
 
     [Fact]
-    public void ReRunDecodesTheStretchWithItsContextAndTheLoopPenalty()
+    public async Task ReRunDecodesTheStretchWithItsContextAndTheLoopPenalty()
     {
         var audio = new float[20 * 16000];
         Word[] clip = [new(" outside", 0.2, 0.6), new(" new", 2.5, 2.9), new(" words.", 3.0, 3.5)]; // the clip starts at 3 s
@@ -273,19 +273,67 @@ public class ReviewTests
         {
             CudaDeviceCount = () => 0, FindModel = _ => "fake-model", LoadModel = (_, _) => model,
             SpeechProbabilities = FakeSpeech.Everywhere,
+            ReadAudioPart = (_, _, _, _, _) => throw new InvalidOperationException("the review's audio will do"),
         };
         var log = new List<string>();
 
-        var cues = PartTranscription.Run(audio, 5, 9, new JobSettings(), steps, log.Add, default);
+        var cues = await PartTranscription.RunAsync(new PartAudio("video.mp4", audio, false), 5, 9, new JobSettings(), steps, log.Add, default);
 
         Assert.Equal([new Cue(5.5, 6.5, "new words.")], cues);
         var call = Assert.Single(model.Calls);
         Assert.Equal(8 * 16000, call.Samples); // 3..11 s: 2 s of context either side
         Assert.Equal(FileTranscription.LoopRepetitionPenalty, call.RepetitionPenalty);
-        Assert.StartsWith("Re-running 00:05–00:09", log[0]);
+        Assert.StartsWith("Re-running 00:05–00:09 with Balanced", log[0]);
 
         var missing = new JobSteps { FindModel = _ => null };
-        Assert.Throws<Engine.EngineException>(() => PartTranscription.Run(audio, 5, 9, new JobSettings(), missing, _ => { }, default));
+        await Assert.ThrowsAsync<Engine.EngineException>(() =>
+            PartTranscription.RunAsync(new PartAudio("video.mp4", audio, false), 5, 9, new JobSettings(), missing, _ => { }, default));
+    }
+
+    [Fact]
+    public async Task ReRunWithAnotherPresetUsesItsModelAndItsAudioCleanUp()
+    {
+        var audio = new float[20 * 16000];
+        Word[] clip = [new(" heard", 2.5, 2.9), new(" better.", 3.0, 3.5)];
+        var loaded = new List<string>();
+        var model = new FakeTranscriber([], clip, audio.Length);
+        var parts = new List<(string Path, double From, double Length, bool Enhance)>();
+        var steps = new JobSteps
+        {
+            CudaDeviceCount = () => 0, FindModel = name => "models/" + name,
+            LoadModel = (path, _) => { loaded.Add(path); return model; },
+            SpeechProbabilities = FakeSpeech.Everywhere,
+            ReadAudioPart = (path, from, length, enhance, _) =>
+            {
+                parts.Add((path, from, length, enhance));
+                return Task.FromResult(new float[(int)(length * 16000)]);
+            },
+        };
+        var balanced = new JobSettings();
+        var review = new PartAudio("video.mp4", audio, PartTranscription.Enhances(balanced));
+
+        // Thorough: large-v3, beam 5, and the clean-up the review's audio did not have, so its part is read again
+        var cues = await PartTranscription.RunAsync(review, 5, 9, balanced with { Preset = "Thorough" }, steps, _ => { }, default);
+
+        Assert.Equal([new Cue(5.5, 6.5, "heard better.")], cues);
+        Assert.Equal(["models/large-v3"], loaded);
+        Assert.Equal([("video.mp4", 3.0, 8.0, true)], parts);
+        Assert.Equal(5, model.Calls[0].Options.BeamSize);
+
+        // Fast: the turbo model with beam 1 hears the audio as the review read it
+        await PartTranscription.RunAsync(review, 5, 9, balanced with { Preset = "Fast" }, steps, _ => { }, default);
+        Assert.Equal(["models/large-v3", "models/large-v3-turbo"], loaded);
+        Assert.Single(parts);
+        Assert.Equal(1, model.Calls[1].Options.BeamSize);
+    }
+
+    [Fact]
+    public void ReRunReachesIntoTheSilenceAroundTheSubtitles()
+    {
+        Assert.Equal((9.0, 21.0), PartTranscription.Widen(10, 20, 5, 30)); // a second either side
+        Assert.Equal((9.6, 20.2), PartTranscription.Widen(10, 20, 9.6, 20.2)); // up to the subtitles around them
+        Assert.Equal((10.0, 20.0), PartTranscription.Widen(10, 20, 10, 20)); // touching: no room
+        Assert.Equal((10.0, 20.0), PartTranscription.Widen(10, 20, 10.5, 19)); // never narrower
     }
 
     [Fact]
@@ -301,5 +349,26 @@ public class ReviewTests
 
         var cues = PartTranscription.ToCues(words, 12, 12.6);
         Assert.Equal([new Cue(12.0, 12.6, "one two")], cues); // the clean-up's minimum length is cut at the end of the stretch
+    }
+
+    // --- comparing what another model heard
+
+    [Fact]
+    public void TextDiffMarksTheWordsThatDiffer()
+    {
+        var (before, after) = TextDiff.Words("Stay come and carry on.", "Stay calm and carry on.");
+        Assert.Equal(["come"], before.Where(w => w.Changed).Select(w => w.Text));
+        Assert.Equal(["calm"], after.Where(w => w.Changed).Select(w => w.Text));
+        Assert.Equal("Stay calm and carry on.", string.Join(" ", after.Select(w => w.Text)));
+
+        // punctuation and capitals around a word are not a different word
+        Assert.Equal(0, TextDiff.Changes("so, then we left", "So then we left."));
+
+        // words only one side has
+        (before, after) = TextDiff.Words("I knew it", "I knew it was there");
+        Assert.DoesNotContain(before, w => w.Changed);
+        Assert.Equal(["was", "there"], after.Where(w => w.Changed).Select(w => w.Text));
+        Assert.Equal(2, TextDiff.Changes("", "two words"));
+        Assert.Equal(2, TextDiff.Changes("two words", ""));
     }
 }

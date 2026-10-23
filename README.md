@@ -49,7 +49,10 @@ The sidebar holds the three tools:
   text burned into the picture), and run. **Review and edit** then goes through what is worth checking: phrases
   Whisper invents over silence, loops, long gaps, and words it was **not sure** of that sound like other words
   (calm / come / cum, their / there, principle / principal, ...). Those come with one-click swaps to the other
-  spellings; "Looks fine" keeps the word.
+  spellings; "Looks fine" keeps the word. **Re-run this part** transcribes the selected subtitles again; **Try
+  another model** does it with another quality's model (Thorough's large-v3 decodes more carefully than the
+  turbo model of Fast and Balanced) and shows what it heard next to what is there, with the words that differ
+  marked, to use or keep.
 - **Edit subtitles**: open a video with subtitles it already has (`talk.srt` or `talk.en.srt` next to `talk.mp4`
   is found by name), check them against the picture, fix text and timing, then save the `.srt` or put it into a copy
   of the video. Dropping a video with its `.srt`, or right-clicking an `.srt` in Explorer and choosing **Edit
