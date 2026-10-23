@@ -58,7 +58,7 @@ if ($LASTEXITCODE -ne 0) { throw "lib.exe failed" }
 
 # --- build the bridge (CMake picks the newest Visual Studio generator, the same install vswhere found)
 & $cmake -S (Join-Path $root "hushcue_ct2") -B $build -A x64 `
-    "-DCT2_INCLUDE_DIR=$(Join-Path $ct2Source 'include')" "-DCT2_IMPORT_LIB=$lib"
+    "-DCT2_INCLUDE_DIR=$(Join-Path $ct2Source 'include')" "-DCT2_LIBRARY=$lib"
 if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
 & $cmake --build $build --config Release
 if ($LASTEXITCODE -ne 0) { throw "build failed" }

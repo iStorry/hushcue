@@ -6,7 +6,9 @@
 
 #include <stddef.h>
 
-#ifdef HUSHCUE_CT2_BUILD
+#if !defined(_WIN32)
+#define HC_API __attribute__((visibility("default")))
+#elif defined(HUSHCUE_CT2_BUILD)
 #define HC_API __declspec(dllexport)
 #else
 #define HC_API __declspec(dllimport)

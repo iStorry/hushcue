@@ -14,22 +14,32 @@ public sealed class ModelPathTests : IDisposable
     public void Dispose()
     {
         foreach (var link in Directory.EnumerateDirectories(_dir))
-            Directory.Delete(link); // the junction only, never what it points to
+            Directory.Delete(link); // the link only, never what it points to
         Directory.Delete(_dir);
     }
 
-    /// <summary>A junction (no admin rights needed, unlike a symbolic link) to the cached model.</summary>
+    /// <summary>A link to the cached model: on Windows a junction (no admin rights needed, unlike a symbolic link).</summary>
     private string LinkModel(string name)
     {
+        var model = EngineTests.ModelFolder() ?? throw new InvalidOperationException("ModelFact runs this only with a model");
         var link = Path.Combine(_dir, name);
+        if (OperatingSystem.IsWindows())
+            MakeJunction(link, model);
+        else
+            Directory.CreateSymbolicLink(link, model);
+        Assert.True(File.Exists(Path.Combine(link, "model.bin")));
+        return link;
+    }
+
+    private static void MakeJunction(string link, string target)
+    {
         var info = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { "/c", "mklink", "/J", link, EngineTests.ModelFolder()! })
+        foreach (var arg in new[] { "/c", "mklink", "/J", link, target })
             info.ArgumentList.Add(arg);
-        using var process = Process.Start(info)!;
+        using var process = Process.Start(info) ?? throw new InvalidOperationException("cmd.exe did not start");
         var errors = process.StandardError.ReadToEnd();
         process.WaitForExit();
-        Assert.True(process.ExitCode == 0 && File.Exists(Path.Combine(link, "model.bin")), errors);
-        return link;
+        Assert.True(process.ExitCode == 0, errors);
     }
 
     [ModelFact]

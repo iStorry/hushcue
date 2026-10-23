@@ -127,11 +127,9 @@ public sealed class QueueSupportTests : IDisposable
         Assert.Null(RecycleBinRestore.ReadInfo([1, 2, 3]));
     }
 
-    [Fact]
+    [WindowsFact]
     public void ARecycledFileCanBeRestored()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
         var file = Path.Combine(_tmp, $"restore-me-{Guid.NewGuid():N}.txt");
         File.WriteAllText(file, "hello");
         Assert.True(RecycleBin.Send(file));

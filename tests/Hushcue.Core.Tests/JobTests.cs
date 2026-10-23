@@ -238,7 +238,7 @@ public sealed class JobTests : IDisposable
         Assert.Equal(2, files.Count(f => f.State == FileState.Failed));
     }
 
-    [Fact]
+    [WindowsFact]
     public void RecycleMovesARealFileOutOfTheFolder()
     {
         var file = Path.Combine(_dir, "gone.txt");

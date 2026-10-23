@@ -7,8 +7,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition="!$([MSBuild]::IsOSPlatform('OSX'))">
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+  <!-- Development on a Mac: Core, the CLI and the tests only (the app is WinUI), on the CPU. See native/build.sh. -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <Platforms>arm64</Platforms>
+    <PlatformTarget>arm64</PlatformTarget>
+    <RuntimeIdentifier>osx-arm64</RuntimeIdentifier>
   </PropertyGroup>
 </Project>

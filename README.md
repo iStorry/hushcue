@@ -94,6 +94,18 @@ dotnet test Hushcue.slnx
 dotnet run --project src/Hushcue.App
 ```
 
+**On a Mac** (Apple Silicon), Core, the CLI and the tests build and run on the CPU; the app itself is Windows only.
+`native/build.sh` builds the bridge against the macOS `ctranslate2` wheel and puts it, with the CTranslate2 dylib, in
+`native/bin`. It needs the Xcode command line tools and CMake. Burning text into a video needs an ffmpeg with libass:
+Homebrew's `ffmpeg` has none, `ffmpeg-full` does.
+
+```bash
+python3 -m pip install --no-deps --target native/deps/site-packages ctranslate2==4.8.2
+native/build.sh
+dotnet test tests/Hushcue.Core.Tests
+dotnet run --project src/Hushcue.Cli -- job --out out video.mp4
+```
+
 ## Release
 
 ```bash
