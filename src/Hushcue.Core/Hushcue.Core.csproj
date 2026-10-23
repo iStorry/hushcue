@@ -26,6 +26,8 @@
     <!-- The CTranslate2 bridge, built by native/build.ps1; copied next to every app that references Core. -->
     <None Include="..\..\native\bin\hushcue_ct2.dll" Condition="Exists('..\..\native\bin\hushcue_ct2.dll')"
           Link="hushcue_ct2.dll" CopyToOutputDirectory="PreserveNewest" />
+    <!-- On a Mac, native/build.sh puts the bridge and the CTranslate2 dylib it loads from beside it in native/bin. -->
+    <None Include="..\..\native\bin\*.dylib" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

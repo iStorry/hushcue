@@ -3,6 +3,20 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
+## Unreleased
+
+- The window fits any screen: it opens at the right size for your display scaling, can be made much smaller
+  (down to 600×500), and every page rearranges itself for a narrow or short window instead of cutting things off.
+- On a narrow window the options move under the file list, the review editor puts the subtitles under the video,
+  and buttons wrap onto a second line; a window too short for a page scrolls it.
+- The subtitle shown over the video in the review grows and shrinks with the picture.
+- Fixed: long file names and counts running under other text, the timeline drawing past its edges, the options
+  card stopping short of the right edge, the setup screen's download text overlapping, and the setup card sitting
+  at the top of the window instead of in the middle.
+- For developers: the app's CLI, tests and engine build on a Mac (CPU only), Windows and macOS builds of the
+  engine use separate folders so one checkout can be shared, and a speaking-styles test video is made with macOS
+  voices (`tools/bench/make_speaking_styles.py`).
+
 ## 0.1.1 — 2026-10-22
 
 - Words that sound like other words (calm / come / cum, their / there, principle / principal, ...) are flagged

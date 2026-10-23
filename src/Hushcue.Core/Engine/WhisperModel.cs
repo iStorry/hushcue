@@ -249,6 +249,6 @@ public static class RuntimeLibraries
         string[] candidates = [Pipeline.RuntimeDownload.BundledFolder, Pipeline.RuntimeDownload.Folder];
         Folder = candidates.FirstOrDefault(dir => File.Exists(System.IO.Path.Combine(dir, "ctranslate2.dll")));
         // both, even before the GPU libraries are downloaded: CTranslate2 only loads cuBLAS when it first needs it
-        Environment.SetEnvironmentVariable("PATH", string.Join(";", candidates) + ";" + Environment.GetEnvironmentVariable("PATH"));
+        Environment.SetEnvironmentVariable("PATH", string.Join(System.IO.Path.PathSeparator, [.. candidates, Environment.GetEnvironmentVariable("PATH")]));
     }
 }

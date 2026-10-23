@@ -9,21 +9,25 @@ public sealed class MediaException(string message) : Exception(message);
 /// <summary>Finding and running ffmpeg / ffprobe.</summary>
 public static class Tools
 {
-    public static string Ffmpeg => Find("ffmpeg", "ffmpeg was not found. Install it with: winget install Gyan.FFmpeg");
+    private static readonly string InstallCommand =
+        OperatingSystem.IsWindows() ? "winget install Gyan.FFmpeg" : "brew install ffmpeg";
+
+    public static string Ffmpeg => Find("ffmpeg", $"ffmpeg was not found. Install it with: {InstallCommand}");
 
     public static string Ffprobe => Find("ffprobe", "ffprobe was not found (it ships with ffmpeg).");
 
     /// <summary>A copy bundled next to the app (ffmpeg\NAME.exe) wins over one on PATH.</summary>
     private static string Find(string name, string error)
     {
-        var bundled = Path.Combine(AppContext.BaseDirectory, "ffmpeg", name + ".exe");
+        var file = OperatingSystem.IsWindows() ? name + ".exe" : name;
+        var bundled = Path.Combine(AppContext.BaseDirectory, "ffmpeg", file);
         if (File.Exists(bundled))
             return bundled;
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
         {
             if (dir.Length == 0)
                 continue;
-            var candidate = Path.Combine(dir.Trim('"'), name + ".exe");
+            var candidate = Path.Combine(dir.Trim('"'), file);
             if (File.Exists(candidate))
                 return candidate;
         }

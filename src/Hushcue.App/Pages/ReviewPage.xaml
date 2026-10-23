@@ -25,6 +25,33 @@
     </UserControl.Resources>
 
     <Grid x:Name="Root" RowSpacing="12" PreviewKeyDown="OnPreviewKeyDown">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <!-- Too narrow for the video and the list side by side: the list goes under the video, the page
+                     scrolls, and the buttons at the bottom go under the status -->
+                <VisualState x:Name="Stacked">
+                    <VisualState.StateTriggers>
+                        <controls:WidthTrigger Element="{x:Bind Root}" Below="900" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="Scroller.(controls:ScrollFill.MinHeight)" Value="900" />
+                        <Setter Target="Panes.ColumnSpacing" Value="0" />
+                        <Setter Target="Panes.RowSpacing" Value="12" />
+                        <Setter Target="ListColumn.Width" Value="0" />
+                        <Setter Target="ListColumn.MinWidth" Value="0" />
+                        <Setter Target="VideoCard.(Grid.RowSpan)" Value="1" />
+                        <Setter Target="ListCard.(Grid.Column)" Value="0" />
+                        <Setter Target="ListCard.(Grid.Row)" Value="1" />
+                        <Setter Target="ListCard.(Grid.RowSpan)" Value="1" />
+                        <Setter Target="Footer.RowSpacing" Value="8" />
+                        <Setter Target="Footer.ColumnSpacing" Value="0" />
+                        <Setter Target="FooterActions.(Grid.Row)" Value="1" />
+                        <Setter Target="FooterActions.(Grid.Column)" Value="0" />
+                        <Setter Target="FooterActions.(Grid.ColumnSpan)" Value="2" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -36,6 +63,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Button x:Name="BackButton" Click="OnBack" Style="{ThemeResource SubtleButtonStyle}" Padding="8,6"
                     ToolTipService.ToolTip="Back to the files" AutomationProperties.Name="Back to the files">
@@ -44,21 +72,25 @@
                     <TextBlock Text="Files" />
                 </StackPanel>
             </Button>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <TextBlock x:Name="FileTitle" Style="{StaticResource SubtitleTextBlockStyle}" TextTrimming="CharacterEllipsis"
-                           AutomationProperties.HeadingLevel="Level1" />
-                <TextBlock x:Name="FileFacts" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            </StackPanel>
+            <TextBlock x:Name="FileTitle" Grid.Column="1" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" AutomationProperties.HeadingLevel="Level1" />
+            <TextBlock x:Name="FileFacts" Grid.Column="2" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </Grid>
 
-        <Grid Grid.Row="1" ColumnSpacing="16">
+        <!-- Side by side the page fits the window down to a short one; stacked it needs more height -->
+        <ScrollViewer x:Name="Scroller" Grid.Row="1" VerticalScrollBarVisibility="Auto" controls:ScrollFill.MinHeight="460">
+        <Grid x:Name="Panes" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="2*" MinWidth="340" MaxWidth="620" />
+                <ColumnDefinition x:Name="ListColumn" Width="2*" MinWidth="340" MaxWidth="620" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
             <!-- Video with the subtitle drawn over it, the controls, and the timeline -->
-            <Border Style="{StaticResource Card}" Padding="16,16,16,12">
+            <Border x:Name="VideoCard" Grid.RowSpan="2" Style="{StaticResource Card}" Padding="16,16,16,12">
                 <Grid RowSpacing="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
@@ -66,14 +98,15 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <Grid x:Name="VideoArea" Background="Black" CornerRadius="6" MinHeight="120" Tapped="OnVideoTapped">
+                    <Grid x:Name="VideoArea" Background="Black" CornerRadius="6" MinHeight="120" Tapped="OnVideoTapped"
+                          SizeChanged="OnVideoAreaSizeChanged">
                         <MediaPlayerElement x:Name="Player" AreTransportControlsEnabled="False" Stretch="Uniform"
                                             AutomationProperties.Name="Video preview" />
                         <TextBlock x:Name="VideoMessage" Foreground="#FFB0B0B0" HorizontalAlignment="Center"
                                    VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="24" />
                         <Border x:Name="Overlay" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="24,0,24,20"
                                 Padding="12,5" CornerRadius="4" Background="#D0000000" Visibility="Collapsed">
-                            <TextBlock x:Name="OverlayText" Foreground="White" FontSize="18" TextWrapping="Wrap"
+                            <TextBlock x:Name="OverlayText" Foreground="White" TextWrapping="Wrap"
                                        TextAlignment="Center" />
                         </Border>
                     </Grid>
@@ -145,7 +178,7 @@
             </Border>
 
             <!-- The subtitles: search, flags, the list, and the selected one's editor -->
-            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0">
+            <Border x:Name="ListCard" Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource Card}" Padding="0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -242,7 +275,7 @@
                             <!-- one-click swaps for words that sound like others: "calm → come  cum" (ShowSwaps) -->
                             <StackPanel x:Name="SwapPanel" Spacing="4" Visibility="Collapsed"
                                         AutomationProperties.Name="Words that sound like others" />
-                            <StackPanel Orientation="Horizontal" Spacing="4">
+                            <controls:WrapPanel HorizontalSpacing="4" VerticalSpacing="4">
                                 <Button x:Name="SplitButton" Click="OnSplit" Style="{StaticResource ToolButton}"
                                         ToolTipService.ToolTip="Split in two at the cursor in the text"
                                         AutomationProperties.Name="Split this subtitle in two">
@@ -275,25 +308,24 @@
                                         <TextBlock Text="Re-run this part" />
                                     </StackPanel>
                                 </Button>
-                            </StackPanel>
+                            </controls:WrapPanel>
                         </StackPanel>
                     </Border>
                 </Grid>
             </Border>
         </Grid>
+        </ScrollViewer>
 
         <!-- Saving, and putting the subtitles into the video as the last step -->
-        <Grid Grid.Row="2" ColumnSpacing="8">
+        <Grid x:Name="Footer" Grid.Row="2" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <StackPanel Spacing="4" VerticalAlignment="Center">
                 <TextBlock x:Name="StatusText" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
                            AutomationProperties.LiveSetting="Polite" />
@@ -303,37 +335,40 @@
                     <HyperlinkButton x:Name="RestoreLink" Content="Put the original back" Click="OnRestore" Visibility="Collapsed" />
                 </StackPanel>
             </StackPanel>
-            <Button x:Name="UndoButton" Grid.Column="1" Click="OnUndo" Style="{ThemeResource SubtleButtonStyle}" Padding="9"
-                    AutomationProperties.AcceleratorKey="Control+Z">
-                <FontIcon Glyph="&#xE7A7;" FontSize="14" />
-            </Button>
-            <Button x:Name="RedoButton" Grid.Column="2" Click="OnRedo" Style="{ThemeResource SubtleButtonStyle}" Padding="9"
-                    AutomationProperties.AcceleratorKey="Control+Y">
-                <FontIcon Glyph="&#xE7A6;" FontSize="14" />
-            </Button>
-            <Button x:Name="SaveButton" Grid.Column="3" Click="OnSave" ToolTipService.ToolTip="Save the .srt (Ctrl+S)"
-                    AutomationProperties.Name="Save" AutomationProperties.AcceleratorKey="Control+S">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE74E;" FontSize="14" />
-                    <TextBlock Text="Save" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="ExportButton" Grid.Column="4" Content="Export .srt" Click="OnExport"
-                    ToolTipService.ToolTip="Save a copy of the subtitles somewhere else" AutomationProperties.Name="Export .srt" />
-            <ComboBox x:Name="ModeBox" Grid.Column="5" MinWidth="200" VerticalAlignment="Center"
-                      AutomationProperties.Name="How to put the subtitles into the video">
-                <ComboBoxItem Content="Subtitle track (.mkv)" Tag="Soft" />
-                <ComboBoxItem Content="Burn into the picture (.mp4)" Tag="Burn" />
-            </ComboBox>
-            <Button x:Name="EmbedButton" Grid.Column="6" Click="OnEmbed" Style="{ThemeResource AccentButtonStyle}" Padding="18,6"
-                    AutomationProperties.Name="Embed into video">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE8B9;" FontSize="14" />
-                    <TextBlock Text="Embed into video" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="CancelEmbedButton" Grid.Column="7" Content="Cancel" Click="OnCancelEmbed" Visibility="Collapsed"
-                    AutomationProperties.Name="Cancel embedding" />
+            <controls:WrapPanel x:Name="FooterActions" Grid.Column="1" HorizontalSpacing="8" VerticalSpacing="8"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button x:Name="UndoButton" Click="OnUndo" Style="{ThemeResource SubtleButtonStyle}" Padding="9"
+                        AutomationProperties.AcceleratorKey="Control+Z">
+                    <FontIcon Glyph="&#xE7A7;" FontSize="14" />
+                </Button>
+                <Button x:Name="RedoButton" Click="OnRedo" Style="{ThemeResource SubtleButtonStyle}" Padding="9"
+                        AutomationProperties.AcceleratorKey="Control+Y">
+                    <FontIcon Glyph="&#xE7A6;" FontSize="14" />
+                </Button>
+                <Button x:Name="SaveButton" Click="OnSave" ToolTipService.ToolTip="Save the .srt (Ctrl+S)"
+                        AutomationProperties.Name="Save" AutomationProperties.AcceleratorKey="Control+S">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE74E;" FontSize="14" />
+                        <TextBlock Text="Save" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ExportButton" Content="Export .srt" Click="OnExport"
+                        ToolTipService.ToolTip="Save a copy of the subtitles somewhere else" AutomationProperties.Name="Export .srt" />
+                <ComboBox x:Name="ModeBox" MinWidth="200" VerticalAlignment="Center"
+                          AutomationProperties.Name="How to put the subtitles into the video">
+                    <ComboBoxItem Content="Subtitle track (.mkv)" Tag="Soft" />
+                    <ComboBoxItem Content="Burn into the picture (.mp4)" Tag="Burn" />
+                </ComboBox>
+                <Button x:Name="EmbedButton" Click="OnEmbed" Style="{ThemeResource AccentButtonStyle}" Padding="18,6"
+                        AutomationProperties.Name="Embed into video">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE8B9;" FontSize="14" />
+                        <TextBlock Text="Embed into video" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="CancelEmbedButton" Content="Cancel" Click="OnCancelEmbed" Visibility="Collapsed"
+                        AutomationProperties.Name="Cancel embedding" />
+            </controls:WrapPanel>
         </Grid>
     </Grid>
 </UserControl>

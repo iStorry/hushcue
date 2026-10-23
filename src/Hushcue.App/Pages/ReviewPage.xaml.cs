@@ -34,6 +34,11 @@ public sealed record ReviewEmbedded(QueuedFile File, EmbedResult Result);
 public sealed partial class ReviewPage : UserControl
 {
     private const double StepSeconds = 5;
+    /// <summary>The subtitle over the video, as a share of the picture's height (as players draw it), within these sizes.</summary>
+    private const double OverlayTextShare = 0.055;
+    private const double MinOverlayFontSize = 12;
+    private const double MaxOverlayFontSize = 40;
+    private const double WidescreenRatio = 16.0 / 9;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private readonly MediaPlayer _player = new() { AutoPlay = false };
     private ObservableCollection<ReviewRow> _rows = [];
@@ -131,6 +136,13 @@ public sealed partial class ReviewPage : UserControl
     }
 
     private void OnMute(object sender, RoutedEventArgs e) => SetVolume(_settings.Volume, !_settings.Muted);
+
+    /// <summary>The subtitle over the video grows and shrinks with the picture, which fills the area's width or height.</summary>
+    private void OnVideoAreaSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var picture = Math.Min(e.NewSize.Height, e.NewSize.Width / WidescreenRatio);
+        OverlayText.FontSize = Math.Clamp(picture * OverlayTextShare, MinOverlayFontSize, MaxOverlayFontSize);
+    }
 
     public async Task OpenAsync(QueuedFile file)
     {
@@ -533,7 +545,7 @@ public sealed partial class ReviewPage : UserControl
         }
         foreach (var (word, unsure) in words)
         {
-            var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+            var line = new WrapPanel { HorizontalSpacing = 4, VerticalSpacing = 4 };
             line.Children.Add(new TextBlock
             {
                 Text = $"{word.Text} →",
