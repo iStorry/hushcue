@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 
 $root = $PSScriptRoot
 $deps = Join-Path $root "deps"
-$build = Join-Path $root "build"
+$build = Join-Path $root "build\windows"
 $bin = Join-Path $root "bin"
 $runtime = Join-Path $env:LOCALAPPDATA "Hushcue\runtime"
 

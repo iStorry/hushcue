@@ -15,7 +15,7 @@ CT2_VERSION="4.8.2"
 root="$(cd "$(dirname "$0")" && pwd)"
 site_packages="${1:-$root/deps/site-packages}"
 deps="$root/deps"
-build="$root/build"
+build="$root/build/macos"
 bin="$root/bin"
 ct2_dylib_name="libctranslate2.$CT2_VERSION.dylib"
 
