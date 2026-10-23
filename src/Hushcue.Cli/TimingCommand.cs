@@ -14,7 +14,8 @@ internal static class TimingCommand
 {
     public const string Usage =
         """
-        usage: Hushcue.Cli timing --reference SRT [--preset NAME] [--device cuda|cpu] [--out DIR] [--no-word-edges] MEDIA
+        usage: Hushcue.Cli timing --reference SRT [--preset NAME] [--device cuda|cpu] [--out DIR] [--no-word-edges]
+                                  [--chunk-on-silence] [--no-punctuation-prompt | --punctuation-prompt TEXT] MEDIA
         """;
 
     private const int WorstShown = 5;
@@ -33,6 +34,9 @@ internal static class TimingCommand
                 case "--device" when i + 1 < args.Length: device = args[++i]; break;
                 case "--out" when i + 1 < args.Length: outDir = args[++i]; break;
                 case "--no-word-edges": settings = settings with { TrimWordEdges = false }; break;
+                case "--chunk-on-silence": settings = settings with { ChunkOnSilence = true }; break;
+                case "--no-punctuation-prompt": settings = settings with { PunctuationPrompt = null }; break;
+                case "--punctuation-prompt" when i + 1 < args.Length: settings = settings with { PunctuationPrompt = args[++i] }; break;
                 default: media = args[i]; break;
             }
         }

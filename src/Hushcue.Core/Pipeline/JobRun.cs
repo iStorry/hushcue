@@ -164,7 +164,8 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
                 });
                 report(0.08, "Transcribing...", FileStage.Transcribing, null);
                 var clock = Stopwatch.StartNew();
-                var decoded = FileTranscription.TranscribeWords(model, audio, settings, _preset, onFraction, log, cancel, onWords);
+                var decoded = FileTranscription.TranscribeWords(model, audio, settings, _preset, onFraction, log, cancel, onWords,
+                                                               speech);
                 var words = settings.TrimWordEdges ? WordEdges.Trim(decoded, speech) : decoded;
                 var built = Cleanup.ToCues(words);
                 var cues = UnheardCues.Drop(built, speech);

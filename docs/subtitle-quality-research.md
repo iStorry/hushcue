@@ -322,7 +322,65 @@ standing alone. `eval --no-punctuation-prompt` compares the two.
 - Silero runs once per file before decoding, so the live transcript and the saved file agree.
 - "Re-run this part" goes through the same check.
 
+### Measuring timing: `Hushcue.Cli timing`
+
+- `tools/bench/make_speaking_styles.py` now times each phrase from the first to the last sample of its voice (within
+  35 dB of its peak, before noise is added). Before, a phrase's time was the whole clip.
+- `Hushcue.Cli timing --reference SRT MEDIA` runs the job and scores each phrase:
+  - start error: its first word's start against the reference
+  - end error: its last word's end against the reference
+  - the share of phrases within 0.1 s and 0.25 s
+  - the word error rate and the phrases furthest off
+- The scorer is `Evaluation/TimingScoring.cs`. It works with any subtitles whose times are exact, so real recordings
+  with careful human subtitles can be added later.
+
+### Step 4 (done): word edges out of silence
+
+`Pipeline/WordEdges.cs`, as stable-ts does:
+- Each word's start moves forward to the first Silero window inside it at 0.35 or above, and its end back to the
+  last such window.
+- One window (32 ms) is kept to spare, and a word is never shorter than 0.1 s.
+- A word with no speech under it is left alone.
+
+On `speaking-styles` (Balanced):
+
+| | Start error, median | Starts within 0.1 s | End error, median |
+|---|---|---|---|
+| Before | 0.38 s (0.35 s early on average) | 2% | 0.15 s |
+| After | **0.03 s** | **95%** | 0.15 s |
+
+- Words and WER are unchanged.
+- The early starts were Whisper's timing stretching the first word after a pause back over the silence, which made
+  subtitles appear before anyone spoke.
+- The two phrases still early are whispered: Silero hears no speech in them, so their words are left as they are.
+- Ends are about 0.16 s early. Trimming can only shrink a word, so it cannot fix them, and the reading-speed hold
+  already covers cue ends.
+
+### Step 5 (built, off, to measure on a GPU): VAD cut & merge
+
+`JobSettings.ChunkOnSilence` (off) decodes only the speech, through faster-whisper's clip_timestamps.
+`Pipeline/SpeechClips.cs` builds the clips:
+- Silero finds speech at threshold 0.1, the same generous level as "skip silence".
+- Neighbouring speech is merged into clips of up to 30 s.
+- A silence of 2 s or more between clips is skipped.
+- Clips closer together than that touch, so nothing between them is lost. The cut is at the first of the quietest
+  windows in the second before the next speech.
+- A clip starts up to 1 s before its speech.
+
+**Found:** on `speaking-styles`, one clip lost its whole first sentence ("The train to Mumbai leaves…"):
+
+| Clip decoded | Result |
+|---|---|
+| With the default prompt | sentence skipped |
+| With no prompt | complete |
+| With "Hi, how are you? I'm fine, thanks." | complete |
+| With "Hello, welcome. Today, we'll talk about the plan, …" | complete |
+| With "Okay, so, here we go. Yes, it's ready. Is it? Good." | sentence skipped |
+
+The prompt's wording and chunking therefore have to be chosen together. The comparison (three wordings and no prompt,
+each with and without chunking, on `eval` and `timing`) is in TODO.md, to run on an NVIDIA GPU. On the Mac's CPU only
+the first configuration finished: the default prompt without chunking, which matches the numbers above.
+
 ### Next
 
-- **Word edges out of silence** (stable-ts style) with the same probabilities.
-- **VAD cut & merge**, then Enhance off on Thorough; both measured with `eval`.
+- Steps 5 and 6 (Enhance off on Thorough), measured on a GPU: see TODO.md, v0.1.2.
