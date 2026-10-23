@@ -19,6 +19,7 @@ internal static class EvalCommand
     public const string Usage =
         """
         usage: Hushcue.Cli eval [--set DIR] [--preset NAME]... [--only TEXT] [--no-vocabulary] [--previous-text]
+                                [--no-punctuation-prompt]
                                 [--confidence] [--out DIR] [--device cuda|cpu]
         """;
 
@@ -28,7 +29,7 @@ internal static class EvalCommand
     {
         string? setDir = null, outDir = null, device = null, only = null;
         var presets = new List<string>();
-        bool useVocabulary = true, previousText = false, showConfidence = false;
+        bool useVocabulary = true, previousText = false, showConfidence = false, punctuationPrompt = true;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -40,6 +41,7 @@ internal static class EvalCommand
                 case "--device" when i + 1 < args.Length: device = args[++i]; break;
                 case "--no-vocabulary": useVocabulary = false; break;
                 case "--previous-text": previousText = true; break;
+                case "--no-punctuation-prompt": punctuationPrompt = false; break;
                 case "--confidence": showConfidence = true; break;
                 default: Console.Error.WriteLine(Usage); return 2;
             }
@@ -71,7 +73,10 @@ internal static class EvalCommand
             var decoded = new Dictionary<string, IReadOnlyList<Word>>();
             foreach (var group in files.GroupBy(f => useVocabulary ? f.Passage.Vocabulary ?? "" : ""))
             {
-                var settings = new JobSettings { Preset = preset, Vocabulary = group.Key, PreviousText = previousText };
+                var settings = new JobSettings
+                {
+                    Preset = preset, Vocabulary = group.Key, PreviousText = previousText, PunctuationPrompt = punctuationPrompt,
+                };
                 await SubtitleJob.RunAsync([.. group.Select(f => f.File)], dir, settings, (_, _) => { }, _ => { }, null,
                                            e => { if (e is FileTranscribed t) decoded[t.Path] = t.Words; },
                                            steps, CancellationToken.None);

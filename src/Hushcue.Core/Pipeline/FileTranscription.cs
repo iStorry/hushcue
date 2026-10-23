@@ -15,6 +15,10 @@ internal static class FileTranscription
     /// <summary>Applied only when re-decoding a passage that looped.</summary>
     public const float LoopRepetitionPenalty = 1.3f;
 
+    /// <summary>A short sentence in the style subtitles want (capitals, commas, question marks, full stops), which
+    /// Whisper copies (<see cref="JobSettings.PunctuationPrompt"/>).</summary>
+    public const string PunctuationPrompt = "Hi, how are you? I'm fine, thanks. Well, see you later.";
+
     /// <summary>
     /// Decode, re-decode looped passages (when <see cref="JobSettings.RecoverLoops"/>), cap what still loops, and
     /// build the cues.
@@ -59,9 +63,7 @@ internal static class FileTranscription
             CompressionRatioThreshold = 2.4,
             WordTimestamps = true,
             HallucinationSilenceThreshold = 2.0,
-            // hotwords, not the initial prompt: without previous-text context the initial prompt only reaches the
-            // first 30 s window, hotwords go into every window
-            Hotwords = Py.Strip(settings.Vocabulary) is { Length: > 0 } vocabulary ? vocabulary : null,
+            Hotwords = Hotwords(settings),
         };
         var (segments, info) = model.Transcribe(audio, options, cancel);
         if (options.Vad is not null && log is not null)
@@ -83,6 +85,17 @@ internal static class FileTranscription
                 onWords(Cleanup.SquashStretched(kept));
         }
         return Cleanup.SquashStretched(words);
+    }
+
+    /// <summary>
+    /// The punctuation prompt and the vocabulary, as hotwords. Hotwords, not the initial prompt: without previous-text
+    /// context the initial prompt only reaches the first 30 s window, hotwords go into every window. Null for none.
+    /// </summary>
+    internal static string? Hotwords(JobSettings settings)
+    {
+        string[] parts = [settings.PunctuationPrompt ? PunctuationPrompt : "", Py.Strip(settings.Vocabulary)];
+        var hotwords = string.Join(' ', parts.Where(p => p.Length > 0));
+        return hotwords.Length > 0 ? hotwords : null;
     }
 
     /// <summary>

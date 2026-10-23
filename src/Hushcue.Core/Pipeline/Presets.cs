@@ -62,6 +62,9 @@ public sealed record JobSettings
     /// <summary>Let each 30 s window see the text decoded before it (Whisper's condition_on_previous_text). Off by
     /// default: a window that goes wrong can pass its mistake on to the next.</summary>
     public bool PreviousText { get; init; }
+    /// <summary>Start every 30 s window from a short punctuated sentence (<see cref="FileTranscription.PunctuationPrompt"/>),
+    /// whose style Whisper copies: without it, windows after the first often lose their capitals and full stops.</summary>
+    public bool PunctuationPrompt { get; init; } = true;
     public EmbedMode Embed { get; init; } = EmbedMode.None;
     /// <summary>When embedding: also leave the .srt next to the video.</summary>
     public bool KeepSrt { get; init; } = true;

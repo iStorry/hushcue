@@ -111,10 +111,17 @@ public class TranscriptionTests
         Assert.Equal((0.6, -1.0, 2.4, 2.0), (options.NoSpeechThreshold, options.LogProbThreshold,
                                              options.CompressionRatioThreshold, options.HallucinationSilenceThreshold));
         Assert.True(options.WordTimestamps);
-        Assert.Equal("Anna", options.Hotwords);
+        Assert.Equal(FileTranscription.PunctuationPrompt + " Anna", options.Hotwords);
         Assert.Null(options.InitialPrompt);
         Assert.Null(options.Vad);
     }
+
+    [Theory]
+    [InlineData(true, "", FileTranscription.PunctuationPrompt)]
+    [InlineData(false, " Anna ", "Anna")]
+    [InlineData(false, "", null)]
+    public void HotwordsAreThePunctuationPromptAndTheVocabulary(bool punctuationPrompt, string vocabulary, string? hotwords) =>
+        Assert.Equal(hotwords, FileTranscription.Hotwords(new JobSettings { PunctuationPrompt = punctuationPrompt, Vocabulary = vocabulary }));
 
     [Fact]
     public void PreviousTextIsOffUnlessAsked()

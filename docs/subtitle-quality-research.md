@@ -250,3 +250,79 @@ In order. Each step is measured before it is kept.
 
 Not doing: temperature fallback, previous-text context (both measured worse here), MMS or CrisperWhisper (licences),
 vocal separation as Whisper's input (evidence against).
+
+## Progress on the `subtitle-quality` branch
+
+### Step 1 (done): cues to broadcast rules
+
+- `Subtitles/Breaks.cs` rates each place between two words as a break.
+- `WrapLines` and `BuildCues` use those ratings.
+- `FixTiming` holds cues until they are readable at 20 characters per second, with Netflix's durations and gap.
+
+What changed on `eval/speaking-styles` (Balanced, CPU):
+
+| Before | After |
+|---|---|
+| "I'd fancy a cup of tea and a / biscuit, if it's no bother." | "I'd fancy a cup of tea / and a biscuit, if it's no bother." |
+| "Back in my day, a loaf / of bread cost a penny." | "Back in my day, / a loaf of bread cost a penny" |
+| "Watch out. The car is / coming. Get off the road now." | "Watch out. The car is coming. / Get off the road now." |
+
+Short cues ("It's adorable.") now stay up 5/6 s instead of 0.7 s. Long ones are held into the pause after them.
+
+**Found while testing:** in long stretches without pauses, Balanced often writes no full stops or capitals ("until the
+petrol station When I was young,"). The cue builder can only find sentences that are punctuated. Two fixes:
+- a capital after an unpunctuated lower-case word now counts as a likely sentence start when choosing breaks
+- the real fix is at the decoder: a punctuated style prompt (step 3)
+
+### Step 2 (done): short cues with no speech under them
+
+`Pipeline/UnheardCues.cs` drops a cue of up to three words when no Silero window under it reaches 0.2.
+
+| Audio (Balanced) | Before | After |
+|---|---|---|
+| 2 min of pink noise, silence, 440 Hz and 1 kHz tones | 2 × "Thank you." | nothing |
+| `speaking-styles` (3:38, 43 phrases, includes 12 s of noise) | 49 cues | nothing real dropped |
+
+The job's log names each dropped cue, so a wrong drop is easy to spot.
+
+### Step 3 (done): punctuation prompt
+
+`JobSettings.PunctuationPrompt` (on) puts "Hi, how are you? I'm fine, thanks. Well, see you later." in front of the
+vocabulary as hotwords, so every window sees punctuated text. Whisper copies the style of its prompt.
+
+On `speaking-styles` (Balanced, CPU, 488 reference words):
+
+| | Sentence ends (ref 61) | Commas (ref 35) | WER |
+|---|---|---|---|
+| Without | 49 | 20 | 8.8% |
+| With | 65 | 32 | 10.0% |
+
+- The prompt never appeared in the output.
+- Of the WER difference:
+  - one word is misheard (peck → pack)
+  - one word is doubled ("Congratulations. Congratulations.")
+  - four words are a cleanup bug the better punctuation exposed: the spoken "Thank you for listening." now stands as
+    its own cue, and `DropJunk`'s phrase list removed it (fixed in step 2b)
+
+On `eval/lookalike` (Balanced, CPU, all four variants, 2592 words, 372 scored):
+
+| | WER | Scored words right |
+|---|---|---|
+| Without | 1.2% | 348/372 |
+| With | **0.9%** | **356/372** |
+
+Names gain most (Jaxon, Ashleigh, Kathryn), probably because the vocabulary now follows a sentence instead of
+standing alone. `eval --no-punctuation-prompt` compares the two.
+
+### Step 2b (done): the phrase list checks the audio
+
+- `DropJunk` no longer removes "Thanks for watching." and the rest of the phrase list blindly. `UnheardCues` drops
+  such a cue only when the mean speech probability under it is below 0.5. People do say these phrases (YouTube
+  outros, the end of talks); Whisper's invented ones sit over music or silence.
+- Silero runs once per file before decoding, so the live transcript and the saved file agree.
+- "Re-run this part" goes through the same check.
+
+### Next
+
+- **Word edges out of silence** (stable-ts style) with the same probabilities.
+- **VAD cut & merge**, then Enhance off on Thorough; both measured with `eval`.
