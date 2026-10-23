@@ -18,7 +18,7 @@ is in the git history; this file holds what's next.
 - [ ] Subtitle tracks inside an `.mkv`: extract to edit, write back as a new file
 - [ ] Compact mini window that stays on top while a batch runs
 
-## v0.1.1 — Subtitle quality: the right word, not just a similar one (released; the open items move to v0.1.2)
+## v0.1.1 — Subtitle quality: the right word, not just a similar one (released; the open items move to v0.2.0)
 
 Whisper's misses are mostly words that sound alike: calm / come / cum, their / there, your / you're, then / than,
 knew / new, weather / whether, here / hear. "come" and "cum" sound the same, so only the words around them can
@@ -87,9 +87,9 @@ a stronger language model, and the person reviewing a fast way to fix what is st
 - [ ] Check the v0.1.1 release run on GitHub Actions, and that an installed v0.1.0 offers the update (needs the
       repository to be public)
 
-## v0.1.2 — Subtitle quality, part 2: cues, timing and silence (branch `subtitle-quality`)
+## v0.2.0 — Subtitle quality, part 2: cues, timing and silence (released; the open items move on)
 
-Research and measurements: `docs/subtitle-quality-research.md`. Done on the branch: cues to Netflix's rules
+Research and measurements: `docs/subtitle-quality-research.md`. Done in 0.2.0: cues to Netflix's rules
 (`Subtitles/Breaks`, reading speed, durations), short cues with no speech dropped and the phrase list checked
 against the audio (`Pipeline/UnheardCues`), the punctuation prompt, word edges trimmed to speech
 (`Pipeline/WordEdges`: phrase starts 0.38 s → 0.03 s off), and `Hushcue.Cli timing` to score word timing.

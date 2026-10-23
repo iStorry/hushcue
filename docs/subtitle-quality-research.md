@@ -383,4 +383,4 @@ the first configuration finished: the default prompt without chunking, which mat
 
 ### Next
 
-- Steps 5 and 6 (Enhance off on Thorough), measured on a GPU: see TODO.md, v0.1.2.
+- Steps 5 and 6 (Enhance off on Thorough), measured on a GPU: see TODO.md, v0.2.0.

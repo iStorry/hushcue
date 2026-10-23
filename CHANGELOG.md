@@ -3,8 +3,16 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
-## Unreleased
+## 0.2.0 — 2026-10-23
 
+- Subtitles read like professional ones: lines and subtitles break where the sentence does (after a comma, before
+  "and"), not after "the" or between a first and last name, and each subtitle stays up long enough to read.
+- Subtitles no longer appear before anyone speaks: word timing is trimmed to the speech itself (in the test video,
+  subtitles now start within 0.1 s of the speech 95% of the time, up from 2%).
+- Full stops and capitals no longer go missing in long stretches of speech, and fewer words are misheard (in the
+  test set, 356 of 372 tricky words right, up from 348).
+- "Thank you." and "you" no longer appear over noise, tones or silence; "Thanks for watching" is kept when someone
+  really says it.
 - The window fits any screen: it opens at the right size for your display scaling, can be made much smaller
   (down to 600×500), and every page rearranges itself for a narrow or short window instead of cutting things off.
 - On a narrow window the options move under the file list, the review editor puts the subtitles under the video,
@@ -15,7 +23,8 @@ shows: keep each section short and plain.
   at the top of the window instead of in the middle.
 - For developers: the app's CLI, tests and engine build on a Mac (CPU only), Windows and macOS builds of the
   engine use separate folders so one checkout can be shared, and a speaking-styles test video is made with macOS
-  voices (`tools/bench/make_speaking_styles.py`).
+  voices (`tools/bench/make_speaking_styles.py`); `Hushcue.Cli timing` scores word timing against it, and
+  `docs/subtitle-quality-research.md` has the research behind this release.
 
 ## 0.1.1 — 2026-10-22
 
