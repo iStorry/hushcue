@@ -7,12 +7,15 @@ using Hushcue.Core.Media;
 using Hushcue.Core.Pipeline;
 using Hushcue.Core.Review;
 using Hushcue.Core.Subtitles;
+using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Media.Core;
 using Windows.Media.Playback;
 using Windows.Storage;
@@ -39,6 +42,8 @@ public sealed partial class ReviewPage : UserControl
     private const double MinOverlayFontSize = 12;
     private const double MaxOverlayFontSize = 40;
     private const double WidescreenRatio = 16.0 / 9;
+    /// <summary>A playhead this far outside the comparison being played was moved there, so it stops showing it.</summary>
+    private const double SeekSlackSeconds = 0.5;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private readonly MediaPlayer _player = new() { AutoPlay = false };
     private ObservableCollection<ReviewRow> _rows = [];
@@ -48,7 +53,12 @@ public sealed partial class ReviewPage : UserControl
     private MediaSource? _media;
     private float[]? _audio;
     private CancellationTokenSource? _reading;
-    private CancellationTokenSource? _embedding;
+    /// <summary>Embedding, or trying another model: what Cancel stops.</summary>
+    private CancellationTokenSource? _work;
+    private Comparison? _comparison;
+    /// <summary>Playing the comparison stops here, and shows its subtitles over the video until then.</summary>
+    private double? _playUntil;
+    private bool _comparisonPlayed;
     private string? _srtPath;
     private string? _output;
     private string? _recycled;
@@ -57,6 +67,9 @@ public sealed partial class ReviewPage : UserControl
     private bool _syncing;
     private bool _busy;
     private AppSettings _settings = new();
+
+    /// <summary>What another quality heard in [Start, End), waiting to be used or not.</summary>
+    private sealed record Comparison(double Start, double End, Preset Preset, List<Cue> Cues);
 
     public ReviewPage()
     {
@@ -148,6 +161,7 @@ public sealed partial class ReviewPage : UserControl
     {
         var transcript = file.Transcript ?? throw new InvalidOperationException($"{file.Name} has no subtitles to review yet.");
         (_file, _transcript, _output, _recycled, _audio) = (file, transcript, null, null, null);
+        DropComparison();
         IReadOnlyList<Cue> cues = transcript.Cues;
         if (transcript.Srt is { } srt && File.Exists(srt))
         {
@@ -168,7 +182,7 @@ public sealed partial class ReviewPage : UserControl
         FileTitle.Text = file.Name;
         ModeBox.SelectedIndex = transcript.Settings.Embed == EmbedMode.Burn ? 1 : 0;
         ResultLinks.Visibility = Visibility.Collapsed;
-        EmbedBar.Visibility = Visibility.Collapsed;
+        WorkBar.Visibility = Visibility.Collapsed;
         SearchBox.Text = "";
         Timeline.SetSource(_editor, _editor.Duration);
         Timeline.SetWaveform(null, "Reading the audio...");
@@ -204,7 +218,8 @@ public sealed partial class ReviewPage : UserControl
     {
         _clock.Stop();
         _reading?.Cancel();
-        _embedding?.Cancel();
+        _work?.Cancel();
+        DropComparison();
         ReleaseMedia();
         _audio = null;
         _editor = null;
@@ -249,7 +264,7 @@ public sealed partial class ReviewPage : UserControl
         var reading = _reading = new CancellationTokenSource();
         try
         {
-            var enhance = settings.Enhance || Presets.Get(settings.Preset).Enhance; // as the run heard it, for re-runs
+            var enhance = PartTranscription.Enhances(settings); // as the run heard it, for re-runs
             var (audio, wave) = await Task.Run(async () =>
             {
                 var samples = await Audio.ReadAsync(path, enhance, reading.Token);
@@ -280,9 +295,27 @@ public sealed partial class ReviewPage : UserControl
         var position = Position;
         Timeline.SetPosition(position, follow: playing);
         TimeText.Text = $"{CueTime.Format(position)} / {CueTime.Format(_editor.Duration)}";
+        if (_playUntil is { } until)
+        {
+            // Play() takes a moment to start, so a pause only counts once it has played
+            _comparisonPlayed |= playing;
+            var paused = _comparisonPlayed && session.PlaybackState == MediaPlaybackState.Paused;
+            if (_comparison is null || paused || position >= until || position < _comparison.Start - SeekSlackSeconds)
+            {
+                _playUntil = null;
+                if (playing && position >= until && position < until + SeekSlackSeconds) // got there by playing, not a seek
+                    _player.Pause();
+            }
+        }
         var index = _editor.IndexAt(position);
-        OverlayText.Text = index >= 0 ? Cleanup.WrapLines(_editor.Cues[index].Text) : "";
-        Overlay.Visibility = index >= 0 ? Visibility.Visible : Visibility.Collapsed;
+        // while the comparison plays, the other model's subtitles are drawn in their own colour instead
+        var text = index >= 0 ? _editor.Cues[index].Text : null;
+        var other = _playUntil is not null && _comparison is { } c && position >= c.Start && position < c.End;
+        if (other)
+            text = _comparison!.Cues.FirstOrDefault(q => position >= q.Start && position < q.End)?.Text;
+        OverlayText.Text = text is null ? "" : Cleanup.WrapLines(text);
+        OverlayText.Foreground = other ? OtherModelBrush : WhiteBrush;
+        Overlay.Visibility = text is null ? Visibility.Collapsed : Visibility.Visible;
         if (index != _current)
         {
             _current = index;
@@ -652,6 +685,8 @@ public sealed partial class ReviewPage : UserControl
 
     private void OnEdited(object? sender, CueEdit edit)
     {
+        if (_comparison is not null)
+            DropComparison(); // made against the subtitles as they were
         RebuildRows();
         Select(RowOf(edit.Select), seek: false);
         Timeline.RefreshCues();
@@ -730,14 +765,22 @@ public sealed partial class ReviewPage : UserControl
 
     // --- re-run a part
 
-    /// <summary>The stretch "Re-run this part" would transcribe: the selected subtitles, or the selected gap.</summary>
+    /// <summary>
+    /// The stretch "Re-run this part" would transcribe: the selected gap, or the selected subtitles and a little of the
+    /// silence either side (<see cref="PartTranscription.Widen"/>).
+    /// </summary>
     private (double Start, double End)? RerunRange()
     {
         if (_editor is null)
             return null;
         if (SelectedRow is { IsGap: true } gap && CueList.SelectedItems.Count == 1)
             return (gap.Start, gap.End);
-        return SelectedCues is { Count: > 0 } cues ? (_editor.Cues[cues[0]].Start, _editor.Cues[cues[^1]].End) : null;
+        if (SelectedCues is not [var first, ..] cues)
+            return null;
+        var last = cues[^1];
+        var before = first > 0 ? _editor.Cues[first - 1].End : 0;
+        var after = last + 1 < Count ? _editor.Cues[last + 1].Start : _editor.Duration;
+        return PartTranscription.Widen(_editor.Cues[first].Start, _editor.Cues[last].End, before, after);
     }
 
     private async void OnRerun(object sender, RoutedEventArgs e)
@@ -756,7 +799,7 @@ public sealed partial class ReviewPage : UserControl
         try
         {
             var editor = _editor;
-            var cues = await PartTranscription.RunAsync(_audio, start, end, _transcript.Settings, _ => { });
+            var cues = await PartTranscription.RunAsync(PartAudio(), start, end, _transcript.Settings, _ => { });
             if (editor != _editor)
                 return; // the page moved on
             if (cues.Count == 0)
@@ -775,6 +818,196 @@ public sealed partial class ReviewPage : UserControl
         {
             SetBusy(false);
         }
+    }
+
+    private PartAudio PartAudio() => new(_file!.Path, _audio!, PartTranscription.Enhances(_transcript!.Settings));
+
+    // --- try another model
+
+    private static readonly SolidColorBrush WhiteBrush = new(Colors.White);
+    /// <summary>The other model's subtitles over the video: a soft yellow, so they are not mistaken for the real ones.</summary>
+    private static readonly SolidColorBrush OtherModelBrush = new(Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xE0, 0x8A));
+
+    /// <summary>One item per quality: its model, and the download when that model is not on this PC.</summary>
+    private void OnCompareMenuOpening(object? sender, object e)
+    {
+        CompareMenu.Items.Clear();
+        var own = Presets.Get(_transcript?.Settings.Preset ?? Presets.Default).Name;
+        foreach (var preset in Presets.All)
+        {
+            var text = $"{preset.Name} · {preset.Model}" + (preset.Name == own ? " (as Re-run this part)" : "")
+                       + (PartTranscription.HasModel(preset.Name) ? "" : $" · download {Gigabytes(ModelSize(preset))}");
+            var item = new MenuFlyoutItem { Text = text };
+            ToolTipService.SetToolTip(item, preset.Description);
+            item.Click += (_, _) => CompareWith(preset);
+            CompareMenu.Items.Add(item);
+        }
+    }
+
+    private static long ModelSize(Preset preset) => Models.Sources.TryGetValue(preset.Model, out var source) ? source.Size : 0;
+
+    private static string Gigabytes(long bytes) => $"{bytes / 1e9:0.0} GB";
+
+    /// <summary>
+    /// Transcribe the selected stretch with <paramref name="preset"/>'s model (downloading it first, if asked) and
+    /// show what it heard next to what is there now, to use or not.
+    /// </summary>
+    private async void CompareWith(Preset preset)
+    {
+        if (_editor is null || _transcript is null || _audio is null || RerunRange() is not var (start, end))
+            return;
+        if (IsJobRunning())
+        {
+            StatusText.Text = "Trying another model needs the speech engine, which the files being transcribed are using. Try again when they are done.";
+            return;
+        }
+        CommitPending();
+        DropComparison();
+        var range = CueTime.Range(start, end);
+        if (!PartTranscription.HasModel(preset.Name)
+            && !await Dialogs.ConfirmAsync(XamlRoot,
+                   $"{preset.Name} uses the {preset.Model} model, which is not on this PC yet. Download it ({Gigabytes(ModelSize(preset))})? "
+                   + "It stays for next time, and a stopped download carries on where it left off.", "Download"))
+            return;
+        var work = _work = new CancellationTokenSource();
+        SetBusy(true, cancellable: true);
+        var ui = DispatcherQueue;
+        try
+        {
+            if (!PartTranscription.HasModel(preset.Name))
+            {
+                StatusText.Text = $"Downloading {preset.Model}...";
+                await Task.Run(() => ModelDownload.DownloadAsync(preset.Model, (done, total) => ui.TryEnqueue(() =>
+                {
+                    WorkBar.Value = total > 0 ? done * 1000.0 / total : 0;
+                    StatusText.Text = $"Downloading {preset.Model}: {Gigabytes(done)} of {Gigabytes(total)}";
+                }), work.Token), work.Token);
+            }
+            var editor = _editor;
+            WorkBar.IsIndeterminate = true;
+            StatusText.Text = $"Transcribing {range} with {preset.Name} ({preset.Model})...";
+            var cues = await PartTranscription.RunAsync(PartAudio(), start, end, _transcript.Settings with { Preset = preset.Name },
+                                                        message => ui.TryEnqueue(() => StatusText.Text = message), work.Token);
+            if (editor != _editor)
+                return; // the page moved on
+            if (cues.Count == 0)
+            {
+                StatusText.Text = $"{preset.Name} heard nothing in {range}; the subtitles are unchanged.";
+                return;
+            }
+            ShowComparison(new Comparison(start, end, preset, cues));
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Stopped; the subtitles are unchanged";
+        }
+        catch (Exception ex) when (ex is EngineException or MediaException or ModelDownloadException or InvalidOperationException
+                                       or IOException or HttpRequestException)
+        {
+            StatusText.Text = $"Could not try {preset.Name} here: " + ex.Message;
+        }
+        finally
+        {
+            if (_work == work)
+                _work = null;
+            WorkBar.IsIndeterminate = false;
+            SetBusy(false);
+        }
+    }
+
+    /// <summary>The cues <see cref="CueEditor.ReplaceRange"/> would replace for [start, end).</summary>
+    private List<Cue> CuesIn(double start, double end) =>
+        _editor is null ? [] : [.. _editor.Cues.SkipWhile(c => c.Start < start).TakeWhile(c => c.Start < end)];
+
+    private void ShowComparison(Comparison comparison)
+    {
+        _comparison = comparison;
+        var range = CueTime.Range(comparison.Start, comparison.End);
+        var name = comparison.Preset.Name;
+        var before = string.Join(" ", CuesIn(comparison.Start, comparison.End).Select(c => c.Text));
+        var after = string.Join(" ", comparison.Cues.Select(c => c.Text));
+        var (left, right) = TextDiff.Words(before, after);
+        CompareTitle.Text = $"{name.ToUpperInvariant()} · {comparison.Preset.Model.ToUpperInvariant()} HEARD {range}";
+        CompareAfterLabel.Text = name;
+        ShowDiff(CompareBefore, left, removed: true);
+        ShowDiff(CompareAfter, right, removed: false);
+        if (left.Count == 0)
+            CompareBefore.Text = "(no subtitles)";
+        AutomationProperties.SetName(CompareAfter, $"What {name} heard");
+        var changes = left.Count(w => w.Changed) + right.Count(w => w.Changed);
+        var count = comparison.Cues.Count;
+        CompareSummary.Text = (changes == 0 ? "The same words as now" : changes == 1 ? "1 word differs" : $"{changes} words differ")
+                              + $" · {count} subtitle{(count == 1 ? "" : "s")}";
+        UseCompareText.Text = $"Use {name}'s";
+        ToolTipService.SetToolTip(UseCompareButton, $"Replace the subtitles in {range} with these (Ctrl+Z puts them back)");
+        ToolTipService.SetToolTip(PlayCompareButton, $"Play {range} with {name}'s subtitles over the video, in yellow");
+        AutomationProperties.SetName(UseCompareButton, $"Use {name}'s subtitles for {range}");
+        AutomationProperties.SetName(PlayCompareButton, $"Play {range} with {name}'s subtitles");
+        ComparePanel.Visibility = Visibility.Visible;
+        StatusText.Text = $"{name} heard {range}: compare, then use it or keep the current subtitles";
+        Timeline.Reveal(comparison.Start, comparison.End);
+        UseCompareButton.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>
+    /// The words into <paramref name="block"/>, the changed ones marked: struck through when <paramref name="removed"/>,
+    /// otherwise bold in the accent colour.
+    /// </summary>
+    private static void ShowDiff(TextBlock block, List<DiffWord> words, bool removed)
+    {
+        block.Inlines.Clear();
+        for (var i = 0; i < words.Count; i++)
+        {
+            var run = new Run { Text = (i > 0 ? " " : "") + words[i].Text };
+            if (words[i].Changed && removed)
+            {
+                run.TextDecorations = Windows.UI.Text.TextDecorations.Strikethrough;
+                run.Foreground = ThemeBrushes.Get(ThemeBrushes.Secondary);
+            }
+            else if (words[i].Changed)
+            {
+                run.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+                run.Foreground = ThemeBrushes.Get(ThemeBrushes.Accent);
+            }
+            block.Inlines.Add(run);
+        }
+    }
+
+    private void DropComparison()
+    {
+        _comparison = null;
+        _playUntil = null;
+        ComparePanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnUseComparison(object sender, RoutedEventArgs e)
+    {
+        if (_editor is null || _comparison is not { } comparison)
+            return;
+        DropComparison();
+        var range = CueTime.Range(comparison.Start, comparison.End);
+        _editor.ReplaceRange(comparison.Start, comparison.End, comparison.Cues, $"Use {comparison.Preset.Name} for {range}");
+        StatusText.Text = $"Used {comparison.Preset.Name}'s subtitles for {range}. Ctrl+Z puts the old ones back.";
+        FocusSelectedRow();
+    }
+
+    private void OnKeepCurrent(object sender, RoutedEventArgs e)
+    {
+        if (_comparison is not { } comparison)
+            return;
+        DropComparison();
+        StatusText.Text = $"Kept the current subtitles for {CueTime.Range(comparison.Start, comparison.End)}";
+        FocusSelectedRow();
+    }
+
+    private void OnPlayComparison(object sender, RoutedEventArgs e)
+    {
+        if (_comparison is not { } comparison || _player.Source is null)
+            return;
+        Seek(comparison.Start);
+        _playUntil = comparison.End;
+        _comparisonPlayed = false;
+        _player.Play();
     }
 
     // --- save, export, embed
@@ -856,8 +1089,8 @@ public sealed partial class ReviewPage : UserControl
         // the run asked for the original to go to the Recycle Bin once its video is made
         var recycle = _transcript.Settings is { DeleteOriginal: true, Embed: not EmbedMode.None };
         var cues = editor.Cues.ToList();
-        var embedding = _embedding = new CancellationTokenSource();
-        SetBusy(true, embedding: true);
+        var embedding = _work = new CancellationTokenSource();
+        SetBusy(true, cancellable: true);
         StatusText.Text = mode == EmbedMode.Soft ? "Adding the subtitle track..." : "Burning the subtitles into the video...";
         if (recycle)
             ReleaseMedia(); // the preview holds the file open
@@ -865,7 +1098,7 @@ public sealed partial class ReviewPage : UserControl
         try
         {
             var result = await Task.Run(() => SubtitleJob.EmbedAsync(file.Path, cues, _transcript.OutDir, mode, recycle,
-                f => ui.TryEnqueue(() => EmbedBar.Value = f * 1000), _ => { }, embedding.Token));
+                f => ui.TryEnqueue(() => WorkBar.Value = f * 1000), _ => { }, embedding.Token));
             _output = result.Video;
             _recycled = result.Recycled ? file.Path : null;
             StatusText.Text = $"Saved {Path.GetFileName(result.Video)}"
@@ -888,11 +1121,13 @@ public sealed partial class ReviewPage : UserControl
         {
             if (recycle && _player.Source is null && _file == file && File.Exists(file.Path))
                 OpenMedia(file.Path, hasVideo: true);
+            if (_work == embedding)
+                _work = null;
             SetBusy(false);
         }
     }
 
-    private void OnCancelEmbed(object sender, RoutedEventArgs e) => _embedding?.Cancel();
+    private void OnCancelWork(object sender, RoutedEventArgs e) => _work?.Cancel();
 
     private void OnShowOutput(object sender, RoutedEventArgs e)
     {
@@ -913,18 +1148,19 @@ public sealed partial class ReviewPage : UserControl
 
     // --- state of the buttons
 
-    private void SetBusy(bool busy, bool embedding = false)
+    /// <param name="cancellable">embedding or trying another model: the progress bar and Cancel show</param>
+    private void SetBusy(bool busy, bool cancellable = false)
     {
         _busy = busy;
-        EmbedBar.Value = 0;
-        EmbedBar.Visibility = busy && embedding ? Visibility.Visible : Visibility.Collapsed;
-        CancelEmbedButton.Visibility = busy && embedding ? Visibility.Visible : Visibility.Collapsed;
-        EmbedButton.Visibility = busy && embedding ? Visibility.Collapsed : Visibility.Visible;
+        WorkBar.Value = 0;
+        WorkBar.Visibility = busy && cancellable ? Visibility.Visible : Visibility.Collapsed;
+        CancelButton.Visibility = busy && cancellable ? Visibility.Visible : Visibility.Collapsed;
+        EmbedButton.Visibility = busy && cancellable ? Visibility.Collapsed : Visibility.Visible;
         if (busy)
             ResultLinks.Visibility = Visibility.Collapsed;
         UpdateCommands();
-        if (busy && embedding)
-            CancelEmbedButton.Focus(FocusState.Programmatic);
+        if (busy && cancellable)
+            CancelButton.Focus(FocusState.Programmatic);
     }
 
     private void UpdateAll()
@@ -953,10 +1189,14 @@ public sealed partial class ReviewPage : UserControl
         DeleteButton.IsEnabled = idle && cues.Count > 0;
         AddButton.IsEnabled = idle;
         TextEditor.IsEnabled = StartBox.IsEnabled = EndBox.IsEnabled = idle && one;
-        RerunButton.IsEnabled = idle && _audio is not null && RerunRange() is not null;
+        RerunButton.IsEnabled = CompareButton.IsEnabled = idle && _audio is not null && RerunRange() is not null;
+        UseCompareButton.IsEnabled = KeepCompareButton.IsEnabled = PlayCompareButton.IsEnabled = idle;
         ToolTipService.SetToolTip(RerunButton, _audio is null
             ? "Available once the audio has been read"
             : "Transcribe the selected stretch again and replace its subtitles (Ctrl+Z puts them back)");
+        ToolTipService.SetToolTip(CompareButton, _audio is null
+            ? "Available once the audio has been read"
+            : "Transcribe the selected stretch with another quality's model and compare before using it");
         UndoButton.IsEnabled = idle && _editor.CanUndo;
         RedoButton.IsEnabled = idle && _editor.CanRedo;
         var undo = _editor.UndoName is { } u ? $"Undo {u.ToLowerInvariant()} (Ctrl+Z)" : "Undo (Ctrl+Z)";

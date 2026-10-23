@@ -26,6 +26,9 @@ internal sealed class JobSteps
     /// <summary>A file's audio as 16 kHz mono samples (path, enhance).</summary>
     public Func<string, bool, CancellationToken, Task<float[]>> ReadAudio { get; init; } = Audio.ReadAsync;
 
+    /// <summary>Part of a file's audio as 16 kHz mono samples (path, from, length in seconds, enhance).</summary>
+    public Func<string, double, double, bool, CancellationToken, Task<float[]>> ReadAudioPart { get; init; } = Audio.ReadPartAsync;
+
     /// <summary>Silero's speech probability for each 512-sample window of 16 kHz audio, for <see cref="UnheardCues"/>.</summary>
     public Func<float[], CancellationToken, float[]> SpeechProbabilities { get; init; } = SileroVad.SpeechProbabilities;
 

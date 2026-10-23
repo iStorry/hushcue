@@ -12,9 +12,25 @@ public static class Audio
     /// (no temporary WAV). Samples go through 16-bit first, exactly as faster-whisper's decoder does,
     /// so the model hears the same values.
     /// </summary>
-    public static async Task<float[]> ReadAsync(string path, bool enhance = false, CancellationToken cancel = default)
+    public static Task<float[]> ReadAsync(string path, bool enhance = false, CancellationToken cancel = default) =>
+        ReadAsync(path, [], enhance, cancel);
+
+    /// <summary>
+    /// <paramref name="length"/> seconds of a file's audio from <paramref name="from"/> seconds, as
+    /// <see cref="ReadAsync(string, bool, CancellationToken)"/> reads all of it. The clean-up, when asked for, hears
+    /// only this part.
+    /// </summary>
+    public static Task<float[]> ReadPartAsync(string path, double from, double length, bool enhance = false,
+                                              CancellationToken cancel = default) =>
+        ReadAsync(path, ["-ss", Seconds(from), "-t", Seconds(length)], enhance, cancel);
+
+    private static string Seconds(double seconds) =>
+        Math.Max(0, seconds).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <param name="seek">ffmpeg's options before the input, to read only part of it</param>
+    private static async Task<float[]> ReadAsync(string path, IReadOnlyList<string> seek, bool enhance, CancellationToken cancel)
     {
-        List<string> cmd = [Tools.Ffmpeg, "-v", "error", "-nostdin", "-i", path, "-vn", "-ac", "1", "-ar", $"{SampleRate}"];
+        List<string> cmd = [Tools.Ffmpeg, "-v", "error", "-nostdin", .. seek, "-i", path, "-vn", "-ac", "1", "-ar", $"{SampleRate}"];
         if (enhance)
             cmd.AddRange(["-af", EnhanceFilter]);
         cmd.AddRange(["-f", "s16le", "pipe:1"]);

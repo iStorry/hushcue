@@ -341,6 +341,20 @@ public sealed class MediaTests : IDisposable
     }
 
     [FfmpegFact]
+    public async Task PartOfTheAudioIsReadFromItsStart()
+    {
+        var whole = await Audio.ReadAsync(MakeVideo(P("in.mp4"), seconds: 4));
+        var part = await Audio.ReadPartAsync(P("in.mp4"), 1.5, 2);
+        Assert.InRange(part.Length, 2 * 16000 - 800, 2 * 16000 + 800);
+        // the same samples as the whole file's from 1.5 s, give or take the decoder's edge
+        var offset = (int)(1.5 * 16000);
+        var differences = Enumerable.Range(1000, 16000).Count(i => Math.Abs(part[i] - whole[offset + i]) > 0.01f);
+        Assert.True(differences < 160, $"{differences} samples differ");
+        var enhanced = await Audio.ReadPartAsync(P("in.mp4"), 3, 5, enhance: true); // cut short at the end of the file
+        Assert.InRange(enhanced.Length, 16000 - 800, 16000 + 800);
+    }
+
+    [FfmpegFact]
     public async Task UnreadableAudioFailsWithAClearMessage()
     {
         var bad = P("bad.mp3");
