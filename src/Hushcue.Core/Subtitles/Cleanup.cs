@@ -8,12 +8,24 @@ namespace Hushcue.Core.Subtitles;
 /// </summary>
 public static partial class Cleanup
 {
+    // Netflix's English (USA) Timed Text Style Guide: two lines of 42 characters, 5/6 s to 7 s on screen, up to 20
+    // characters per second. The 2-frame gap is from its supplementals guide, here at 24 fps (the longest common gap)
     public const int MaxLine = 42;
     public const int MaxCueChars = 84;
-    public const double MaxCueSeconds = 6.0;
-    public const double MinCueSeconds = 0.7;
+    public const double MaxCueSeconds = 7.0;
+    public const double MinCueSeconds = 5.0 / 6.0;
+    public const double MaxCharsPerSecond = 20;
+    public const double CueGapSeconds = 2.0 / 24.0;
     public const double WordGapSplit = 0.8;
     public const double MinCueGap = 0.2; // cues starting closer than this cannot both be shown; they are merged
+
+    // Weighing breaks (Breaks.Cost is 0..9): a break worth taking costs less than a few characters of unevenness
+    private const double BreakWeight = 4;
+    private const double OverflowPenalty = 1000;
+    private const double ShortTopLinePenalty = 12;
+    private const double LookbackWeight = 0.25;
+    private const int MinSplitChars = 20;
+    private const double ShortSplitPenalty = 30;
 
     /// <summary>Whisper habitually emits these when it "hears" silence or noise.</summary>
     public static readonly IReadOnlySet<string> Hallucinations = new HashSet<string>
@@ -136,37 +148,54 @@ public static partial class Cleanup
         return output;
     }
 
-    /// <summary>Split a long cue into two lines of similar length.</summary>
+    /// <summary>
+    /// Split a cue longer than <see cref="MaxLine"/> into two lines, both within it when that is possible: at the
+    /// best place by <see cref="Breaks"/>, preferring lines of similar length, a bottom line longer than the top
+    /// (Netflix's "bottom-heavy pyramid") and more than two words on top.
+    /// </summary>
     public static string WrapLines(string text)
     {
         text = Py.Strip(Py.CollapseWhitespace(text));
         if (Py.Len(text) <= MaxLine)
             return text;
         var words = text.Split(' ');
-        int best = 1, bestDiff = -1;
+        var best = 1;
+        var bestCost = double.PositiveInfinity;
         for (var i = 1; i < words.Length; i++)
         {
-            var diff = Math.Abs(Py.Len(string.Join(' ', words[..i])) - Py.Len(string.Join(' ', words[i..])));
-            if (bestDiff < 0 || diff < bestDiff)
-                (best, bestDiff) = (i, diff);
+            var top = Py.Len(string.Join(' ', words[..i]));
+            var bottom = Py.Len(string.Join(' ', words[i..]));
+            var cost = LineBreakCost(words[i - 1], words[i], top, bottom, i);
+            if (cost < bestCost)
+                (best, bestCost) = (i, cost);
         }
         return string.Join(' ', words[..best]) + "\n" + string.Join(' ', words[best..]);
     }
 
+    private static double LineBreakCost(string before, string after, int top, int bottom, int topWords)
+    {
+        var overflow = Math.Max(0, top - MaxLine) + Math.Max(0, bottom - MaxLine);
+        var imbalance = top > bottom ? top - bottom : (bottom - top) / 2.0;
+        var shortTop = topWords <= 2 ? ShortTopLinePenalty : 0;
+        return overflow * OverflowPenalty + Breaks.Cost(before, after) * BreakWeight + imbalance + shortTop;
+    }
+
+    /// <summary>
+    /// Group words into cues: a new cue after a pause, after a sentence once the cue is long enough to read, and
+    /// before the cue would pass <see cref="MaxCueChars"/> or <see cref="MaxCueSeconds"/>. A cue that is full is cut
+    /// at its best break (<see cref="BestLimitSplit"/>), not simply before the word that did not fit.
+    /// </summary>
     public static List<Cue> BuildCues(IEnumerable<Word> words)
     {
         var cues = new List<Cue>();
         var cur = new List<Word>();
 
-        void Flush()
+        void Flush(int count)
         {
-            if (cur.Count > 0)
-            {
-                var text = Py.Strip(Py.CollapseWhitespace(Joined(cur)));
-                if (text.Length > 0)
-                    cues.Add(new Cue(cur[0].Start, cur[^1].End, text));
-                cur.Clear();
-            }
+            var text = Py.Strip(Py.CollapseWhitespace(Joined(cur.Take(count))));
+            if (text.Length > 0)
+                cues.Add(new Cue(cur[0].Start, cur[count - 1].End, text));
+            cur.RemoveRange(0, count);
         }
 
         foreach (var w in words)
@@ -174,21 +203,45 @@ public static partial class Cleanup
             if (cur.Count > 0)
             {
                 var chars = Py.Len(Py.Strip(Joined(cur)));
-                if (w.Start - cur[^1].End > WordGapSplit
-                    || w.End - cur[0].Start > MaxCueSeconds
-                    || chars + Py.Len(Py.Strip(w.Text)) + 1 > MaxCueChars)
-                {
-                    Flush();
-                }
+                if (w.Start - cur[^1].End > WordGapSplit)
+                    Flush(cur.Count);
+                else if (w.End - cur[0].Start > MaxCueSeconds || chars + Py.Len(Py.Strip(w.Text)) + 1 > MaxCueChars)
+                    Flush(BestLimitSplit(cur, w));
                 else if (EndsSentence(cur[^1].Text) && (chars >= 30 || cur[^1].End - cur[0].Start >= 2.5))
-                {
-                    Flush();
-                }
+                    Flush(cur.Count);
             }
             cur.Add(w);
         }
-        Flush();
+        if (cur.Count > 0)
+            Flush(cur.Count);
         return cues;
+    }
+
+    /// <summary>
+    /// How many words of the full cue <paramref name="cur"/> to keep when <paramref name="next"/> does not fit: the
+    /// best break by <see cref="Breaks"/>, a little dearer the further back it is, never leaving a first part shorter
+    /// than <see cref="MinSplitChars"/> when a longer one will do, and never leaving the rest (with
+    /// <paramref name="next"/>) too long to show.
+    /// </summary>
+    private static int BestLimitSplit(List<Word> cur, Word next)
+    {
+        var total = Py.Len(Py.Strip(Joined(cur)));
+        var best = cur.Count;
+        var bestCost = double.PositiveInfinity;
+        for (var k = 1; k <= cur.Count; k++)
+        {
+            var kept = Py.Len(Py.Strip(Joined(cur.Take(k))));
+            var rest = Py.Len(Py.Strip(Joined(cur.Skip(k).Append(next))));
+            if (k < cur.Count && (next.End - cur[k].Start > MaxCueSeconds || rest > MaxCueChars))
+                continue;
+            var after = k < cur.Count ? cur[k] : next;
+            var cost = Breaks.Cost(cur[k - 1].Text, after.Text) * BreakWeight
+                       + (total - kept) * LookbackWeight
+                       + (kept < MinSplitChars ? ShortSplitPenalty : 0);
+            if (cost < bestCost)
+                (best, bestCost) = (k, cost);
+        }
+        return best;
     }
 
     /// <summary>Join tiny unfinished fragments ('Oh,' + 'my God.') into the next cue.</summary>
@@ -246,7 +299,11 @@ public static partial class Cleanup
         return output;
     }
 
-    /// <summary>Merge cues that start together, give every cue a minimum length, and never let cues overlap.</summary>
+    /// <summary>
+    /// Merge cues that start together; keep every cue on screen long enough to read (at least
+    /// <see cref="MinCueSeconds"/>, and its text at <see cref="MaxCharsPerSecond"/>, up to <see cref="MaxCueSeconds"/>)
+    /// by holding it into the silence after it; leave <see cref="CueGapSeconds"/> before the next cue; never overlap.
+    /// </summary>
     public static List<Cue> FixTiming(IEnumerable<Cue> cues)
     {
         var merged = new List<Cue>();
@@ -260,11 +317,10 @@ public static partial class Cleanup
         for (var i = 0; i < merged.Count; i++)
         {
             var c = merged[i];
-            var end = c.End;
-            if (end - c.Start < MinCueSeconds)
-                end = c.Start + MinCueSeconds;
-            if (i + 1 < merged.Count && end > merged[i + 1].Start - 0.02)
-                end = Math.Max(c.Start + 0.2, merged[i + 1].Start - 0.02);
+            var readable = Math.Min(Math.Max(MinCueSeconds, Py.Len(c.Text) / MaxCharsPerSecond), MaxCueSeconds);
+            var end = Math.Max(c.End, c.Start + readable);
+            if (i + 1 < merged.Count && end > merged[i + 1].Start - CueGapSeconds)
+                end = Math.Max(c.Start + 0.2, merged[i + 1].Start - CueGapSeconds);
             merged[i] = c with { End = end };
         }
         return merged;
