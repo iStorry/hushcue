@@ -30,14 +30,10 @@
         </Grid.RowDefinitions>
 
         <!-- Files | options; on a wide window a third column keeps the live transcript or the finished summary next
-             to the options instead of in their place (GeneratePage.ApplyLayout) -->
-        <Grid ColumnSpacing="16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="2*" MinWidth="330" MaxWidth="540" />
-                <ColumnDefinition x:Name="ActivityColumn" Width="0" MaxWidth="560" />
-            </Grid.ColumnDefinitions>
-
+             to the options instead of in their place, and on a narrow one the cards go under the files
+             (GeneratePage.ApplyLayout, FilesLayout) -->
+        <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto">
+        <Grid x:Name="Columns" ColumnSpacing="16" RowSpacing="16">
             <Grid RowSpacing="12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
@@ -55,7 +51,7 @@
             </Grid>
 
             <!-- As tall as its content: a full-height card is mostly empty on a big window -->
-            <Border x:Name="OptionsCard" Grid.Column="1" Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
+            <Border x:Name="OptionsCard" Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
                     <StackPanel Spacing="18">
                         <StackPanel Spacing="8">
@@ -117,15 +113,16 @@
                 </ScrollViewer>
             </Border>
 
-            <Border x:Name="FinishedCard" Grid.Column="1" Style="{StaticResource Card}" Visibility="Collapsed">
+            <Border x:Name="FinishedCard" Style="{StaticResource Card}" Visibility="Collapsed">
                 <controls:FinishedPanel x:Name="Summary" />
             </Border>
 
             <!-- While a batch runs, the subtitles of the file being transcribed, as they are heard -->
-            <Border x:Name="LiveCard" Grid.Column="1" Style="{StaticResource Card}" Padding="20,14,20,12" Visibility="Collapsed">
+            <Border x:Name="LiveCard" Style="{StaticResource Card}" Padding="20,14,20,12" Visibility="Collapsed">
                 <controls:LiveTranscript x:Name="Live" />
             </Border>
         </Grid>
+        </ScrollViewer>
 
         <controls:RunPanel x:Name="Run" Grid.Row="1" StartText="Generate subtitles" />
     </Grid>

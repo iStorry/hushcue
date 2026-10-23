@@ -20,7 +20,7 @@ public sealed partial class SettingsPage : UserControl
         InitializeComponent();
         foreach (var (name, _) in Presets.Languages)
             LanguageBox.Items.Add(name);
-        DataText.Text = DataFolder;
+        DataRow.Description = DataFolder;
     }
 
     /// <summary>Something changed (also the theme): the other pages refresh what they show of it.</summary>
@@ -48,7 +48,7 @@ public sealed partial class SettingsPage : UserControl
     }
 
     /// <summary>"On your NVIDIA GeForce RTX 4070" or why it runs on the CPU, from the system check.</summary>
-    public void SetDevice(string text) => DeviceText.Text = text;
+    public void SetDevice(string text) => DeviceRow.Description = text;
 
     private void OnChanged(object sender, RoutedEventArgs e)
     {

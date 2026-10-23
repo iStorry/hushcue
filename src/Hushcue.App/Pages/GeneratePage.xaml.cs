@@ -21,6 +21,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     private Batch? _batch;
     private bool _showingResult;
     private bool _starting;
+    private readonly FilesLayout _layout;
 
     /// <summary>One run over the queue, and what it did so far.</summary>
     private sealed class Batch(IReadOnlyList<QueuedFile> files, int skipped, string preset, bool burning)
@@ -42,6 +43,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     public GeneratePage()
     {
         InitializeComponent();
+        _layout = new FilesLayout(Scroller, Columns);
+        ApplyLayout();
         Queue.Extensions = MediaFiles.Extensions;
         Queue.ProbeFiles = true;
         Queue.Checker = CheckFile;
@@ -557,14 +560,10 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     private void ApplyLayout()
     {
         var card = _card ?? OptionsCard;
-        var beside = _wide && card != OptionsCard;
-        OptionsCard.Visibility = card == OptionsCard || beside ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var each in new[] { LiveCard, FinishedCard })
-        {
-            each.Visibility = each == card ? Visibility.Visible : Visibility.Collapsed;
-            Grid.SetColumn(each, beside ? 2 : 1);
-        }
-        ActivityColumn.Width = beside ? new GridLength(2, GridUnitType.Star) : new GridLength(0);
+        Border[] shown = _wide && card != OptionsCard ? [OptionsCard, card] : [card];
+        foreach (var each in new[] { OptionsCard, LiveCard, FinishedCard })
+            each.Visibility = shown.Contains(each) ? Visibility.Visible : Visibility.Collapsed;
+        _layout.Show(shown);
     }
 
     private JobSettings CurrentSettings() => _settings.ToJob(SelectedPreset, SelectedEmbed);

@@ -61,7 +61,12 @@ public sealed partial class WaveformTimeline : Grid
         _canvas.Children.Add(_message);
         Children.Add(_canvas);
         AutomationProperties.SetName(this, "Timeline: waveform and a block for each subtitle. Drag the edges of a block to change its timing; the start and end boxes do the same from the keyboard.");
-        SizeChanged += (_, _) => Redraw();
+        SizeChanged += (_, e) =>
+        {
+            // a Canvas draws its shapes past its edges too: blocks and labels at the ends of the view spilled over the card
+            _canvas.Clip = new RectangleGeometry { Rect = new Rect(new Point(0, 0), e.NewSize) };
+            Redraw();
+        };
         ActualThemeChanged += (_, _) => Redraw();
         _canvas.PointerPressed += OnPressed;
         _canvas.PointerMoved += OnMoved;

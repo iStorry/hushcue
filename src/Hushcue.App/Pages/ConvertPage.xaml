@@ -11,12 +11,9 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid ColumnSpacing="16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="2*" MinWidth="330" MaxWidth="540" />
-            </Grid.ColumnDefinitions>
-
+        <!-- Files | options, or the options under the files on a narrow window (FilesLayout) -->
+        <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto">
+        <Grid x:Name="Columns" ColumnSpacing="16" RowSpacing="16">
             <Grid RowSpacing="12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
@@ -33,7 +30,7 @@
                 </Border>
             </Grid>
 
-            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
+            <Border x:Name="OptionsCard" Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
                     <StackPanel Spacing="14">
                         <TextBlock Text="MKV to MP4" Style="{StaticResource BodyStrongTextBlockStyle}"
@@ -49,6 +46,7 @@
                 </ScrollViewer>
             </Border>
         </Grid>
+        </ScrollViewer>
 
         <controls:RunPanel x:Name="Run" Grid.Row="1" StartText="Convert to MP4" />
     </Grid>

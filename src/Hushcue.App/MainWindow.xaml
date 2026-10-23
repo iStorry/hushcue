@@ -23,9 +23,10 @@
             </TitleBar.IconSource>
         </TitleBar>
 
-        <!-- The app's three tools in a sidebar, with Settings and About at the bottom -->
+        <!-- The app's three tools in a sidebar, with Settings and About at the bottom. Never the minimal mode: its
+             floating menu button sat on top of the page, so a narrow window keeps the row of icons instead. -->
         <NavigationView x:Name="Nav" Grid.Row="1" PaneDisplayMode="Auto" IsBackButtonVisible="Collapsed"
-                        IsSettingsVisible="True" OpenPaneLength="232" CompactModeThresholdWidth="760"
+                        IsSettingsVisible="True" OpenPaneLength="232" CompactModeThresholdWidth="0"
                         ExpandedModeThresholdWidth="1100" SelectionChanged="OnNavSelectionChanged"
                         ItemInvoked="OnNavItemInvoked"
                         AutomationProperties.Name="Tools">

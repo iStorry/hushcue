@@ -10,7 +10,6 @@ using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
-using Windows.Graphics;
 using Windows.Storage;
 using Windows.System;
 using Windows.UI.Core;
@@ -36,6 +35,7 @@ public sealed partial class MainWindow : Window
     private readonly Updater _updater;
     private string? _gpuName;
     private bool _closeConfirmed;
+    private double _scale;
 
     public MainWindow()
     {
@@ -45,14 +45,10 @@ public sealed partial class MainWindow : Window
         // Standard height: the caption buttons are exactly as tall as the title bar. Tall ones (48 px) hung below it,
         // so their hover boxes (and Close's red one) stuck out into the page.
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Standard;
-        AppWindow.Resize(new SizeInt32(1040, 740));
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Hushcue.ico"));
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.PreferredMinimumWidth = 900;
-            presenter.PreferredMinimumHeight = 640;
-        }
-        _taskbar = new Taskbar(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WindowPlacement.Open(AppWindow, handle);
+        _taskbar = new Taskbar(handle);
         _updater = new Updater(_settings, PrepareToExitAsync);
 
         Generate.Load(_settings);
@@ -96,6 +92,11 @@ public sealed partial class MainWindow : Window
         AppWindow.Closing += OnClosing;
         Root.ActualThemeChanged += (_, _) => ColorCaptionButtons();
         Root.Loaded += (_, _) => ColorCaptionButtons();
+        Root.Loaded += (_, _) =>
+        {
+            _scale = Root.XamlRoot.RasterizationScale;
+            Root.XamlRoot.Changed += OnXamlRootChanged;
+        };
         Root.Loaded += async (_, _) =>
         {
             if (await AppIcon.LoadAsync() is { } icon)
@@ -147,6 +148,15 @@ public sealed partial class MainWindow : Window
     }
 
     private static Visibility Shown(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>The window moved to a monitor with another scale: its minimum size follows, in effective pixels.</summary>
+    private void OnXamlRootChanged(XamlRoot root, XamlRootChangedEventArgs args)
+    {
+        if (root.RasterizationScale == _scale)
+            return;
+        _scale = root.RasterizationScale;
+        WindowPlacement.SetMinimum(AppWindow, _scale);
+    }
 
     private void ApplyTheme() => Root.RequestedTheme = _settings.Theme switch
     {

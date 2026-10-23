@@ -5,7 +5,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Hushcue.Controls">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto">
+        <!-- at least as tall as the window, so the card sits in the middle of it -->
+        <Grid MinHeight="{Binding ViewportHeight, ElementName=Scroller}">
         <Border Style="{StaticResource Card}" MaxWidth="600" Margin="0,12" Padding="28,24,28,24"
                 HorizontalAlignment="Center" VerticalAlignment="Center">
             <StackPanel Spacing="20">
@@ -31,9 +33,13 @@
                         <local:CheckRow x:Name="ModelRow" />
                         <StackPanel x:Name="DownloadPanel" Spacing="6" Margin="32,0,0,0" Visibility="Collapsed">
                             <ProgressBar x:Name="DownloadBar" Maximum="1000" AutomationProperties.Name="Model download" />
-                            <Grid>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="DownloadText" Style="{StaticResource Hint}" />
-                                <TextBlock Text="resumes if closed" HorizontalAlignment="Right" Style="{StaticResource Hint}" />
+                                <TextBlock Grid.Column="1" Text="resumes if closed" Style="{StaticResource Hint}" />
                             </Grid>
                         </StackPanel>
                     </StackPanel>
@@ -43,15 +49,16 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Button x:Name="RecheckButton" Content="Check again" Click="OnRecheck" />
-                    <Button x:Name="DownloadButton" Grid.Column="2" Click="OnDownload" Visibility="Collapsed" Style="{ThemeResource AccentButtonStyle}" />
-                    <Button x:Name="ContinueButton" Grid.Column="3" Content="Continue" MinWidth="120" IsEnabled="False"
-                            Style="{ThemeResource AccentButtonStyle}" Click="OnContinue" />
+                    <Button x:Name="RecheckButton" Content="Check again" Click="OnRecheck" VerticalAlignment="Top" />
+                    <local:WrapPanel Grid.Column="1" HorizontalSpacing="8" VerticalSpacing="8" HorizontalAlignment="Right">
+                        <Button x:Name="DownloadButton" Click="OnDownload" Visibility="Collapsed" Style="{ThemeResource AccentButtonStyle}" />
+                        <Button x:Name="ContinueButton" Content="Continue" MinWidth="120" IsEnabled="False"
+                                Style="{ThemeResource AccentButtonStyle}" Click="OnContinue" />
+                    </local:WrapPanel>
                 </Grid>
             </StackPanel>
         </Border>
+        </Grid>
     </ScrollViewer>
 </UserControl>

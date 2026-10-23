@@ -15,6 +15,7 @@ public sealed partial class ConvertPage : UserControl, IRunPage
     public ConvertPage()
     {
         InitializeComponent();
+        new FilesLayout(Scroller, Columns).Show([OptionsCard]);
         Queue.Extensions = [".mkv"];
         Run.SetStatus("Add .mkv files to start");
         Queue.Files.CollectionChanged += (_, _) =>
