@@ -3,7 +3,7 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
-## Unreleased
+## 0.2.2 — 2026-10-24
 
 - Edit subtitles opens the subtitle track inside a video (.mkv, .mp4) when there is no .srt next to it: the track is
   saved as an .srt next to the video (`name.eng.srt`) and opens in the editor. With more than one track you pick
