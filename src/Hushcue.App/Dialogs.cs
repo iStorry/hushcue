@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Hushcue;
@@ -23,7 +24,28 @@ internal static class Dialogs
     public static async Task<bool> ConfirmAsync(XamlRoot root, string message, string confirm, string cancel = "Cancel") =>
         await ShowAsync(root, Core.Product.Name, message, confirm, cancel) == ContentDialogResult.Primary;
 
-    private static async Task<ContentDialogResult> ShowAsync(XamlRoot root, string title, string message,
+    /// <returns>the index of the option chosen (the first is selected to begin with); -1 if the user cancelled, or
+    /// another dialog is open.</returns>
+    public static async Task<int> ChooseAsync(XamlRoot root, string message, IReadOnlyList<string> options, string confirm,
+                                              string cancel = "Cancel")
+    {
+        var choices = new RadioButtons { ItemsSource = options, SelectedIndex = 0 };
+        AutomationProperties.SetName(choices, message);
+        var content = new StackPanel { Spacing = 12 };
+        content.Children.Add(Text(message));
+        content.Children.Add(choices);
+        return await ShowAsync(root, Core.Product.Name, content, confirm, cancel) == ContentDialogResult.Primary
+            ? choices.SelectedIndex
+            : -1;
+    }
+
+    private static TextBlock Text(string message) => new() { Text = message, TextWrapping = TextWrapping.Wrap };
+
+    private static Task<ContentDialogResult> ShowAsync(XamlRoot root, string title, string message, string primary,
+                                                       string? close) =>
+        ShowAsync(root, title, Text(message), primary, close);
+
+    private static async Task<ContentDialogResult> ShowAsync(XamlRoot root, string title, UIElement content,
                                                              string primary, string? close)
     {
         if (_open)
@@ -32,7 +54,7 @@ internal static class Dialogs
         {
             XamlRoot = root,
             Title = title,
-            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+            Content = content,
             PrimaryButtonText = primary,
             DefaultButton = ContentDialogButton.Primary,
             Style = (Style)Application.Current.Resources["DefaultContentDialogStyle"],

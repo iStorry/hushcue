@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Hushcue.Core.Media;
+using Hushcue.Core.Subtitles;
 
 namespace Hushcue.Core.Tests;
 
@@ -325,6 +326,100 @@ public sealed class MediaTests : IDisposable
         Assert.Equal([(bad, FileState.Failed, null), (good, FileState.Done, mp4)],
                      finished.Select(p => (p.Path, p.State, p.Output)));
         Assert.True(File.Exists(mp4));
+    }
+
+    // ------------------------------------------------------------------------------------------- subtitle tracks
+
+    [Fact]
+    public void SubtitleTracksAreReadFromFfprobe()
+    {
+        var tracks = SubtitleTracks.Parse("""
+            {"streams": [
+              {"index": 0, "codec_type": "video", "codec_name": "h264"},
+              {"index": 2, "codec_type": "subtitle", "codec_name": "subrip", "tags": {"language": "eng", "title": "SDH"},
+               "disposition": {"default": 1, "forced": 0}},
+              {"index": 3, "codec_type": "subtitle", "codec_name": "ass", "tags": {"language": "ger"}, "disposition": {"forced": 1}},
+              {"index": 4, "codec_type": "subtitle", "codec_name": "hdmv_pgs_subtitle"}
+            ]}
+            """);
+        Assert.Equal([2, 3, 4], tracks.Select(t => t.Index));
+        Assert.Equal([true, true, false], tracks.Select(t => t.IsText));
+        Assert.Equal("English · SDH · default · SRT", tracks[0].Label);
+        Assert.Equal("German · forced · ASS", tracks[1].Label);
+        Assert.Equal("Unknown language · Blu-ray PGS", tracks[2].Label);
+        Assert.Empty(SubtitleTracks.Parse("""{"streams": []}"""));
+        Assert.Empty(SubtitleTracks.Parse("{}"));
+    }
+
+    [Fact]
+    public void TrackLanguagesAreNamedFromEitherCode()
+    {
+        Assert.Equal("English", SubtitleTrack.LanguageName("en"));
+        Assert.Equal("French", SubtitleTrack.LanguageName("fre"));
+        Assert.Equal("French", SubtitleTrack.LanguageName("fra"));
+        Assert.Null(SubtitleTrack.LanguageName("und"));
+        Assert.Null(SubtitleTrack.LanguageName(null));
+        Assert.Equal("xx-made-up", SubtitleTrack.LanguageName("xx-made-up")); // unknown: as written
+    }
+
+    [Fact]
+    public void ATrackIsSavedNextToTheVideoByLanguage()
+    {
+        var video = P("film.mkv");
+        Assert.Equal(P("film.eng.srt"), SubtitleTracks.SrtPath(video, new SubtitleTrack(2, "subrip", "eng", null, false, false)));
+        Assert.Equal(P("film.srt"), SubtitleTracks.SrtPath(video, new SubtitleTrack(2, "subrip", "und", null, false, false)));
+        Assert.Equal(P("film.srt"), SubtitleTracks.SrtPath(video, new SubtitleTrack(2, "subrip", null, null, false, false)));
+        Assert.Equal(P("film.x.srt"), SubtitleTracks.SrtPath(video, new SubtitleTrack(2, "subrip", "../x", null, false, false)));
+        File.WriteAllText(P("film.eng.srt"), "");
+        Assert.Equal(P("film.eng (1).srt"), SubtitleTracks.SrtPath(video, new SubtitleTrack(2, "subrip", "eng", null, false, false)));
+    }
+
+    [Fact]
+    public async Task PictureTracksAreNotExtracted()
+    {
+        var error = await Assert.ThrowsAsync<MediaException>(() => SubtitleTracks.ExtractAsync(
+            P("film.mkv"), new SubtitleTrack(2, "hdmv_pgs_subtitle", null, null, false, false), P("film.srt")));
+        Assert.Contains("Blu-ray PGS", error.Message);
+        Assert.False(File.Exists(P("film.srt")));
+    }
+
+    [FfmpegFact]
+    public async Task EachTextTrackOfAnMkvCanBeSavedAsAnSrt()
+    {
+        var video = MakeVideo(P("in.mp4"), seconds: 2);
+        var english = MakeSrt(P("en.srt"));
+        var german = P("de.srt");
+        File.WriteAllText(german, "1\n00:00:00,500 --> 00:00:01,500\nHallo zusammen\n");
+        var mkv = P("film.mkv");
+        Run(Tools.Ffmpeg, "-y", "-v", "error", "-i", video, "-i", english, "-i", german, "-map", "0", "-map", "1", "-map", "2",
+            "-c", "copy", "-c:s:1", "ass", "-metadata:s:s:0", "language=eng", "-metadata:s:s:1", "language=ger", mkv);
+
+        var tracks = await SubtitleTracks.ReadAsync(mkv);
+        Assert.Equal(["subrip", "ass"], tracks.Select(t => t.Codec));
+        Assert.Equal(["eng", "ger"], tracks.Select(t => t.Language));
+        Assert.All(tracks, t => Assert.True(t.IsText));
+
+        var srt = SubtitleTracks.SrtPath(mkv, tracks[1]);
+        Assert.Equal(P("film.ger.srt"), srt);
+        await SubtitleTracks.ExtractAsync(mkv, tracks[1], srt);
+        var cue = Assert.Single(Srt.Read(File.ReadAllText(srt)));
+        Assert.Equal((0.5, 1.5, "Hallo zusammen"), (cue.Start, cue.End, cue.Text)); // the ASS track, back as SubRip
+        Assert.Equal(srt, SubtitlePairs.FindSubtitles(mkv)); // found by name next time
+        Assert.Empty(await SubtitleTracks.ReadAsync(video));
+    }
+
+    [FfmpegFact]
+    public async Task AnEmptyTrackLeavesNoSrtBehind()
+    {
+        var video = MakeVideo(P("in.mp4"), seconds: 1);
+        var empty = P("empty.srt");
+        File.WriteAllText(empty, "");
+        var mkv = P("film.mkv");
+        Run(Tools.Ffmpeg, "-y", "-v", "error", "-i", video, "-f", "srt", "-i", empty, "-map", "0", "-map", "1", "-c", "copy", mkv);
+        var track = Assert.Single(await SubtitleTracks.ReadAsync(mkv));
+        var srt = SubtitleTracks.SrtPath(mkv, track);
+        await Assert.ThrowsAsync<MediaException>(() => SubtitleTracks.ExtractAsync(mkv, track, srt));
+        Assert.False(File.Exists(srt));
     }
 
     // ------------------------------------------------------------------------------------------- audio
