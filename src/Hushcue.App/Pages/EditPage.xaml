@@ -28,8 +28,8 @@
                             <TextBlock HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="460"
                                        Style="{StaticResource CaptionTextBlockStyle}"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Text="A video on its own works too: the subtitles next to it are found by name (talk.mp4 and talk.srt or talk.en.srt)." />
-                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,6,0,0">
+                                       Text="A video on its own works too: the subtitles next to it are found by name (talk.mp4 and talk.srt or talk.en.srt), else the subtitle track inside it (.mkv, .mp4) is saved as an .srt next to it." />
+                            <StackPanel x:Name="OpenButtons" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,6,0,0">
                                 <Button Style="{ThemeResource AccentButtonStyle}" Click="OnOpenVideo"
                                         AutomationProperties.Name="Open a video to edit its subtitles">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -44,13 +44,24 @@
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
+                            <StackPanel x:Name="BusyPanel" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                                        Visibility="Collapsed">
+                                <ProgressRing IsActive="True" Width="16" Height="16" />
+                                <TextBlock x:Name="BusyText" Style="{StaticResource CaptionTextBlockStyle}"
+                                           AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <StackPanel x:Name="RecentPanel" Spacing="8">
-                    <TextBlock Text="Recent" Style="{StaticResource BodyStrongTextBlockStyle}"
-                               AutomationProperties.HeadingLevel="Level2" />
+                    <Grid>
+                        <TextBlock Text="Recent" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center"
+                                   AutomationProperties.HeadingLevel="Level2" />
+                        <HyperlinkButton Content="Clear" HorizontalAlignment="Right" Padding="8,2" Click="OnClearRecent"
+                                         ToolTipService.ToolTip="Empty this list (the videos and .srt files are not touched)"
+                                         AutomationProperties.Name="Clear the recent list" />
+                    </Grid>
                     <ListView x:Name="RecentList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnRecentClick"
                               AutomationProperties.Name="Recently edited subtitles">
                         <ListView.ItemTemplate>

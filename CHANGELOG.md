@@ -3,6 +3,14 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
+## Unreleased
+
+- Edit subtitles opens the subtitle track inside a video (.mkv, .mp4) when there is no .srt next to it: the track is
+  saved as an .srt next to the video (`name.eng.srt`) and opens in the editor. With more than one track you pick
+  which. Picture subtitles (Blu-ray PGS, DVD VobSub) can't be edited as text; the app says so and lets you pick an
+  .srt instead.
+- **Clear** empties the Recent list on the Edit subtitles page (the files themselves are not touched).
+
 ## 0.2.1 — 2026-10-23
 
 - Try another model on part of a file while reviewing: select subtitles (or a gap), choose **Try another model**,
