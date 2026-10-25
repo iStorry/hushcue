@@ -3,7 +3,7 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
-## Unreleased
+## 0.2.3 — 2026-10-25
 
 - **Preview first**, a switch under Result on Generate subtitles: the subtitles are made in a temporary folder and
   nothing is saved next to your videos or in the output folder. Check and edit each preview, then **Keep** it (as an
