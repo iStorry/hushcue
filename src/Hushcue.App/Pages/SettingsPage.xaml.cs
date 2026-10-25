@@ -40,7 +40,6 @@ public sealed partial class SettingsPage : UserControl
         SkipSilenceToggle.IsOn = settings.SkipSilence;
         KeepSrtToggle.IsOn = settings.KeepSrt;
         DeleteToggle.IsOn = settings.DeleteOriginal;
-        ReviewToggle.IsOn = settings.ReviewBeforeEmbed;
         UpdatesToggle.IsOn = settings.CheckForUpdates;
         ThemeBox.SelectedItem = ThemeBox.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == settings.Theme)
                                 ?? ThemeBox.Items[0];
@@ -60,7 +59,6 @@ public sealed partial class SettingsPage : UserControl
         _settings.SkipSilence = SkipSilenceToggle.IsOn;
         _settings.KeepSrt = KeepSrtToggle.IsOn;
         _settings.DeleteOriginal = DeleteToggle.IsOn;
-        _settings.ReviewBeforeEmbed = ReviewToggle.IsOn;
         _settings.CheckForUpdates = UpdatesToggle.IsOn;
         _settings.Theme = (ThemeBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "System";
         Changed?.Invoke(this, EventArgs.Empty);

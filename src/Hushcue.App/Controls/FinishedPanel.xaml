@@ -83,7 +83,7 @@
                 </ItemsControl>
 
                 <StackPanel x:Name="ReviewPanel" Spacing="2" Visibility="Collapsed">
-                    <TextBlock Text="Review and edit" Style="{StaticResource BodyStrongTextBlockStyle}"
+                    <TextBlock x:Name="ReviewTitle" Text="Review and edit" Style="{StaticResource BodyStrongTextBlockStyle}"
                                AutomationProperties.HeadingLevel="Level3" />
                     <TextBlock x:Name="ReviewHint" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <ItemsControl x:Name="ReviewLinks" IsTabStop="False" Margin="-12,0,0,0">
@@ -103,6 +103,14 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <StackPanel x:Name="PreviewActions" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+                        <Button x:Name="KeepAllButton" Click="OnKeepAll"
+                                ToolTipService.ToolTip="Make the result you chose for every preview, as it is now"
+                                AutomationProperties.Name="Keep all the previews" />
+                        <Button x:Name="DiscardAllButton" Click="OnDiscardAll"
+                                ToolTipService.ToolTip="Delete every preview; nothing is saved"
+                                AutomationProperties.Name="Discard all the previews" />
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel x:Name="RecyclePanel" Spacing="2" Visibility="Collapsed">

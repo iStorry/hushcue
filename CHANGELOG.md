@@ -3,6 +3,14 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
+## Unreleased
+
+- **Preview first**, a switch under Result on Generate subtitles: the subtitles are made in a temporary folder and
+  nothing is saved next to your videos or in the output folder. Check and edit each preview, then **Keep** it (as an
+  .srt, a subtitle track or burned in, chosen there) or **Discard** it. **Keep all** / **Discard all** on the finished
+  screen do every preview at once. Closing the app asks first, then discards previews that weren't kept.
+- Preview first replaces the "Review before embedding" setting, which wrote the .srt before you had looked at it.
+
 ## 0.2.2 — 2026-10-24
 
 - Edit subtitles opens the subtitle track inside a video (.mkv, .mp4) when there is no .srt next to it: the track is

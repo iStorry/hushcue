@@ -28,6 +28,9 @@ namespace Hushcue.Pages;
 /// <summary>A reviewed file's subtitles were put into its video.</summary>
 public sealed record ReviewEmbedded(QueuedFile File, EmbedResult Result);
 
+/// <summary>A preview was kept: its result was made.</summary>
+public sealed record ReviewKept(QueuedFile File, KeptPreview Result);
+
 /// <summary>
 /// Review and edit one file's subtitles before they go into the video: the video with the subtitle drawn over it, a
 /// waveform timeline whose subtitle blocks can be dragged, and the list of subtitles to search, fix, split, merge,
@@ -95,6 +98,12 @@ public sealed partial class ReviewPage : UserControl
 
     public event EventHandler<ReviewEmbedded>? Embedded;
 
+    /// <summary>A preview was kept (the page stays open on the kept subtitles).</summary>
+    public event EventHandler<ReviewKept>? Kept;
+
+    /// <summary>A preview was discarded and its subtitles deleted; <see cref="Closed"/> follows.</summary>
+    public event EventHandler<QueuedFile>? Discarded;
+
     /// <summary>Whether a batch is running: re-running a part needs the model to itself.</summary>
     public Func<bool> IsJobRunning { get; set; } = () => false;
 
@@ -106,6 +115,11 @@ public sealed partial class ReviewPage : UserControl
                                                            || HasTypedChange(EndBox));
 
     private int Count => _editor?.Cues.Count ?? 0;
+
+    /// <summary>The subtitles are a preview: nothing is saved until it is kept.</summary>
+    private bool IsPreview => _transcript is { IsPreview: true };
+
+    private EmbedMode SelectedMode => (ModeBox.SelectedItem as ComboBoxItem)?.Tag is EmbedMode mode ? mode : EmbedMode.Soft;
 
     private double Position => _player.PlaybackSession.Position.TotalSeconds;
 
@@ -180,7 +194,7 @@ public sealed partial class ReviewPage : UserControl
         _editor.Changed += OnEdited;
 
         FileTitle.Text = file.Name;
-        ModeBox.SelectedIndex = transcript.Settings.Embed == EmbedMode.Burn ? 1 : 0;
+        ShowModes(transcript.Settings.Embed);
         ResultLinks.Visibility = Visibility.Collapsed;
         WorkBar.Visibility = Visibility.Collapsed;
         SearchBox.Text = "";
@@ -1012,6 +1026,29 @@ public sealed partial class ReviewPage : UserControl
 
     // --- save, export, embed
 
+    /// <summary>
+    /// The results the footer offers: for a preview also an .srt of its own, and Keep and Discard instead of Embed; for
+    /// subtitles already saved, a subtitle track or burning in.
+    /// </summary>
+    private void ShowModes(EmbedMode selected)
+    {
+        ModeBox.Items.Clear();
+        if (IsPreview)
+            ModeBox.Items.Add(new ComboBoxItem { Content = "Subtitle file (.srt)", Tag = EmbedMode.None });
+        ModeBox.Items.Add(new ComboBoxItem { Content = "Subtitle track (.mkv)", Tag = EmbedMode.Soft });
+        ModeBox.Items.Add(new ComboBoxItem { Content = "Burn into the picture (.mp4)", Tag = EmbedMode.Burn });
+        if (!IsPreview && selected == EmbedMode.None)
+            selected = EmbedMode.Soft;
+        ModeBox.SelectedItem = ModeBox.Items.OfType<ComboBoxItem>().First(i => (EmbedMode)i.Tag == selected);
+        AutomationProperties.SetName(ModeBox, IsPreview ? "What to make when the preview is kept" : "How to put the subtitles into the video");
+        DiscardButton.Visibility = IsPreview ? Visibility.Visible : Visibility.Collapsed;
+        EmbedText.Text = IsPreview ? "Keep" : "Embed into video";
+        EmbedIcon.Glyph = IsPreview ? "\uE73E" : "\uE8B9"; // check mark, or the picture
+        AutomationProperties.SetName(EmbedButton, IsPreview ? "Keep the preview" : "Embed into video");
+    }
+
+    private void OnModeChanged(object sender, SelectionChangedEventArgs e) => UpdateCommands();
+
     private string DefaultSrtPath()
     {
         var source = _file!.Path;
@@ -1023,6 +1060,13 @@ public sealed partial class ReviewPage : UserControl
     {
         if (_editor is null || _file is null)
             return;
+        if (IsPreview)
+        {
+            StatusText.Text = _editor.IsDirty
+                ? "Unsaved changes · Save keeps them in the preview"
+                : "Preview · nothing is saved to your folders until you keep it";
+            return;
+        }
         var name = Path.GetFileName(_srtPath ?? DefaultSrtPath());
         StatusText.Text = _editor.IsDirty ? $"Unsaved changes · Save writes {name}" : $"Edits save to {name}";
     }
@@ -1049,7 +1093,7 @@ public sealed partial class ReviewPage : UserControl
         _editor.MarkSaved();
         _transcript = _transcript with { Cues = [.. _editor.Cues], Srt = path, Unsure = _editor.Unsure };
         _file.SetTranscript(_transcript);
-        StatusText.Text = $"Saved {Path.GetFileName(path)}";
+        StatusText.Text = IsPreview ? "Saved your changes in the preview" : $"Saved {Path.GetFileName(path)}";
         UpdateCommands();
         return true;
     }
@@ -1080,12 +1124,17 @@ public sealed partial class ReviewPage : UserControl
 
     private async void OnEmbed(object sender, RoutedEventArgs e)
     {
+        if (IsPreview)
+        {
+            await KeepAsync();
+            return;
+        }
         if (_editor is not { Cues.Count: > 0 } editor || _file is not { } file || _transcript is null)
             return;
         CommitPending();
         if (editor.IsDirty && !await SaveAsync())
             return;
-        var mode = ModeBox.SelectedIndex == 1 ? EmbedMode.Burn : EmbedMode.Soft;
+        var mode = SelectedMode;
         // the run asked for the original to go to the Recycle Bin once its video is made
         var recycle = _transcript.Settings is { DeleteOriginal: true, Embed: not EmbedMode.None };
         var cues = editor.Cues.ToList();
@@ -1125,6 +1174,83 @@ public sealed partial class ReviewPage : UserControl
                 _work = null;
             SetBusy(false);
         }
+    }
+
+    /// <summary>
+    /// Keep the preview as it is now: make the result chosen in the footer (as the run would have, recycling the
+    /// original if it was asked to), then go on editing the kept subtitles.
+    /// </summary>
+    private async Task KeepAsync()
+    {
+        if (_editor is not { Cues.Count: > 0 } editor || _file is not { } file || _transcript is not { IsPreview: true, Srt: { } preview } transcript)
+            return;
+        CommitPending();
+        if (editor.IsDirty && !await SaveAsync())
+            return;
+        var mode = SelectedMode;
+        var settings = transcript.Settings;
+        var recycle = mode != EmbedMode.None && settings.DeleteOriginal;
+        var cues = editor.Cues.ToList();
+        var unsure = editor.Unsure.ToList();
+        var keeping = _work = new CancellationTokenSource();
+        SetBusy(true, cancellable: mode != EmbedMode.None);
+        StatusText.Text = mode switch
+        {
+            EmbedMode.Soft => "Adding the subtitle track...",
+            EmbedMode.Burn => "Burning the subtitles into the video...",
+            _ => "Saving the subtitles...",
+        };
+        if (recycle)
+            ReleaseMedia(); // the preview holds the file open
+        var ui = DispatcherQueue;
+        try
+        {
+            var result = await Task.Run(() => Previews.KeepAsync(file.Path, preview, cues, unsure, transcript.OutDir, mode,
+                settings.KeepSrt, recycle, f => ui.TryEnqueue(() => WorkBar.Value = f * 1000), _ => { }, keeping.Token));
+            _srtPath = result.Srt;
+            _transcript = transcript with { Cues = cues, Srt = result.Srt, Unsure = unsure };
+            file.SetTranscript(_transcript);
+            _output = result.Output;
+            _recycled = result.Recycled ? file.Path : null;
+            ShowModes(mode);
+            StatusText.Text = $"Kept · saved {Path.GetFileName(result.Output)}"
+                              + (result.Recycled ? " · the original was moved to the Recycle Bin" : "");
+            ResultLinks.Visibility = Visibility.Visible;
+            RestoreLink.Visibility = result.Recycled ? Visibility.Visible : Visibility.Collapsed;
+            Kept?.Invoke(this, new ReviewKept(file, result));
+            if (result.Recycled && _file == file)
+                OpenMedia(result.Output, hasVideo: true);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Stopped; the preview is still here and nothing was saved";
+        }
+        catch (Exception ex) when (ex is MediaException or IOException or UnauthorizedAccessException
+                                     or System.ComponentModel.Win32Exception)
+        {
+            StatusText.Text = "Could not keep the preview: " + ex.Message;
+        }
+        finally
+        {
+            if (recycle && _player.Source is null && _file == file && File.Exists(file.Path))
+                OpenMedia(file.Path, hasVideo: true);
+            if (_work == keeping)
+                _work = null;
+            SetBusy(false);
+        }
+    }
+
+    private async void OnDiscard(object sender, RoutedEventArgs e)
+    {
+        if (_busy || _file is not { } file || _transcript is not { IsPreview: true, Srt: { } preview })
+            return;
+        if (!await Dialogs.ConfirmAsync(XamlRoot, $"Discard the preview of {file.Name}? Its subtitles are deleted, with any "
+                                                  + "edits; nothing was saved to your folders.", "Discard", "Keep previewing"))
+            return;
+        Shutdown();
+        Previews.Discard(preview);
+        Discarded?.Invoke(this, file);
+        Closed?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnCancelWork(object sender, RoutedEventArgs e) => _work?.Cancel();
@@ -1171,7 +1297,7 @@ public sealed partial class ReviewPage : UserControl
         FlagsText.Text = flags switch { 0 => "Nothing to check", 1 => "1 to review", _ => $"{flags} to review" };
         AutomationProperties.SetName(FlagsButton, flags == 0 ? "Nothing flagged to check" : $"{FlagsText.Text}: go to the next one");
         FlagsButton.IsEnabled = PreviousFlagButton.IsEnabled = flags > 0;
-        FileFacts.Text = $"{Count} subtitles · {BatchEstimate.Clock(TimeSpan.FromSeconds(_editor.Duration))}";
+        FileFacts.Text = (IsPreview ? "Preview · " : "") + $"{Count} subtitles · {BatchEstimate.Clock(TimeSpan.FromSeconds(_editor.Duration))}";
         if (!_busy)
             ShowSaveState();
         UpdateCommands();
@@ -1207,10 +1333,23 @@ public sealed partial class ReviewPage : UserControl
         AutomationProperties.SetName(RedoButton, redo);
         SaveButton.IsEnabled = ExportButton.IsEnabled = idle;
         var canEmbed = _file?.Info?.HasVideo != false && _file is not null && File.Exists(_file.Path) && Count > 0;
-        EmbedButton.IsEnabled = ModeBox.IsEnabled = idle && canEmbed;
-        ToolTipService.SetToolTip(EmbedButton, canEmbed
-            ? "Save the subtitles and put them into a copy of the video"
-            : "There is no video to put the subtitles into (an audio file, or the original was moved)");
+        if (IsPreview)
+        {
+            var srtOnly = SelectedMode == EmbedMode.None;
+            ModeBox.IsEnabled = idle;
+            DiscardButton.IsEnabled = idle;
+            EmbedButton.IsEnabled = idle && Count > 0 && (srtOnly || canEmbed);
+            ToolTipService.SetToolTip(EmbedButton, srtOnly ? "Keep: save the subtitles as an .srt"
+                : canEmbed ? "Keep: put the subtitles into a copy of the video"
+                : "There is no video to put the subtitles into (an audio file, or the original was moved): keep them as an .srt");
+        }
+        else
+        {
+            EmbedButton.IsEnabled = ModeBox.IsEnabled = idle && canEmbed;
+            ToolTipService.SetToolTip(EmbedButton, canEmbed
+                ? "Save the subtitles and put them into a copy of the video"
+                : "There is no video to put the subtitles into (an audio file, or the original was moved)");
+        }
         BackButton.IsEnabled = idle;
     }
 

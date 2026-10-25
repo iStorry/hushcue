@@ -99,6 +99,20 @@
                                                         Detail="Shows in every player; re-encodes the video" />
                                 </RadioButton>
                             </StackPanel>
+                            <Grid ColumnSpacing="12" Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Preview first" />
+                                    <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                               Text="Check the subtitles before anything is saved, then keep the result or discard it" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="PreviewToggle" Grid.Column="1" OnContent="" OffContent="" MinWidth="0"
+                                              Toggled="OnPreviewToggled"
+                                              AutomationProperties.Name="Preview first: check the subtitles before anything is saved" />
+                            </Grid>
                         </StackPanel>
 
                         <!-- Language, vocabulary, clean-up and what happens to the files live in Settings -->

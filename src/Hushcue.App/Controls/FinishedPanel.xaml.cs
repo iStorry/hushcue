@@ -11,7 +11,7 @@ namespace Hushcue.Controls;
 /// <param name="Recycled">originals moved to the Recycle Bin, by their old paths</param>
 /// <param name="Outputs">the files written</param>
 /// <param name="Reviewable">files whose subtitles can be opened for review</param>
-/// <param name="ToReview">files waiting for a review before their subtitles go into the video</param>
+/// <param name="ToReview">previews waiting to be kept or discarded</param>
 public sealed record RunSummary(int Done, int Failed, int Skipped, TimeSpan Video, TimeSpan Took, IReadOnlyList<string> Notes,
                                 IReadOnlyList<string> Recycled, IReadOnlyList<string> Outputs,
                                 IReadOnlyList<QueuedFile> Reviewable, int ToReview);
@@ -32,6 +32,12 @@ public sealed partial class FinishedPanel : UserControl
     /// <summary>One of the files' "Review" links.</summary>
     public event EventHandler<QueuedFile>? ReviewRequested;
 
+    /// <summary>"Keep all": make every preview's result.</summary>
+    public event EventHandler? KeepAllRequested;
+
+    /// <summary>"Discard all": delete every preview.</summary>
+    public event EventHandler? DiscardAllRequested;
+
     public void Show(RunSummary summary)
     {
         _summary = summary;
@@ -39,7 +45,7 @@ public sealed partial class FinishedPanel : UserControl
         string[] parts =
         [
             summary.Done > 0 || summary.ToReview == 0 ? files : "",
-            summary.ToReview > 0 ? $"{summary.ToReview} ready to review" : "",
+            summary.ToReview > 0 ? $"{summary.ToReview} ready to preview" : "",
             summary.Failed > 0 ? $"{summary.Failed} failed" : "", summary.Skipped > 0 ? $"{summary.Skipped} skipped" : "",
         ];
         HeadText.Text = string.Join(", ", parts.Where(p => p.Length > 0));
@@ -52,9 +58,13 @@ public sealed partial class FinishedPanel : UserControl
         SpeedText.Text = speed > 0 ? $"{(speed >= 10 ? Math.Round(speed) : Math.Round(speed, 1))}×" : "–";
         Tiles.Visibility = summary.Done + summary.ToReview > 0 ? Visibility.Visible : Visibility.Collapsed;
         ReviewPanel.Visibility = summary.Reviewable.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ReviewTitle.Text = summary.ToReview > 0 ? "Preview, then keep or discard" : "Review and edit";
         ReviewHint.Text = summary.ToReview > 0
-            ? "Check and edit the subtitles, then embed each file from its review."
+            ? "Nothing is saved yet. Open each preview to check and edit it, then keep it to make the result, or discard it."
             : "Check and edit the subtitles; a review can also make a new video with them.";
+        PreviewActions.Visibility = summary.ToReview > 0 ? Visibility.Visible : Visibility.Collapsed;
+        KeepAllButton.Content = summary.ToReview == 1 ? "Keep it" : $"Keep all {summary.ToReview}";
+        DiscardAllButton.Content = summary.ToReview == 1 ? "Discard it" : "Discard all";
         ReviewLinks.ItemsSource = summary.Reviewable;
         Notes.ItemsSource = summary.Notes;
 
@@ -96,6 +106,10 @@ public sealed partial class FinishedPanel : UserControl
     }
 
     private void OnBack(object sender, RoutedEventArgs e) => Closed?.Invoke(this, EventArgs.Empty);
+
+    private void OnKeepAll(object sender, RoutedEventArgs e) => KeepAllRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnDiscardAll(object sender, RoutedEventArgs e) => DiscardAllRequested?.Invoke(this, EventArgs.Empty);
 
     private void OnReview(object sender, RoutedEventArgs e)
     {

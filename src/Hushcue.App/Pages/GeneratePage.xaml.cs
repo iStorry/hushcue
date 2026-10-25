@@ -21,6 +21,10 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     private Batch? _batch;
     private bool _showingResult;
     private bool _starting;
+    /// <summary>Keep all: making every preview's result; what Cancel stops.</summary>
+    private CancellationTokenSource? _keeping;
+    /// <summary>Previews made by this page's runs, deleted once no file in the list is waiting on them.</summary>
+    private readonly HashSet<string> _previews = new(StringComparer.OrdinalIgnoreCase);
     private readonly FilesLayout _layout;
 
     /// <summary>One run over the queue, and what it did so far.</summary>
@@ -53,6 +57,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         {
             _showingResult = false;
             Run.HideProgress();
+            DropUnusedPreviews();
         };
         foreach (var (preset, column) in Presets.All.Select((p, i) => (p, i)))
         {
@@ -68,10 +73,14 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         Run.CancelRequested += async (_, ask) => await CancelAsync(ask);
         Summary.Closed += (_, _) => ShowSummary(null);
         Summary.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
+        Summary.KeepAllRequested += async (_, _) => await KeepAllAsync();
+        Summary.DiscardAllRequested += async (_, _) => await DiscardAllAsync();
         Queue.ReviewRequested += async (_, file) => await OpenReviewAsync(file);
         SizeChanged += OnPageSizeChanged;
         Review.Closed += (_, _) => ShowReview(false);
         Review.Embedded += (_, embedded) => Queue.Update(FileProgress.Done(embedded.File.Path, embedded.Result.Video));
+        Review.Kept += (_, kept) => Queue.Update(FileProgress.Done(kept.File.Path, kept.Result.Output));
+        Review.Discarded += (_, file) => Queue.Update(FileProgress.Waiting(file.Path)); // can be run again
         Review.IsJobRunning = () => IsRunning;
     }
 
@@ -92,7 +101,10 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             Run.RequestStart();
     }
 
-    public bool IsRunning => _batch is not null;
+    public bool IsRunning => _batch is not null || _keeping is not null;
+
+    /// <summary>Previews in the list not kept or discarded yet: closing the app discards them.</summary>
+    public int PreviewCount => Queue.Files.Count(f => f.State == FileState.Review && f.Transcript is { IsPreview: true });
 
     /// <summary>A file's subtitles are open for review (the page shows the review instead of the queue).</summary>
     public bool IsReviewing => Review.Visibility == Visibility.Visible;
@@ -107,7 +119,9 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var preset = Presets.Get(settings.Preset).Name;
         Check<string>(PresetChoices, name => name == preset);
         Check<ResultChoice>(ResultChoices, choice => choice.Mode == settings.Embed);
+        PreviewToggle.IsOn = settings.PreviewFirst;
         Output.Folder = settings.OutputFolder;
+        _ = Task.Run(() => Previews.CleanUp(TimeSpan.FromDays(7))); // left by an app that did not close normally
         RefreshSettingsSummary();
         ShowIdleStatus();
     }
@@ -116,6 +130,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     {
         settings.Preset = SelectedPreset;
         settings.Embed = SelectedEmbed;
+        settings.PreviewFirst = PreviewToggle.IsOn;
         settings.OutputFolder = Output.Folder;
     }
 
@@ -128,11 +143,12 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             ShowIdleStatus();
     }
 
-    /// <summary>Stop a running job (window closing); waits briefly for it to wind down.</summary>
+    /// <summary>Stop a running job (window closing); waits briefly for it to wind down. Previews not kept are deleted.</summary>
     public void Stop()
     {
         Review.Shutdown();
         _cancel?.Cancel();
+        _keeping?.Cancel();
         try
         {
             _coreJob?.Wait(TimeSpan.FromSeconds(5)); // the job runs on the thread pool, so this can't deadlock the UI
@@ -140,6 +156,21 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         catch (AggregateException)
         {
             // cancelled or failed: either way it has stopped
+        }
+        foreach (var preview in _previews)
+            Previews.Discard(preview);
+        _previews.Clear();
+    }
+
+    /// <summary>Delete the previews no file in the list is waiting on any more (removed, run again, kept or discarded).</summary>
+    private void DropUnusedPreviews()
+    {
+        var used = Queue.Files.Where(f => f.State is FileState.Review or FileState.Working).Select(f => f.Transcript?.Srt)
+                        .OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var preview in _previews.Where(p => !used.Contains(p)).ToList())
+        {
+            Previews.Discard(preview);
+            _previews.Remove(preview);
         }
     }
 
@@ -196,6 +227,9 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         ToolTipService.SetToolTip(SpeedHint, speed is null ? null : "Measured on this PC during your last run with this preset");
     }
 
+    private void OnPreviewToggled(object sender, RoutedEventArgs e) =>
+        Run.StartText = PreviewToggle.IsOn ? "Generate a preview" : "Generate subtitles";
+
     private void OnResultChanged(object sender, RoutedEventArgs e)
     {
         RefreshSettingsSummary();
@@ -224,8 +258,6 @@ public sealed partial class GeneratePage : UserControl, IRunPage
                 parts.Add("keeps the .srt");
             if (_settings.DeleteOriginal)
                 parts.Add("originals to the Recycle Bin");
-            if (_settings.ReviewBeforeEmbed)
-                parts.Add("review before embedding");
         }
         SettingsSummary.Text = string.Join(" · ", parts);
     }
@@ -345,10 +377,12 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var srtOnly = new Func<QueuedFile, bool>(f => settings.Embed != EmbedMode.None && f.Info is { HasVideo: false });
         var recycling = settings.DeleteOriginal ? files.Count(f => !srtOnly(f)) : 0;
         if (recycling > 0 && !await Dialogs.ConfirmAsync(XamlRoot,
-                $"After each video is finished, its original will be moved to the Recycle Bin. You can put "
-                + $"{(recycling == 1 ? "it" : "them")} back from the finished screen.\n\nContinue with {recycling} file(s)?",
+                (settings.PreviewFirst ? "When you keep a preview as a video, its original will be moved to the Recycle Bin."
+                    : "After each video is finished, its original will be moved to the Recycle Bin.")
+                + $" You can put {(recycling == 1 ? "it" : "them")} back from the finished screen.\n\nContinue with {recycling} file(s)?",
                 "Continue"))
             return;
+        DropUnusedPreviews(); // previews of files added again to run again
 
         foreach (var file in skipped)
             Queue.Update(FileProgress.Failed(file.Path, "Skipped · " + file.Check!.Warning.Replace(" · will be skipped", "")));
@@ -460,7 +494,9 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             case FileTranscribed file:
                 batch.Speed.Observe(file);
                 var unsure = UnsureWords.Find(file.Words);
-                if (file.Srt is not null)
+                if (Previews.IsPreview(file.Srt))
+                    _previews.Add(file.Srt!);
+                else if (file.Srt is not null)
                     UnsureWords.Save(file.Srt, unsure); // so a review opened later flags them too
                 batch.Files.FirstOrDefault(f => f.Path == file.Path)
                      ?.SetTranscript(new Transcript(file.Cues, file.Srt, settings, outDir, file.AudioSeconds, unsure));
@@ -509,7 +545,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         {
             var parts = new[]
             {
-                done.Count > 0 || toReview.Count == 0 ? $"{done.Count} saved" : "", toReview.Count > 0 ? $"{toReview.Count} ready to review" : "",
+                done.Count > 0 || toReview.Count == 0 ? $"{done.Count} saved" : "", toReview.Count > 0 ? $"{toReview.Count} ready to preview" : "",
                 failed > 0 ? $"{failed} failed" : "", batch.Skipped > 0 ? $"{batch.Skipped} skipped" : "",
             };
             Run.SetStatus((failed > 0 ? "Finished · " : "Done · ") + string.Join(" · ", parts.Where(p => p.Length > 0)),
@@ -520,8 +556,112 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         Run.SetProgress(1);
         var finished = done.Concat(toReview).ToList();
         ShowSummary(new RunSummary(done.Count, failed, batch.Skipped, TimeSpan.FromSeconds(finished.Sum(f => f.Duration)), batch.Clock.Elapsed,
-                                   notes, batch.Recycled, [.. finished.Select(f => f.Output).OfType<string>()],
+                                   notes, batch.Recycled, [.. done.Select(f => f.Output).OfType<string>()], // a preview is not saved yet
                                    [.. batch.Files.Where(f => f.CanReview)], toReview.Count));
+        if (batch.Files.Count == 1 && toReview.Count == 1)
+            await OpenReviewAsync(toReview[0]); // one preview: straight to it
+    }
+
+    /// <summary>The previews in the list, waiting to be kept or discarded.</summary>
+    private List<QueuedFile> WaitingPreviews() =>
+        [.. Queue.Files.Where(f => f.State == FileState.Review && f.Transcript is { IsPreview: true, Srt: not null })];
+
+    /// <summary>
+    /// Keep every preview as it is now (with any edits saved in it), one after another: the result its run was for,
+    /// recycling the original if the run asked to. A preview that can't be kept stays a preview.
+    /// </summary>
+    private async Task KeepAllAsync()
+    {
+        var previews = WaitingPreviews();
+        if (previews.Count == 0 || IsRunning)
+            return;
+        var keeping = _keeping = new CancellationTokenSource();
+        var ui = DispatcherQueue;
+        var problems = new List<string>();
+        var kept = 0;
+        ShowSummary(null);
+        _showingResult = true; // the queue's changes don't replace the status line with the idle one
+        Run.Reset();
+        Run.SetRunning(true);
+        Queue.SetLocked(true);
+        SetOptionsEnabled(false);
+        try
+        {
+            for (var i = 0; i < previews.Count && !keeping.IsCancellationRequested; i++)
+            {
+                var (file, index) = (previews[i], i);
+                var transcript = file.Transcript!;
+                var preview = transcript.Srt!;
+                void Report(double f)
+                {
+                    Queue.Update(FileProgress.Working(file.Path, f, $"Keeping · {(int)(f * 100)}%", FileStage.Embedding));
+                    Run.SetStatus($"Keeping {index + 1} of {previews.Count} · {file.Name}");
+                    Run.SetProgress((index + f) / previews.Count);
+                    ProgressChanged?.Invoke(this, new RunProgress((index + f) / previews.Count, Taskbar.State.Normal));
+                }
+                Report(0);
+                try
+                {
+                    var cues = await Srt.LoadAsync(preview);
+                    var unsure = transcript.Unsure ?? UnsureWords.Load(preview);
+                    var settings = transcript.Settings;
+                    var result = await Task.Run(() => Previews.KeepAsync(
+                        file.Path, preview, cues, unsure, transcript.OutDir, settings.Embed, settings.KeepSrt, settings.DeleteOriginal,
+                        f => ui.TryEnqueue(() => Report(f)), line => ui.TryEnqueue(() => Run.AppendLog(line)), keeping.Token));
+                    file.SetTranscript(transcript with { Cues = cues, Srt = result.Srt, Unsure = unsure });
+                    Queue.Update(FileProgress.Done(file.Path, result.Output));
+                    kept++;
+                }
+                catch (OperationCanceledException)
+                {
+                    Queue.Update(FileProgress.ReadyForReview(file.Path, preview));
+                }
+                catch (Exception e) when (e is MediaException or IOException or UnauthorizedAccessException or FormatException
+                                            or System.ComponentModel.Win32Exception)
+                {
+                    Queue.Update(FileProgress.ReadyForReview(file.Path, preview));
+                    problems.Add($"{file.Name}: {e.Message}");
+                    Run.AppendLog($"ERROR: could not keep {file.Name}: {e.Message}");
+                }
+            }
+        }
+        finally
+        {
+            _keeping = null;
+            Queue.SetLocked(false);
+            SetOptionsEnabled(true);
+            Run.SetRunning(false);
+            ProgressChanged?.Invoke(this, new RunProgress(null, Taskbar.State.None));
+        }
+        var left = previews.Count - kept;
+        Run.SetStatus(keeping.IsCancellationRequested ? $"Stopped · kept {kept} of {previews.Count}; the rest are still previews"
+                      : left == 0 ? $"Kept {kept} preview{(kept == 1 ? "" : "s")}"
+                      : $"Kept {kept} of {previews.Count} · {left} could not be kept and {(left == 1 ? "is" : "are")} still a preview",
+                      problems.Count > 0 ? StatusKind.Warning : StatusKind.Done);
+        Run.SetProgress(1);
+        Finished?.Invoke(this, EventArgs.Empty);
+        if (problems.Count > 0)
+            await Dialogs.ErrorAsync(XamlRoot, "Could not keep:\n\n" + string.Join("\n", problems));
+    }
+
+    /// <summary>Delete every preview; the files go back to waiting, to run again or remove.</summary>
+    private async Task DiscardAllAsync()
+    {
+        var previews = WaitingPreviews();
+        if (previews.Count == 0 || IsRunning)
+            return;
+        if (!await Dialogs.ConfirmAsync(XamlRoot, previews.Count == 1
+                ? $"Discard the preview of {previews[0].Name}? Its subtitles are deleted; nothing was saved to your folders."
+                : $"Discard all {previews.Count} previews? Their subtitles are deleted; nothing was saved to your folders.",
+                "Discard", "Cancel"))
+            return;
+        foreach (var file in previews)
+            Queue.Update(FileProgress.Waiting(file.Path));
+        DropUnusedPreviews();
+        ShowSummary(null);
+        _showingResult = true;
+        Run.HideProgress();
+        Run.SetStatus(previews.Count == 1 ? "Discarded the preview" : $"Discarded {previews.Count} previews");
     }
 
     /// <param name="summary">null goes back to the options</param>
@@ -566,12 +706,12 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         _layout.Show(shown);
     }
 
-    private JobSettings CurrentSettings() => _settings.ToJob(SelectedPreset, SelectedEmbed);
+    private JobSettings CurrentSettings() => _settings.ToJob(SelectedPreset, SelectedEmbed) with { PreviewFirst = PreviewToggle.IsOn };
 
     private async Task OpenReviewAsync(QueuedFile file)
     {
-        if (!file.CanReview || ReferenceEquals(Review.Current, file) && IsReviewing)
-            return;
+        if (!file.CanReview || ReferenceEquals(Review.Current, file) && IsReviewing || _keeping is not null)
+            return; // (Keep all is making the previews' results)
         if (Review.Current is not null && !await Review.CloseAsync())
             return;
         ShowReview(true);
@@ -590,13 +730,20 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     {
         Output.IsEnabled = enabled;
         SettingsLink.IsEnabled = enabled;
+        PreviewToggle.IsEnabled = enabled;
         foreach (var card in PresetChoices.Children.Concat(ResultChoices.Children).OfType<Control>())
             card.IsEnabled = enabled;
     }
 
     private async Task CancelAsync(bool ask)
     {
-        if (!IsRunning || _cancel is null || _cancel.IsCancellationRequested)
+        if (_keeping is { IsCancellationRequested: false } keeping)
+        {
+            keeping.Cancel(); // the file being kept stays a preview
+            Run.SetCancelling();
+            return;
+        }
+        if (_batch is null || _cancel is null || _cancel.IsCancellationRequested)
             return;
         if (ask && !await Dialogs.ConfirmAsync(XamlRoot,
                 "Stop making subtitles? Files that are finished are kept; the file in progress is not saved.",

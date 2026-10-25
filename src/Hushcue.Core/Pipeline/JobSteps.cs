@@ -36,6 +36,9 @@ internal sealed class JobSteps
     public Func<string, string, string?, EmbedMode, Action<double>, CancellationToken, Task<string>> Embed { get; init; } =
         (video, srt, outDir, mode, onFraction, cancel) => Media.Embed.SubtitlesAsync(video, srt, outDir, mode, onFraction, cancel: cancel);
 
+    /// <summary>The folder previews go into (<see cref="Previews.Root"/>).</summary>
+    public string PreviewRoot { get; init; } = Previews.Root;
+
     /// <summary>Move a file to the Recycle Bin; false if it could not.</summary>
     public Func<string, bool> Recycle { get; init; } = RecycleBin.Send;
 

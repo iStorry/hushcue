@@ -331,34 +331,33 @@ public sealed partial class MainWindow : Window
 
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (!_closeConfirmed && (Generate.HasUnsavedEdits || Edit.HasUnsavedEdits))
+        var unsaved = Generate.HasUnsavedEdits || Edit.HasUnsavedEdits;
+        var previews = Generate.PreviewCount;
+        var running = Generate.IsRunning || Convert.IsRunning;
+        if (_closeConfirmed || !(unsaved || previews > 0 || running))
         {
-            args.Cancel = true;
-            if (!await Dialogs.ConfirmAsync(Root.XamlRoot, "Your edits to the subtitles are not saved. Close Hushcue without saving them?",
-                                            "Close without saving", "Keep editing"))
-                return;
-            _closeConfirmed = !(Generate.IsRunning || Convert.IsRunning); // a running batch still asks below
-            if (_closeConfirmed)
-            {
-                ShutDown();
-                Close();
-                return;
-            }
-        }
-        if (!_closeConfirmed && (Generate.IsRunning || Convert.IsRunning))
-        {
-            args.Cancel = true;
-            if (!await Dialogs.ConfirmAsync(Root.XamlRoot, "Files are still being processed. Stop and close Hushcue?\n\n"
-                                                           + "Finished files are kept; the file in progress is not saved.",
-                                            "Stop and close", "Keep working"))
-                return;
-            _closeConfirmed = true;
-            ShutDown(); // Close() doesn't raise Closing again, and the job must stop before its ffmpeg outlives the app
-            Close();
+            ShutDown();
             return;
         }
-        ShutDown();
+        args.Cancel = true;
+        if (unsaved && !await Dialogs.ConfirmAsync(Root.XamlRoot, "Your edits to the subtitles are not saved. Close Hushcue without saving them?",
+                                                   "Close without saving", "Keep editing"))
+            return;
+        if (previews > 0 && !await Dialogs.ConfirmAsync(Root.XamlRoot, PreviewsQuestion(previews, "Close Hushcue"),
+                                                        "Close and discard", "Keep previewing"))
+            return;
+        if (running && !await Dialogs.ConfirmAsync(Root.XamlRoot, "Files are still being processed. Stop and close Hushcue?\n\n"
+                                                                  + "Finished files are kept; the file in progress is not saved.",
+                                                   "Stop and close", "Keep working"))
+            return;
+        _closeConfirmed = true;
+        ShutDown(); // Close() doesn't raise Closing again, and a job must stop before its ffmpeg outlives the app
+        Close();
     }
+
+    private static string PreviewsQuestion(int previews, string action) => previews == 1
+        ? $"A preview hasn't been kept. {action} and discard it? Its subtitles are deleted."
+        : $"{previews} previews haven't been kept. {action} and discard them? Their subtitles are deleted.";
 
     /// <summary>
     /// Before an update's installer takes over: ask about unsaved edits and a running batch like closing does, then stop
@@ -372,6 +371,9 @@ public sealed partial class MainWindow : Window
                                             "Update without saving", "Keep editing"))
                 return false;
         }
+        if (Generate.PreviewCount is > 0 and var previews
+            && !await Dialogs.ConfirmAsync(Root.XamlRoot, PreviewsQuestion(previews, "Update"), "Update and discard", "Keep previewing"))
+            return false;
         if (Generate.IsRunning || Convert.IsRunning)
         {
             if (!await Dialogs.ConfirmAsync(Root.XamlRoot, "Files are still being processed. Stop them and update?\n\n"
