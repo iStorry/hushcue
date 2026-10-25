@@ -47,7 +47,9 @@ public sealed class JobTests : IDisposable
     private List<string> Names() => [.. Directory.EnumerateFiles(_dir).Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal)];
 
     /// <summary>Real audio extraction and embedding (x264, so the test does not depend on the GPU), the given model.</summary>
-    private static JobSteps Steps(ITranscriber model, Func<string, string, string?, EmbedMode, Action<double>, CancellationToken, Task<string>>? embed = null,
+    private string PreviewRoot => Path.Combine(_dir, "previews");
+
+    private JobSteps Steps(ITranscriber model, Func<string, string, string?, EmbedMode, Action<double>, CancellationToken, Task<string>>? embed = null,
                                   Func<string, bool>? recycle = null) =>
         new()
         {
@@ -57,6 +59,7 @@ public sealed class JobTests : IDisposable
             SpeechProbabilities = FakeSpeech.Everywhere,
             Embed = embed ?? RealEmbed,
             Recycle = recycle ?? (_ => throw new InvalidOperationException("recycled without asking")),
+            PreviewRoot = PreviewRoot,
         };
 
     private static Task<string> RealEmbed(string video, string srt, string? outDir, EmbedMode mode, Action<double> onFraction,
@@ -378,19 +381,118 @@ public sealed class JobTests : IDisposable
         Assert.Equal("cpu", Assert.Single(run.Events.OfType<FileTranscribed>()).Device);
     }
 
-    // --- review before embedding
+    // --- preview first
 
     [FfmpegFact]
-    public async Task ReviewBeforeEmbeddingStopsAtTheSrt()
+    public async Task PreviewFirstWritesNothingButThePreview()
     {
         var clip = Clip();
-        var run = await RunAsync([clip], new JobSettings { Embed = EmbedMode.Soft, KeepSrt = false, DeleteOriginal = true, ReviewBeforeEmbed = true },
+        var run = await RunAsync([clip], new JobSettings { Embed = EmbedMode.Soft, KeepSrt = true, DeleteOriginal = true, PreviewFirst = true },
                                  Steps(new FakeTranscriber(Hello, duration: 4), FailingEmbed));
-        Assert.Equal(["clip.mp4", "clip.srt"], Names()); // the .srt is kept for the review, the video not touched yet
-        Assert.Equal(FileProgress.ReadyForReview(clip, Path.ChangeExtension(clip, ".srt")), run.Files[^1]);
-        Assert.Equal(run.Outputs, [Path.ChangeExtension(clip, ".srt")]);
-        Assert.Equal(Path.ChangeExtension(clip, ".srt"), Assert.Single(run.Events.OfType<FileTranscribed>()).Srt);
+        Assert.Equal(["clip.mp4"], Names()); // no .srt, no video, the original not recycled
+        var srt = Assert.Single(run.Events.OfType<FileTranscribed>()).Srt!;
+        Assert.True(Previews.IsPreview(srt, PreviewRoot));
+        Assert.Equal("clip.srt", Path.GetFileName(srt));
+        Assert.Equal(["hello there"], Srt.Read(File.ReadAllText(srt)).Select(c => c.Text));
+        Assert.Equal(FileProgress.ReadyForReview(clip, srt), run.Files[^1]);
+        Assert.Equal("Ready to preview", run.Files[^1].Status);
+        Assert.Empty(run.Outputs);
         AssertMonotonic(run.Seen);
+    }
+
+    [FfmpegFact]
+    public async Task APreviewWithNothingHeardFails()
+    {
+        var clip = Clip();
+        var run = await RunAsync([clip], new JobSettings { PreviewFirst = true }, Steps(new FakeTranscriber([], duration: 4)));
+        Assert.Equal(["clip.mp4"], Names());
+        Assert.Equal(FileState.Failed, run.Files[^1].State);
+        Assert.False(Directory.Exists(PreviewRoot) && Directory.EnumerateFileSystemEntries(PreviewRoot).Any());
+    }
+
+    private async Task<string> PreviewOf(string source)
+    {
+        var preview = Previews.NewSrtPath(source, PreviewRoot);
+        await Srt.SaveAsync(preview, [new Cue(1.0, 2.0, "as heard")]);
+        return preview;
+    }
+
+    [FfmpegFact]
+    public async Task KeepingAPreviewAsAnSrtSavesItNextToTheVideo()
+    {
+        var clip = Clip();
+        var preview = await PreviewOf(clip);
+        File.WriteAllText(Path.ChangeExtension(clip, ".srt"), "someone else's");
+        var kept = await Previews.KeepAsync(clip, preview, [new Cue(0.5, 2.0, "edited by hand")], [], null, EmbedMode.None,
+                                            keepSrt: false, deleteOriginal: true, _ => { }, _ => { }, Steps(new FakeTranscriber(Hello)),
+                                            PreviewRoot, default);
+        var srt = Path.Combine(_dir, "clip (1).srt"); // never over an existing file
+        Assert.Equal(new KeptPreview(srt, srt, Recycled: false), kept); // an .srt alone never recycles the original
+        Assert.Equal(["edited by hand"], Srt.Read(File.ReadAllText(srt)).Select(c => c.Text));
+        Assert.False(Directory.Exists(Path.GetDirectoryName(preview))); // the preview is gone
+        Assert.Equal("someone else's", File.ReadAllText(Path.ChangeExtension(clip, ".srt")));
+    }
+
+    [FfmpegFact]
+    public async Task KeepingAPreviewAsATrackEmbedsAndRecycles()
+    {
+        var clip = Clip();
+        var preview = await PreviewOf(clip);
+        var recycled = new List<string>();
+        var kept = await Previews.KeepAsync(clip, preview, [new Cue(0.5, 2.0, "edited by hand")], [], Path.Combine(_dir, "out"),
+                                            EmbedMode.Soft, keepSrt: true, deleteOriginal: true, _ => { }, _ => { },
+                                            Steps(new FakeTranscriber(Hello), recycle: path =>
+                                            {
+                                                recycled.Add(path);
+                                                return true;
+                                            }), PreviewRoot, default);
+        Assert.Equal(new KeptPreview(Path.Combine(_dir, "out", "clip.mkv"), Path.Combine(_dir, "out", "clip.srt"), Recycled: true), kept);
+        Assert.Equal([clip], recycled);
+        Assert.True(File.Exists(kept.Srt));
+        Assert.False(Directory.Exists(Path.GetDirectoryName(preview)));
+    }
+
+    [FfmpegFact]
+    public async Task APreviewThatCouldNotBeKeptIsStillThere()
+    {
+        var clip = Clip();
+        var preview = await PreviewOf(clip);
+        await Assert.ThrowsAsync<MediaException>(() => Previews.KeepAsync(
+            clip, preview, [new Cue(0.5, 2.0, "x")], [], null, EmbedMode.Burn, keepSrt: true, deleteOriginal: true, _ => { }, _ => { },
+            Steps(new FakeTranscriber(Hello), FailingEmbed), PreviewRoot, default));
+        Assert.True(File.Exists(preview));
+        Assert.Equal(["clip.mp4"], Names()); // and nothing half made
+        await Assert.ThrowsAsync<MediaException>(() => Previews.KeepAsync(
+            clip, preview, [], [], null, EmbedMode.None, false, false, _ => { }, _ => { }, Steps(new FakeTranscriber(Hello)), PreviewRoot, default));
+    }
+
+    [Fact]
+    public void OnlyPreviewsAreDiscarded()
+    {
+        var preview = Previews.NewSrtPath(Path.Combine(_dir, "talk.mp4"), PreviewRoot);
+        File.WriteAllText(preview, "");
+        var outside = Path.Combine(_dir, "talk.srt");
+        File.WriteAllText(outside, "");
+        Assert.True(Previews.IsPreview(preview, PreviewRoot));
+        Assert.False(Previews.IsPreview(outside, PreviewRoot));
+        Assert.False(Previews.IsPreview(null, PreviewRoot));
+        Previews.Discard(outside, PreviewRoot);
+        Assert.True(File.Exists(outside));
+        Previews.Discard(preview, PreviewRoot);
+        Assert.False(Directory.Exists(Path.GetDirectoryName(preview)));
+        Assert.True(Directory.Exists(PreviewRoot));
+    }
+
+    [Fact]
+    public void CleanUpRemovesOnlyOldPreviews()
+    {
+        var old = Previews.NewSrtPath("a.mp4", PreviewRoot);
+        var recent = Previews.NewSrtPath("b.mp4", PreviewRoot);
+        Directory.SetLastWriteTimeUtc(Path.GetDirectoryName(old)!, DateTime.UtcNow.AddDays(-8));
+        Previews.CleanUp(TimeSpan.FromDays(7), PreviewRoot);
+        Assert.False(Directory.Exists(Path.GetDirectoryName(old)));
+        Assert.True(Directory.Exists(Path.GetDirectoryName(recent)));
+        Previews.CleanUp(TimeSpan.FromDays(7), Path.Combine(_dir, "missing")); // nothing there: nothing to do
     }
 
     [FfmpegFact]

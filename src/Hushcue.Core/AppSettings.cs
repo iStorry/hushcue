@@ -14,7 +14,10 @@ public sealed class AppSettings
     public EmbedMode Embed { get; set; } = EmbedMode.Soft;
     public bool KeepSrt { get; set; }
     public bool DeleteOriginal { get; set; }
-    public bool ReviewBeforeEmbed { get; set; }
+
+    /// <summary>Preview first (<see cref="JobSettings.PreviewFirst"/>), for every kind of result.</summary>
+    public bool PreviewFirst { get; set; }
+
     public bool Enhance { get; set; }
     public bool SkipSilence { get; set; }
     public string OutputFolder { get; set; } = "";
@@ -55,7 +58,7 @@ public sealed class AppSettings
 
     /// <summary>
     /// A job's settings from these choices. The options that only apply when subtitles go into the video (keep the
-    /// .srt, recycle the original, review first) are off when <paramref name="embed"/> is None.
+    /// .srt, recycle the original) are off when <paramref name="embed"/> is None.
     /// </summary>
     public JobSettings ToJob(string? preset = null, EmbedMode? embed = null)
     {
@@ -71,7 +74,7 @@ public sealed class AppSettings
             Embed = mode,
             KeepSrt = embedding && KeepSrt,
             DeleteOriginal = embedding && DeleteOriginal,
-            ReviewBeforeEmbed = embedding && ReviewBeforeEmbed,
+            PreviewFirst = PreviewFirst,
         };
     }
 

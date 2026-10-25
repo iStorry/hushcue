@@ -111,31 +111,28 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
            cancel);
 
         Report(0.99, "Writing SRT...", FileStage.WritingSrt);
+        var warnings = Cleanup.CoverageWarnings(cues, seconds);
+        foreach (var warning in warnings)
+            log("WARNING: " + warning);
+        if (settings.PreviewFirst)
+        {
+            await PreviewAsync(index, cues, words, seconds, took, warnings, cancel);
+            return null;
+        }
         var destDir = outDir ?? Path.GetDirectoryName(src) ?? "";
         Directory.CreateDirectory(destDir);
         var embedding = settings.Embed != EmbedMode.None && cues.Count > 0;
-        var review = embedding && settings.ReviewBeforeEmbed;
-        var tempSrt = embedding && !settings.KeepSrt && !review;
+        var tempSrt = embedding && !settings.KeepSrt;
         var srt = tempSrt
             ? Path.Combine(Path.GetTempPath(), $"hushcue_{Guid.NewGuid():N}.srt") // only fed to ffmpeg, deleted after
             : FileNames.Unique(Path.Combine(destDir, Path.GetFileNameWithoutExtension(src) + ".srt"));
         await Srt.SaveAsync(srt, cues, cancel);
         if (!tempSrt)
             log($"Saved {srt} ({cues.Count} subtitles)");
-        var warnings = Cleanup.CoverageWarnings(cues, seconds);
-        foreach (var warning in warnings)
-            log("WARNING: " + warning);
         if (settings.Embed != EmbedMode.None && cues.Count == 0)
             log("No subtitles were found, so nothing was embedded in the video.");
         onEvent(new FileTranscribed(src, cues, seconds, took, _device, tempSrt ? null : srt, warnings, words));
 
-        if (review)
-        {
-            log($"{Path.GetFileName(src)} is ready to review; its subtitles will be added to the video after that.");
-            _outputs[index] = srt;
-            _progress.ReadyForReview(index, srt);
-            return null;
-        }
         if (embedding)
         {
             _progress.WaitingToEmbed(index, _share);
@@ -144,6 +141,27 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         _outputs[index] = srt;
         _progress.Done(JobStage.Transcribing, index, srt);
         return null;
+    }
+
+    /// <summary>
+    /// Preview first: the .srt goes into a temporary folder of its own and the file stops there, ready to preview;
+    /// nothing is written to the output folder or the video. Without subtitles there is nothing to preview.
+    /// </summary>
+    private async Task PreviewAsync(int index, List<Cue> cues, List<Word> words, double seconds, TimeSpan took,
+                                    IReadOnlyList<string> warnings, CancellationToken cancel)
+    {
+        var src = files[index];
+        if (cues.Count == 0)
+        {
+            onEvent(new FileTranscribed(src, cues, seconds, took, _device, null, warnings, words));
+            _progress.Failed(JobStage.Transcribing, index, "Nothing was heard, so there is nothing to preview");
+            return;
+        }
+        var srt = Previews.NewSrtPath(src, steps.PreviewRoot);
+        await Srt.SaveAsync(srt, cues, cancel);
+        log($"{Path.GetFileName(src)} is ready to preview ({cues.Count} subtitles); nothing is saved until it is kept.");
+        onEvent(new FileTranscribed(src, cues, seconds, took, _device, srt, warnings, words));
+        _progress.ReadyForReview(index, srt);
     }
 
     /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>

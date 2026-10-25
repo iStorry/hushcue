@@ -33,7 +33,7 @@ internal sealed class JobProgress(IReadOnlyList<string> files, Action<double, st
     public void Done(JobStage stage, int index, string output) =>
         Update(stage, index, 1, "", FileProgress.Done(files[index], output));
 
-    /// <summary>The file is transcribed and its embedding waits for a review; it counts as finished in the overall value.</summary>
+    /// <summary>The file is transcribed into a preview, to keep or discard; it counts as finished in the overall value.</summary>
     public void ReadyForReview(int index, string srt) =>
         Update(JobStage.Transcribing, index, 1, "", FileProgress.ReadyForReview(files[index], srt));
 

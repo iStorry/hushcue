@@ -47,7 +47,7 @@ public static class SubtitleJob
     }
 
     /// <summary>
-    /// The last step of a file that was reviewed (<see cref="JobSettings.ReviewBeforeEmbed"/>): put the (edited)
+    /// The last step of a file that was reviewed (a kept preview, or a finished file opened later): put the (edited)
     /// subtitles into the video, and move the original to the Recycle Bin if asked, as the job would have.
     /// </summary>
     /// <param name="onFraction">how far ffmpeg is, 0..1</param>

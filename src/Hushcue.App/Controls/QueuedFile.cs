@@ -20,7 +20,11 @@ public sealed record FileCheck(string Warning, bool Skip);
 /// <param name="Duration">the audio's length in seconds</param>
 /// <param name="Unsure">look-alike words Whisper was not sure of; null: look them up for <paramref name="Srt"/></param>
 public sealed record Transcript(IReadOnlyList<Cue> Cues, string? Srt, JobSettings Settings, string? OutDir, double Duration,
-                                IReadOnlyList<Hushcue.Core.Review.UnsureWord>? Unsure = null);
+                                IReadOnlyList<Hushcue.Core.Review.UnsureWord>? Unsure = null)
+{
+    /// <summary>The subtitles are a preview (<see cref="Previews"/>): nothing has been saved yet.</summary>
+    public bool IsPreview => Previews.IsPreview(Srt);
+}
 
 /// <summary>A file in the queue and where it is: waiting, being worked on, done, or failed.</summary>
 public sealed class QueuedFile(string path) : INotifyPropertyChanged
@@ -54,7 +58,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     /// <summary>The subtitles heard so far while the file is transcribed (provisional).</summary>
     public ObservableCollection<CueLine> LiveCues { get; } = [];
 
-    /// <summary>Finished, or waiting for a review, with subtitles to look at.</summary>
+    /// <summary>Finished, or a preview waiting to be kept or discarded, with subtitles to look at.</summary>
     public bool CanReview => State is FileState.Done or FileState.Review && Transcript is { Cues.Count: > 0 };
 
     /// <summary>Seconds, 0 until probed or when the file does not say.</summary>
@@ -66,7 +70,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
         FileState.Working => _progress.Status,
         FileState.Done => Join("Done", Lower(_progress.Status), Length),
         FileState.Failed => _progress.Status,
-        FileState.Review => Join("Ready to review", Length),
+        FileState.Review => Join("Ready to preview", Length),
         _ when Check is not null => Check.Warning,
         _ => Join(ProbeError is null && Info is null ? "Waiting · reading the file..." : "Waiting", Length),
     };
@@ -84,7 +88,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     public double Percent => _progress.Fraction * 100;
     public string PercentText => State == FileState.Working ? $"{Percent:F0}%" : "";
     public Visibility ProgressVisibility => VisibleIf(State == FileState.Working);
-    public Visibility OutputVisibility => VisibleIf(State is FileState.Done or FileState.Review && Output is not null);
+    public Visibility OutputVisibility => VisibleIf(State == FileState.Done && Output is not null); // a preview is in a temporary folder
     public Visibility ReviewVisibility => VisibleIf(CanReview);
     public Visibility RemoveVisibility => VisibleIf(!_locked && State != FileState.Working);
 
@@ -108,7 +112,7 @@ public sealed class QueuedFile(string path) : INotifyPropertyChanged
     /// <summary>What a screen reader says for the row.</summary>
     public string AccessibleName => State == FileState.Working ? $"{Name}, {PercentText}, {Detail}" : $"{Name}, {Detail}";
     public string RemoveName => $"Remove {Name} from the list";
-    public string ReviewName => $"Review and edit the subtitles of {Name}";
+    public string ReviewName => State == FileState.Review ? $"Preview the subtitles of {Name}" : $"Review and edit the subtitles of {Name}";
     public string ShowName => $"Show {System.IO.Path.GetFileName(Output ?? Name)} in its folder";
 
     public void Update(FileProgress progress)

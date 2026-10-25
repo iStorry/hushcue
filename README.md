@@ -52,7 +52,8 @@ The sidebar holds the three tools:
   spellings; "Looks fine" keeps the word. **Re-run this part** transcribes the selected subtitles again; **Try
   another model** does it with another quality's model (Thorough's large-v3 decodes more carefully than the
   turbo model of Fast and Balanced) and shows what it heard next to what is there, with the words that differ
-  marked, to use or keep.
+  marked, to use or keep. With **Preview first** on, nothing is saved until you look: each file's subtitles open as
+  a preview in a temporary folder, to **Keep** (as the result you pick) or **Discard**.
 - **Edit subtitles**: open a video with subtitles it already has (`talk.srt` or `talk.en.srt` next to `talk.mp4`
   is found by name), check them against the picture, fix text and timing, then save the `.srt` or put it into a copy
   of the video. Dropping a video with its `.srt`, or right-clicking an `.srt` in Explorer and choosing **Edit

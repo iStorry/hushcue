@@ -11,22 +11,23 @@ public sealed class AppSettingsTests
         var settings = new AppSettings
         {
             Preset = "Fast", Language = "Auto-detect", Vocabulary = "Anna", Enhance = true, SkipSilence = true,
-            Embed = EmbedMode.Soft, KeepSrt = true, DeleteOriginal = true, ReviewBeforeEmbed = true,
+            Embed = EmbedMode.Soft, KeepSrt = true, DeleteOriginal = true, PreviewFirst = true,
         };
         var job = settings.ToJob();
         Assert.Equal("Fast", job.Preset);
         Assert.Null(job.Language); // auto-detect
         Assert.Equal("Anna", job.Vocabulary);
-        Assert.True(job.Enhance && job.SkipSilence && job.KeepSrt && job.DeleteOriginal && job.ReviewBeforeEmbed);
+        Assert.True(job.Enhance && job.SkipSilence && job.KeepSrt && job.DeleteOriginal && job.PreviewFirst);
         Assert.Equal("Balanced", settings.ToJob(preset: "Balanced").Preset);
     }
 
     [Fact]
     public void FileOptionsOnlyApplyWhenSubtitlesGoIntoTheVideo()
     {
-        var settings = new AppSettings { KeepSrt = true, DeleteOriginal = true, ReviewBeforeEmbed = true, Language = "English" };
+        var settings = new AppSettings { KeepSrt = true, DeleteOriginal = true, PreviewFirst = true, Language = "English" };
         var job = settings.ToJob(embed: EmbedMode.None);
-        Assert.False(job.KeepSrt || job.DeleteOriginal || job.ReviewBeforeEmbed); // an .srt-only run never recycles
+        Assert.False(job.KeepSrt || job.DeleteOriginal); // an .srt-only run never recycles
+        Assert.True(job.PreviewFirst); // but can be previewed like any other
         Assert.Equal("en", job.Language);
     }
 

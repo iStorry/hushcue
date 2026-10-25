@@ -39,10 +39,10 @@ public sealed partial class FileQueue : UserControl
     /// <summary>The files changed: added, removed, probed, or moved on in a run.</summary>
     public event EventHandler? Changed;
 
-    /// <summary>The review button of a file (or Enter / double-click on a file waiting for its review).</summary>
+    /// <summary>The review button of a file (or Enter / double-click on a preview).</summary>
     public event EventHandler<QueuedFile>? ReviewRequested;
 
-    /// <summary>The files the next run should do: everything not done yet (or waiting for its review).</summary>
+    /// <summary>The files the next run should do: everything not done yet (or a preview waiting to be kept).</summary>
     public List<QueuedFile> Pending => [.. Files.Where(f => f.State is not (FileState.Done or FileState.Review))];
 
     public List<string> PendingPaths => [.. Pending.Select(f => f.Path)];
@@ -190,7 +190,7 @@ public sealed partial class FileQueue : UserControl
             count,
             length > 0 ? BatchEstimate.Clock(TimeSpan.FromSeconds(length)) : "",
             done > 0 ? $"{done} done" : "",
-            review > 0 ? $"{review} to review" : "",
+            review > 0 ? $"{review} to preview" : "",
         }.Where(p => p.Length > 0));
         Changed?.Invoke(this, EventArgs.Empty);
     }

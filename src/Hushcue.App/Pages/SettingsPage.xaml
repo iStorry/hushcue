@@ -49,10 +49,6 @@
                                  Description="Only after the new video has been written. You can put it back from the finished screen or the Recycle Bin.">
                 <ToggleSwitch x:Name="DeleteToggle" Toggled="OnChanged" AutomationProperties.Name="Move the original to the Recycle Bin" />
             </controls:SettingRow>
-            <controls:SettingRow Glyph="&#xE70F;" Title="Review before embedding"
-                                 Description="Stop after the subtitles are made so you can check and edit them, then embed each file from its review.">
-                <ToggleSwitch x:Name="ReviewToggle" Toggled="OnChanged" AutomationProperties.Name="Review before embedding" />
-            </controls:SettingRow>
 
             <TextBlock Text="Appearance" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2" />
             <controls:SettingRow Glyph="&#xE790;" Title="Theme" Description="Light, dark, or the same as Windows.">

@@ -405,16 +405,22 @@
                 </Button>
                 <Button x:Name="ExportButton" Content="Export .srt" Click="OnExport"
                         ToolTipService.ToolTip="Save a copy of the subtitles somewhere else" AutomationProperties.Name="Export .srt" />
-                <ComboBox x:Name="ModeBox" MinWidth="200" VerticalAlignment="Center"
-                          AutomationProperties.Name="How to put the subtitles into the video">
-                    <ComboBoxItem Content="Subtitle track (.mkv)" Tag="Soft" />
-                    <ComboBoxItem Content="Burn into the picture (.mp4)" Tag="Burn" />
-                </ComboBox>
+                <!-- A preview: discard it, or keep it as the result chosen here -->
+                <Button x:Name="DiscardButton" Click="OnDiscard" Visibility="Collapsed"
+                        ToolTipService.ToolTip="Delete this preview; nothing is saved" AutomationProperties.Name="Discard the preview">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                        <TextBlock Text="Discard" />
+                    </StackPanel>
+                </Button>
+                <!-- Items from ReviewPage.ShowModes: with an .srt of its own for a preview -->
+                <ComboBox x:Name="ModeBox" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnModeChanged"
+                          AutomationProperties.Name="How to put the subtitles into the video" />
                 <Button x:Name="EmbedButton" Click="OnEmbed" Style="{ThemeResource AccentButtonStyle}" Padding="18,6"
                         AutomationProperties.Name="Embed into video">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE8B9;" FontSize="14" />
-                        <TextBlock Text="Embed into video" />
+                        <FontIcon x:Name="EmbedIcon" Glyph="&#xE8B9;" FontSize="14" />
+                        <TextBlock x:Name="EmbedText" Text="Embed into video" />
                     </StackPanel>
                 </Button>
                 <Button x:Name="CancelButton" Content="Cancel" Click="OnCancelWork" Visibility="Collapsed" />
