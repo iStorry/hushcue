@@ -26,7 +26,7 @@
 
     <Grid x:Name="Root" RowSpacing="12" PreviewKeyDown="OnPreviewKeyDown">
         <VisualStateManager.VisualStateGroups>
-            <VisualStateGroup>
+            <VisualStateGroup x:Name="PaneLayout" CurrentStateChanged="OnPaneLayoutChanged">
                 <!-- Too narrow for the video and the list side by side: the list goes under the video, the page
                      scrolls, and the buttons at the bottom go under the status -->
                 <VisualState x:Name="Stacked">
@@ -43,6 +43,10 @@
                         <Setter Target="ListCard.(Grid.Column)" Value="0" />
                         <Setter Target="ListCard.(Grid.Row)" Value="1" />
                         <Setter Target="ListCard.(Grid.RowSpan)" Value="1" />
+                        <!-- under the video the list takes no width from it: nothing to resize or hide -->
+                        <Setter Target="ListCard.Visibility" Value="Visible" />
+                        <Setter Target="ListDivider.Visibility" Value="Collapsed" />
+                        <Setter Target="ListToggle.Visibility" Value="Collapsed" />
                         <Setter Target="Footer.RowSpacing" Value="8" />
                         <Setter Target="Footer.ColumnSpacing" Value="0" />
                         <Setter Target="FooterActions.(Grid.Row)" Value="1" />
@@ -121,6 +125,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Button x:Name="BackStep" Click="OnStepBack" Style="{StaticResource TransportButton}"
                                 ToolTipService.ToolTip="Back 5 seconds (J)" AutomationProperties.Name="Back 5 seconds"
@@ -168,6 +173,10 @@
                                 ToolTipService.ToolTip="Show less of the timeline, in more detail (Ctrl+wheel)"
                                 AutomationProperties.Name="Zoom the timeline in">
                             <FontIcon Glyph="&#xE8A3;" FontSize="14" />
+                        </Button>
+                        <!-- Tooltip and name from ReviewPage.ApplyListLayout -->
+                        <Button x:Name="ListToggle" Grid.Column="8" Click="OnToggleList" Style="{ThemeResource SubtleButtonStyle}" Padding="8">
+                            <FontIcon x:Name="ListToggleIcon" Glyph="&#xE740;" FontSize="14" />
                         </Button>
                     </Grid>
 
@@ -364,6 +373,16 @@
                     </Border>
                 </Grid>
             </Border>
+
+            <!-- In the gap between the two cards: drag it to give the video more room -->
+            <controls:PaneDivider x:Name="ListDivider" Grid.Column="1" Grid.RowSpan="2" Width="16" Margin="-16,0,0,0"
+                                  HorizontalAlignment="Left"
+                                  ToolTipService.ToolTip="Drag to resize the video and the subtitle list (double-click to reset)"
+                                  AutomationProperties.Name="Resize the video and the subtitle list">
+                <Grid Background="Transparent">
+                    <Border Width="4" Height="40" CornerRadius="2" Background="{ThemeResource ControlStrongFillColorDefaultBrush}" />
+                </Grid>
+            </controls:PaneDivider>
         </Grid>
         </ScrollViewer>
 

@@ -47,6 +47,12 @@ public sealed partial class ReviewPage : UserControl
     private const double WidescreenRatio = 16.0 / 9;
     /// <summary>A playhead this far outside the comparison being played was moved there, so it stops showing it.</summary>
     private const double SeekSlackSeconds = 0.5;
+    /// <summary>The gap between the video and the list; the list's limits are also ListColumn's in the XAML.</summary>
+    private const double PaneSpacing = 16;
+    private const double MinListWidth = 340;
+    private const double MaxListWidth = 620;
+    /// <summary>Dragging the list wider stops here: the player's buttons need this much.</summary>
+    private const double MinVideoPaneWidth = 560;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private readonly MediaPlayer _player = new() { AutoPlay = false };
     private ObservableCollection<ReviewRow> _rows = [];
@@ -69,6 +75,7 @@ public sealed partial class ReviewPage : UserControl
     private int _current = -1;
     private bool _syncing;
     private bool _busy;
+    private double _listWidthAtDrag;
     private AppSettings _settings = new();
 
     /// <summary>What another quality heard in [Start, End), waiting to be used or not.</summary>
@@ -86,6 +93,18 @@ public sealed partial class ReviewPage : UserControl
         Timeline.SeekRequested += (_, seconds) => Seek(seconds);
         Timeline.CueClicked += (_, index) => Select(RowOf(index), seek: true);
         Timeline.TimesChanged += (_, e) => _editor?.SetTimes(e.Index, e.Start, e.End);
+        ListDivider.DragStarted += (_, _) => _listWidthAtDrag = ListColumn.ActualWidth;
+        ListDivider.Dragged += (_, moved) =>
+        {
+            _settings.ReviewListWidth = FittingListWidth(_listWidthAtDrag - moved);
+            ApplyListLayout();
+        };
+        ListDivider.Reset += (_, _) =>
+        {
+            _settings.ReviewListWidth = 0;
+            ApplyListLayout();
+        };
+        Panes.SizeChanged += (_, _) => ApplyListLayout();
         ActualThemeChanged += (_, _) =>
         {
             foreach (var row in _rows)
@@ -128,11 +147,50 @@ public sealed partial class ReviewPage : UserControl
     /// <summary>The selected subtitles' indices, in order.</summary>
     private List<int> SelectedCues => [.. CueList.SelectedItems.OfType<ReviewRow>().Where(r => !r.IsGap).Select(r => r.Cue).Order()];
 
-    /// <summary>The app's settings: the player's volume is kept there, so it is the same next time.</summary>
+    /// <summary>The app's settings: the player's volume and the list's size are kept there, so they are the same next time.</summary>
     public void UseSettings(AppSettings settings)
     {
         _settings = settings;
         SetVolume(settings.Volume, settings.Muted);
+        ApplyListLayout();
+    }
+
+    /// <summary>A width for the subtitle list within its limits, leaving the video its room in this window.</summary>
+    private double FittingListWidth(double width)
+    {
+        var most = Math.Min(MaxListWidth, Panes.ActualWidth - PaneSpacing - MinVideoPaneWidth);
+        return Math.Clamp(width, MinListWidth, Math.Max(MinListWidth, most));
+    }
+
+    /// <summary>
+    /// The subtitle list as the settings have it: hidden, dragged to a width, or its default share of the page. Not
+    /// while the list is under the video: values set here would replace the Stacked state's.
+    /// </summary>
+    private void ApplyListLayout()
+    {
+        if (PaneLayout.CurrentState == Stacked)
+            return;
+        var hidden = _settings.ReviewListHidden;
+        ListCard.Visibility = ListDivider.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        Panes.ColumnSpacing = hidden ? 0 : PaneSpacing;
+        ListColumn.MinWidth = hidden ? 0 : MinListWidth;
+        ListColumn.Width = hidden ? new GridLength(0)
+            : _settings.ReviewListWidth > 0 ? new GridLength(FittingListWidth(_settings.ReviewListWidth))
+            : new GridLength(2, GridUnitType.Star);
+        ListToggleIcon.Glyph = hidden ? "" : ""; // back to window, full screen
+        var name = hidden ? "Show the subtitle list" : "Hide the subtitle list for a larger video";
+        ToolTipService.SetToolTip(ListToggle, name);
+        AutomationProperties.SetName(ListToggle, name);
+    }
+
+    private void OnPaneLayoutChanged(object sender, VisualStateChangedEventArgs e) => ApplyListLayout();
+
+    private void OnToggleList(object sender, RoutedEventArgs e) => ShowList(_settings.ReviewListHidden);
+
+    private void ShowList(bool show)
+    {
+        _settings.ReviewListHidden = !show;
+        ApplyListLayout();
     }
 
     /// <param name="volume">0..1</param>
@@ -194,6 +252,7 @@ public sealed partial class ReviewPage : UserControl
         _editor.Changed += OnEdited;
 
         FileTitle.Text = file.Name;
+        ApplyListLayout(); // the other tool's editor may have changed it
         ShowModes(transcript.Settings.Embed);
         ResultLinks.Visibility = Visibility.Collapsed;
         WorkBar.Visibility = Visibility.Collapsed;
@@ -1381,6 +1440,7 @@ public sealed partial class ReviewPage : UserControl
                     break;
                 case VirtualKey.F:
                     e.Handled = true;
+                    ShowList(true);
                     SearchBox.Focus(FocusState.Keyboard);
                     SearchBox.SelectAll();
                     break;
@@ -1424,6 +1484,7 @@ public sealed partial class ReviewPage : UserControl
                 MoveSelection(1);
                 break;
             case VirtualKey.Enter when !onButton && _editing >= 0:
+                ShowList(true);
                 TextEditor.Focus(FocusState.Keyboard);
                 TextEditor.SelectionStart = TextEditor.Text.Length;
                 break;

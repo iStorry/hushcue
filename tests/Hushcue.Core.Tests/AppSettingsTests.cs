@@ -49,11 +49,13 @@ public sealed class AppSettingsTests
         var path = Path.Combine(Path.GetTempPath(), $"hushcue_settings_{Guid.NewGuid():N}.json");
         try
         {
-            var settings = new AppSettings { Theme = "Dark" };
+            var settings = new AppSettings { Theme = "Dark", ReviewListWidth = 400, ReviewListHidden = true };
             settings.AddRecentEdit(new SubtitlePair("a.mp4", "a.srt"));
             settings.Save(path);
             var loaded = AppSettings.Load(path);
             Assert.Equal("Dark", loaded.Theme);
+            Assert.Equal(400, loaded.ReviewListWidth);
+            Assert.True(loaded.ReviewListHidden);
             Assert.Equal([new SubtitlePair("a.mp4", "a.srt")], loaded.RecentEdits);
         }
         finally

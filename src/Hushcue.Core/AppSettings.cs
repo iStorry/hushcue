@@ -42,6 +42,12 @@ public sealed class AppSettings
     public double Volume { get; set; } = 1;
     public bool Muted { get; set; }
 
+    /// <summary>How wide the subtitle list beside the review player was dragged; 0 is its default share of the page.</summary>
+    public double ReviewListWidth { get; set; }
+
+    /// <summary>The subtitle list is hidden, so the review player has the whole page.</summary>
+    public bool ReviewListHidden { get; set; }
+
     /// <summary>Videos and subtitles opened in the editor, most recent first (at most <see cref="MaxRecentEdits"/>).</summary>
     public List<SubtitlePair> RecentEdits { get; set; } = [];
 
