@@ -3,7 +3,7 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
-## Unreleased
+## 0.2.4 — 2026-11-01
 
 - A bigger video while you check subtitles: drag the divider between the video and the subtitle list, or hide the list
   with the new button next to the timeline zoom. The app remembers both. Double-click the divider to reset it.
