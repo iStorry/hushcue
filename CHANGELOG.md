@@ -3,7 +3,7 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
-## Unreleased
+## 0.2.5 — 2026-11-15
 
 - **Translate to English**, a switch in Settings: videos in other languages get English subtitles. The language spoken
   is detected (the log says which) and translated while transcribing; English videos are transcribed as usual.
