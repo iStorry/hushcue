@@ -10,6 +10,11 @@ public sealed class AppSettings
 {
     public string Preset { get; set; } = Pipeline.Presets.Default;
     public string Language { get; set; } = "English";
+
+    /// <summary>Translate to English (<see cref="JobSettings.Translate"/>): the language spoken is detected, whatever
+    /// <see cref="Language"/> says.</summary>
+    public bool Translate { get; set; }
+
     public string Vocabulary { get; set; } = "";
     public EmbedMode Embed { get; set; } = EmbedMode.Soft;
     public bool KeepSrt { get; set; }
@@ -73,7 +78,8 @@ public sealed class AppSettings
         return new JobSettings
         {
             Preset = preset ?? Preset,
-            Language = Presets.Languages.FirstOrDefault(l => l.Name == Language, Presets.Languages[0]).Code,
+            Language = Translate ? null : Presets.Languages.FirstOrDefault(l => l.Name == Language, Presets.Languages[0]).Code,
+            Translate = Translate,
             Enhance = Enhance,
             Vocabulary = Vocabulary,
             SkipSilence = SkipSilence,

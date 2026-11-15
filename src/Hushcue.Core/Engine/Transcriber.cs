@@ -146,7 +146,9 @@ public sealed class Transcriber : ITranscriber
             languageProbability = 1;
         }
 
-        var tokenizer = new WhisperTokenizer(_tokenizerPath, _model.IsMultilingual, options.Task, language);
+        // Not in faster-whisper: English speech has nothing to translate, and Whisper transcribes it better.
+        var task = options.Task == "translate" && language == "en" ? "transcribe" : options.Task;
+        var tokenizer = new WhisperTokenizer(_tokenizerPath, _model.IsMultilingual, task, language);
         var suppress = options.SuppressTokens is { Count: > 0 } ? SuppressedTokens(tokenizer, options.SuppressTokens) : options.SuppressTokens;
         var info = new TranscriptionInfo(language, languageProbability, duration, duration);
         return (GenerateSegments(features, frames, tokenizer, options, suppress, cancel), info);

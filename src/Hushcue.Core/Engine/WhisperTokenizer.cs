@@ -181,7 +181,8 @@ public sealed partial class WhisperTokenizer
     /// <summary>Split tokens into words: at spaces and punctuation, keeping multi-byte characters whole.</summary>
     public (List<string> Words, List<List<int>> Tokens) SplitToWordTokens(IReadOnlyList<int> tokens)
     {
-        if (LanguageCode is "zh" or "ja" or "th" or "lo" or "my" or "yue")
+        // Not in faster-whisper, which splits by the language spoken: a translation is English, whose words end at spaces
+        if (LanguageCode is "zh" or "ja" or "th" or "lo" or "my" or "yue" && Task != Translate)
             return SplitTokensOnUnicode(tokens);
         return SplitTokensOnSpaces(tokens);
     }

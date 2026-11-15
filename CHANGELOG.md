@@ -3,6 +3,13 @@
 The release workflow puts a version's section at the top of its GitHub release notes, which the app's update dialog
 shows: keep each section short and plain.
 
+## Unreleased
+
+- **Translate to English**, a switch in Settings: videos in other languages get English subtitles. The language spoken
+  is detected (the log says which) and translated while transcribing; English videos are transcribed as usual.
+  Translating uses the large-v3 model for every quality (downloaded the first time, 3.1 GB), because the faster turbo
+  model of Fast and Balanced can't translate. Re-run this part and Try another model translate too.
+
 ## 0.2.4 — 2026-11-01
 
 - A bigger video while you check subtitles: drag the divider between the video and the subtitle list, or hide the list

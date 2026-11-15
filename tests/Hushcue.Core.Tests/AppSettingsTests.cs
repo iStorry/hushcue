@@ -22,6 +22,15 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public void TranslatingDetectsTheLanguage()
+    {
+        Assert.False(new AppSettings().ToJob().Translate);
+        var job = new AppSettings { Language = "English", Translate = true }.ToJob();
+        Assert.True(job.Translate);
+        Assert.Null(job.Language); // "English" is what the subtitles are in, not what is spoken
+    }
+
+    [Fact]
     public void FileOptionsOnlyApplyWhenSubtitlesGoIntoTheVideo()
     {
         var settings = new AppSettings { KeepSrt = true, DeleteOriginal = true, PreviewFirst = true, Language = "English" };

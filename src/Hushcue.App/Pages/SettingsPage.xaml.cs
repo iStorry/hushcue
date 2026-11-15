@@ -35,6 +35,8 @@ public sealed partial class SettingsPage : UserControl
         _settings = settings;
         _loading = true;
         LanguageBox.SelectedItem = Presets.Languages.Any(l => l.Name == settings.Language) ? settings.Language : Presets.Languages[0].Name;
+        TranslateToggle.IsOn = settings.Translate;
+        LanguageBox.IsEnabled = !settings.Translate; // translating detects the language
         VocabularyBox.Text = settings.Vocabulary;
         EnhanceToggle.IsOn = settings.Enhance;
         SkipSilenceToggle.IsOn = settings.SkipSilence;
@@ -54,6 +56,8 @@ public sealed partial class SettingsPage : UserControl
         if (_loading)
             return;
         _settings.Language = LanguageBox.SelectedItem as string ?? _settings.Language;
+        _settings.Translate = TranslateToggle.IsOn;
+        LanguageBox.IsEnabled = !_settings.Translate;
         _settings.Vocabulary = VocabularyBox.Text;
         _settings.Enhance = EnhanceToggle.IsOn;
         _settings.SkipSilence = SkipSilenceToggle.IsOn;

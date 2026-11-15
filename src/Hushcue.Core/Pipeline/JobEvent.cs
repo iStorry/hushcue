@@ -34,8 +34,10 @@ public sealed record CuesDecoded(string Path, IReadOnlyList<Cue> Cues) : JobEven
 /// <param name="Srt">the .srt written, or null when it was only a temporary file for embedding</param>
 /// <param name="Warnings">coverage warnings about the result (<see cref="Cleanup.CoverageWarnings"/>)</param>
 /// <param name="Words">the words the cues were made from, with how sure Whisper was of each</param>
+/// <param name="Language">the language spoken, as Whisper's code ("de"): the one asked for, or the one detected</param>
 public sealed record FileTranscribed(string Path, IReadOnlyList<Cue> Cues, double AudioSeconds, TimeSpan Took, string Device,
-                                     string? Srt, IReadOnlyList<string> Warnings, IReadOnlyList<Word> Words) : JobEvent
+                                     string? Srt, IReadOnlyList<string> Warnings, IReadOnlyList<Word> Words,
+                                     string? Language = null) : JobEvent
 {
     /// <summary>Times faster than real time.</summary>
     public double Speed => Took.TotalSeconds > 0 ? AudioSeconds / Took.TotalSeconds : 0;

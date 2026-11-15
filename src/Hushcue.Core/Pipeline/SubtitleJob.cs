@@ -41,7 +41,7 @@ public static class SubtitleJob
                                                         Action<FileProgress>? onFile, Action<JobEvent> onEvent,
                                                         JobSteps steps, CancellationToken cancel)
     {
-        var model = Presets.Get(settings.Preset).Model;
+        var model = Presets.ModelFor(settings);
         var modelPath = steps.FindModel(model) ?? await DownloadModelAsync(model, steps, progress, log, onEvent, cancel);
         return await new JobRun(files, outDir, settings, modelPath, steps, progress, log, onFile, onEvent).RunAsync(cancel);
     }

@@ -27,6 +27,9 @@ internal sealed class FakeTranscriber(IReadOnlyList<Word> whole, IReadOnlyList<W
     /// <summary>Runs before each decode, e.g. to block or throw.</summary>
     public Action<Call>? OnTranscribe { get; init; }
 
+    /// <summary>The language "detected" when none is asked for.</summary>
+    public string Language { get; init; } = "en";
+
     public (IEnumerable<Segment> Segments, TranscriptionInfo Info) Transcribe(float[] audio, TranscribeOptions options,
                                                                               CancellationToken cancel = default)
     {
@@ -36,7 +39,7 @@ internal sealed class FakeTranscriber(IReadOnlyList<Word> whole, IReadOnlyList<W
         OnTranscribe?.Invoke(call);
         var words = call.Whole ? whole : clip ?? [];
         IEnumerable<Segment> segments = words.Count == 0 ? [] : [Segment(words)];
-        return (segments, new TranscriptionInfo("en", 1, duration, duration));
+        return (segments, new TranscriptionInfo(options.Language ?? Language, 1, duration, duration));
     }
 
     private static Segment Segment(IReadOnlyList<Word> words) =>

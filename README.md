@@ -63,7 +63,9 @@ The sidebar holds the three tools:
 
 **Settings** holds the choices that rarely change (language, vocabulary, audio clean-up, skipping silence, what happens
 to the files when subtitles go into the video, the theme, automatic updates), and shows where transcription runs on
-this PC. **About** has the version, "Check for updates", the source code and the third-party notices.
+this PC. **Translate to English** there gives English subtitles for videos in other languages: the language spoken is
+detected and translated while transcribing (English videos are transcribed as usual). Every quality then uses the
+large-v3 model, as the turbo model of Fast and Balanced was not trained to translate. **About** has the version, "Check for updates", the source code and the third-party notices.
 
 **Updates**: once a day on start, Hushcue asks GitHub whether there is a newer release and offers to install it. The
 installer is checked against the release's `SHA256SUMS.txt`, Hushcue closes, updates and opens again. A portable copy

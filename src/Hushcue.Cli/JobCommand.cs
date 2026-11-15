@@ -14,7 +14,11 @@ internal static class JobCommand
     public const string Usage =
         """
         usage: Hushcue.Cli job --out DIR [--preset NAME] [--model DIR] [--device cuda|cpu] [--features DIR]
-                               [--language CODE|auto] [--prompt TEXT] [--skip-silence] [--no-recover-loops] FILE...
+                               [--language CODE|auto] [--translate] [--prompt TEXT] [--skip-silence]
+                               [--no-recover-loops] FILE...
+
+        --translate writes English subtitles for speech in another language, with the large-v3 model whatever the
+        preset; the language is detected unless --language names it.
         """;
 
     public static async Task<int> RunAsync(string[] args)
@@ -22,6 +26,7 @@ internal static class JobCommand
         string? outDir = null, modelDir = null, device = null, featuresDir = null;
         var settings = new JobSettings();
         var files = new List<string>();
+        bool translate = false, languageGiven = false;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -31,13 +36,19 @@ internal static class JobCommand
                 case "--model" when i + 1 < args.Length: modelDir = args[++i]; break;
                 case "--device" when i + 1 < args.Length: device = args[++i]; break;
                 case "--features" when i + 1 < args.Length: featuresDir = args[++i]; break;
-                case "--language" when i + 1 < args.Length: settings = settings with { Language = args[++i] == "auto" ? null : args[i] }; break;
+                case "--language" when i + 1 < args.Length:
+                    settings = settings with { Language = args[++i] == "auto" ? null : args[i] };
+                    languageGiven = true;
+                    break;
+                case "--translate": translate = true; break;
                 case "--prompt" when i + 1 < args.Length: settings = settings with { Vocabulary = args[++i] }; break;
                 case "--skip-silence": settings = settings with { SkipSilence = true }; break;
                 case "--no-recover-loops": settings = settings with { RecoverLoops = false }; break;
                 default: files.Add(args[i]); break;
             }
         }
+        if (translate)
+            settings = settings with { Translate = true, Language = languageGiven ? settings.Language : null };
         if (outDir is null || files.Count == 0 || Presets.All.All(p => p.Name != settings.Preset))
         {
             Console.Error.WriteLine(Usage);

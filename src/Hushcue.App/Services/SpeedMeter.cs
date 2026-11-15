@@ -15,7 +15,9 @@ internal sealed class SpeedMeter
     private double _audio;
     private double _seconds;
 
-    public static string Key(string preset, string device) => $"{preset}/{device}";
+    /// <param name="translate">translating runs every preset on large-v3, so its speed is kept apart</param>
+    public static string Key(string preset, string device, bool translate = false) =>
+        $"{preset}/{device}{(translate ? "/translate" : "")}";
 
     public void Observe(FileTranscribed file)
     {

@@ -1,3 +1,4 @@
+using Hushcue.Core.Engine;
 using Hushcue.Core.Pipeline;
 using Hushcue.Core.Subtitles;
 
@@ -108,6 +109,7 @@ public class TranscriptionTests
         FileTranscription.DecodeWords(model, Silence, new JobSettings { Vocabulary = "  Anna \n" }, Balanced, default);
         var options = model.Calls[0].Options;
         Assert.Equal(("en", 5, false, 1f), (options.Language, options.BeamSize, options.ConditionOnPreviousText, options.RepetitionPenalty));
+        Assert.Equal("transcribe", options.Task);
         Assert.Equal((0.6, -1.0, 2.4, 2.0), (options.NoSpeechThreshold, options.LogProbThreshold,
                                              options.CompressionRatioThreshold, options.HallucinationSilenceThreshold));
         Assert.True(options.WordTimestamps);
@@ -139,6 +141,50 @@ public class TranscriptionTests
         Assert.Null(model.Calls[0].Options.Vad);
         Assert.Null(model.Calls[1].Options.ClipTimestamps);
     }
+
+    [Fact]
+    public void TranslatingAsksWhisperToTranslate()
+    {
+        var model = new FakeTranscriber([W(" hi", 0, 1)]);
+        FileTranscription.DecodeWords(model, Silence, new JobSettings { Translate = true, Language = null }, Balanced, default);
+        var options = model.Calls[0].Options;
+        Assert.Equal(("translate", null), (options.Task, options.Language)); // the language is detected
+        Assert.Equal(FileTranscription.PunctuationPrompt, options.Hotwords); // English, as the subtitles will be
+    }
+
+    [Theory]
+    [InlineData("Fast", false, "large-v3-turbo")]
+    [InlineData("Balanced", false, "large-v3-turbo")]
+    [InlineData("Thorough", false, "large-v3")]
+    [InlineData("Fast", true, "large-v3")] // the turbo model was not trained to translate
+    [InlineData("Balanced", true, "large-v3")]
+    [InlineData("Thorough", true, "large-v3")]
+    public void TranslatingUsesLargeV3WhateverThePreset(string preset, bool translate, string model) =>
+        Assert.Equal(model, Presets.ModelFor(new JobSettings { Preset = preset, Translate = translate }));
+
+    [Fact]
+    public void LoopsAreRedecodedInTheLanguageDetected()
+    {
+        var model = new FakeTranscriber(LoopWords(), [W(" that", 2.1, 2.4)], Silence.Length) { Language = "de" };
+        var log = new List<string>();
+        string? spoken = null;
+        FileTranscription.TranscribeWords(model, Silence, new JobSettings { Translate = true, Language = null }, Balanced, _ => { },
+                                          log.Add, default, onLanguage: language => spoken = language);
+        Assert.Equal("de", spoken);
+        // the second decode is a few seconds of the file: not asked to detect the language again
+        Assert.Equal([null, "de"], model.Calls.Select(c => c.Options.Language));
+        Assert.All(model.Calls, c => Assert.Equal("translate", c.Options.Task));
+        Assert.Contains("Detected German (100% sure); translating to English", log);
+    }
+
+    [Theory]
+    [InlineData("fr", 0.974, null, true, "Detected French (97% sure); translating to English")]
+    [InlineData("en", 0.99, null, true, "Detected English (99% sure); nothing to translate")]
+    [InlineData("ja", 0.8, null, false, "Detected Japanese (80% sure)")]
+    [InlineData("hi", 1.0, "hi", true, "The speech is Hindi; translating to English")]
+    public void TheLogSaysWhichLanguageWasHeard(string language, double probability, string? asked, bool translate, string line) =>
+        Assert.Equal(line, FileTranscription.DescribeLanguage(new TranscriptionInfo(language, probability, 60, 60),
+                                                              new JobSettings { Language = asked, Translate = translate }));
 
     [Fact]
     public void PreviousTextIsOffUnlessAsked()
