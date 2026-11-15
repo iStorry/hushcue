@@ -28,11 +28,13 @@ public sealed partial class GeneratePage : UserControl, IRunPage
     private readonly FilesLayout _layout;
 
     /// <summary>One run over the queue, and what it did so far.</summary>
-    private sealed class Batch(IReadOnlyList<QueuedFile> files, int skipped, string preset, bool burning)
+    private sealed class Batch(IReadOnlyList<QueuedFile> files, int skipped, string preset, bool translate, bool burning)
     {
         public IReadOnlyList<QueuedFile> Files { get; } = files;
         public int Skipped { get; } = skipped;
         public string Preset { get; } = preset;
+        /// <summary>Translating to English, which has a speed of its own (<see cref="SpeedMeter.Key"/>).</summary>
+        public bool Translate { get; } = translate;
         /// <summary>Re-encoding takes longer than transcribing: the measured transcribing speed is no guide then.</summary>
         public bool Burning { get; } = burning;
         public Stopwatch Clock { get; } = Stopwatch.StartNew();
@@ -178,8 +180,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
 
     private EmbedMode SelectedEmbed => Checked<ResultChoice>(ResultChoices).Mode;
 
-    private double? KnownSpeed(string preset) =>
-        _settings.Speeds.TryGetValue(SpeedMeter.Key(preset, _device), out var speed) && speed > 0 ? speed : null;
+    private double? KnownSpeed(string preset, bool translate) =>
+        _settings.Speeds.TryGetValue(SpeedMeter.Key(preset, _device, translate), out var speed) && speed > 0 ? speed : null;
 
     /// <summary>The content of the card checked in <paramref name="group"/>.</summary>
     private static T Checked<T>(Panel group) =>
@@ -220,8 +222,8 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         if (PresetChoices.Children.OfType<RadioButton>().All(card => card.IsChecked != true))
             return;
         var preset = Presets.Get(SelectedPreset);
-        PresetHint.Text = $"{preset.Model} · {preset.Description}";
-        var speed = KnownSpeed(preset.Name);
+        PresetHint.Text = $"{Presets.ModelFor(preset, _settings.Translate)}{(_settings.Translate ? " to translate" : "")} · {preset.Description}";
+        var speed = KnownSpeed(preset.Name, _settings.Translate);
         SpeedHint.Text = speed is { } s ? SpeedMeter.Describe(s, _device) : "";
         SpeedHint.Visibility = speed is null ? Visibility.Collapsed : Visibility.Visible;
         ToolTipService.SetToolTip(SpeedHint, speed is null ? null : "Measured on this PC during your last run with this preset");
@@ -238,13 +240,17 @@ public sealed partial class GeneratePage : UserControl, IRunPage
 
     /// <summary>
     /// One line under the options with the choices kept in Settings that apply to this run ("English · keeps the
-    /// .srt · originals to the Recycle Bin"), so nothing set there is a surprise.
+    /// .srt · originals to the Recycle Bin"), so nothing set there is a surprise. Translating also changes the model
+    /// and the speed shown under the quality.
     /// </summary>
     public void RefreshSettingsSummary()
     {
         if (SettingsSummary is null || ResultChoices.Children.Count == 0)
             return;
-        var parts = new List<string> { _settings.Language };
+        UpdatePresetHint();
+        if (!IsRunning && !_showingResult)
+            ShowIdleStatus();
+        var parts = new List<string> { _settings.Translate ? "Any language, translated to English" : _settings.Language };
         var words = _settings.Vocabulary.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
         if (words > 0)
             parts.Add(words == 1 ? "1 vocabulary word" : $"{words} vocabulary words");
@@ -291,7 +297,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var parts = new List<string> { usable.Count == 1 ? "1 file ready" : $"{usable.Count} files ready" };
         if (length > 0)
             parts.Add($"{BatchEstimate.Clock(TimeSpan.FromSeconds(length))} of {(usable.Any(f => f.Info?.HasVideo == true) ? "video" : "audio")}");
-        if (length > 0 && KnownSpeed(SelectedPreset) is { } speed)
+        if (length > 0 && KnownSpeed(SelectedPreset, _settings.Translate) is { } speed)
             parts.Add($"{BatchEstimate.Describe(TimeSpan.FromSeconds(length / speed))} to transcribe");
         if (pending.Count > usable.Count)
             parts.Add($"{pending.Count - usable.Count} skipped");
@@ -309,7 +315,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         var total = work.Sum(w => w.Duration);
         var overall = total > 0 ? work.Sum(w => w.Duration * w.Fraction) / total : 0;
         var finished = batch.Files.Count(f => f.State is FileState.Done or FileState.Failed or FileState.Review);
-        var left = batch.Estimate.TimeLeft(work, batch.Burning ? null : KnownSpeed(batch.Preset));
+        var left = batch.Estimate.TimeLeft(work, batch.Burning ? null : KnownSpeed(batch.Preset, batch.Translate));
         var status = $"{finished} of {batch.Files.Count} done";
         if (_cancel?.IsCancellationRequested == true)
             status = "Cancelling...";
@@ -395,7 +401,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
             groups[^1].Files.Add(file);
         }
 
-        var batch = new Batch(files, skipped.Count, settings.Preset, settings.Embed == EmbedMode.Burn);
+        var batch = new Batch(files, skipped.Count, settings.Preset, settings.Translate, settings.Embed == EmbedMode.Burn);
         _batch = batch;
         _cancel = new CancellationTokenSource();
         Run.Reset();
@@ -498,8 +504,10 @@ public sealed partial class GeneratePage : UserControl, IRunPage
                     _previews.Add(file.Srt!);
                 else if (file.Srt is not null)
                     UnsureWords.Save(file.Srt, unsure); // so a review opened later flags them too
+                // re-running a part later decodes a few seconds: too little to detect the language from again
                 batch.Files.FirstOrDefault(f => f.Path == file.Path)
-                     ?.SetTranscript(new Transcript(file.Cues, file.Srt, settings, outDir, file.AudioSeconds, unsure));
+                     ?.SetTranscript(new Transcript(file.Cues, file.Srt, settings with { Language = file.Language ?? settings.Language },
+                                                    outDir, file.AudioSeconds, unsure));
                 var name = Path.GetFileName(file.Path);
                 batch.Notes.AddRange(file.Warnings.Select(warning => $"{name}: {warning}"));
                 break;
@@ -515,7 +523,7 @@ public sealed partial class GeneratePage : UserControl, IRunPage
         if (batch.Speed.Speed is not { } speed)
             return;
         // half the old value: one run on a busy GPU shouldn't swing the hint too far
-        var key = SpeedMeter.Key(batch.Preset, _device);
+        var key = SpeedMeter.Key(batch.Preset, _device, batch.Translate);
         var blended = _settings.Speeds.TryGetValue(key, out var old) && old > 0 ? (old + speed) / 2 : speed;
         _settings.Speeds[key] = Math.Round(blended, 1);
         Save(_settings);

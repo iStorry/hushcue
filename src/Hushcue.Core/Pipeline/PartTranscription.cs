@@ -9,7 +9,8 @@ namespace Hushcue.Core.Pipeline;
 /// <see cref="FileTranscription.LoopPadSeconds"/> of context either side, decoded on its own with the loop
 /// repetition penalty, and its words are moved back to the file's time; words whose middle falls in the padding
 /// belong to the subtitles around the stretch and are dropped. "Try another quality" decodes the same way with another
-/// preset, whose model may hear the stretch better (large-v3 for Thorough, large-v3-turbo for the others).
+/// preset, whose model may hear the stretch better (large-v3 for Thorough, large-v3-turbo for the others; large-v3
+/// for all of them when translating).
 /// </summary>
 public static class PartTranscription
 {
@@ -53,8 +54,8 @@ public static class PartTranscription
                                            CancellationToken cancel = default) =>
         Task.Run(() => RunAsync(audio, start, end, settings, JobSteps.Default, log, cancel), cancel);
 
-    /// <summary>Whether the model of the preset called <paramref name="preset"/> is on this PC, so it can re-run a part.</summary>
-    public static bool HasModel(string preset) => Models.Find(Presets.Get(preset).Model) is not null;
+    /// <summary>Whether the model a run with <paramref name="settings"/> uses is on this PC, so it can re-run a part.</summary>
+    public static bool HasModel(JobSettings settings) => Models.Find(Presets.ModelFor(settings)) is not null;
 
     /// <summary>Whether a preset hears the audio with ffmpeg's clean-up (<see cref="Media.Audio.EnhanceFilter"/>).</summary>
     public static bool Enhances(JobSettings settings) => settings.Enhance || Presets.Get(settings.Preset).Enhance;
@@ -63,8 +64,9 @@ public static class PartTranscription
                                                    Action<string> log, CancellationToken cancel)
     {
         var preset = Presets.Get(settings.Preset);
-        var modelPath = steps.FindModel(preset.Model)
-                        ?? throw new EngineException($"The {preset.Model} model is not on this PC; make subtitles for a file first to download it.");
+        var modelName = Presets.ModelFor(settings);
+        var modelPath = steps.FindModel(modelName)
+                        ?? throw new EngineException($"The {modelName} model is not on this PC; make subtitles for a file first to download it.");
         var duration = audio.Samples.Length / (double)Media.Audio.SampleRate;
         var (lo, hi) = Window(start, end, duration);
         // the review read the audio with the job's clean-up; a preset that wants the other reads its part again
@@ -79,7 +81,7 @@ public static class PartTranscription
             try
             {
                 var model = steps.Cache.Get(modelPath, device, steps.LoadModel,
-                                            () => log($"Loading '{preset.Model}' on {(device == "cuda" ? "GPU" : "CPU")}..."));
+                                            () => log($"Loading '{modelName}' on {(device == "cuda" ? "GPU" : "CPU")}..."));
                 var decoded = FileTranscription.DecodeWords(model, clip, settings, preset, cancel,
                                                             repetitionPenalty: FileTranscription.LoopRepetitionPenalty);
                 var speech = steps.SpeechProbabilities(clip, cancel);

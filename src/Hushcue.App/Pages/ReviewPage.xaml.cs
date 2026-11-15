@@ -908,8 +908,8 @@ public sealed partial class ReviewPage : UserControl
         var own = Presets.Get(_transcript?.Settings.Preset ?? Presets.Default).Name;
         foreach (var preset in Presets.All)
         {
-            var text = $"{preset.Name} · {preset.Model}" + (preset.Name == own ? " (as Re-run this part)" : "")
-                       + (PartTranscription.HasModel(preset.Name) ? "" : $" · download {Gigabytes(ModelSize(preset))}");
+            var text = $"{preset.Name} · {ModelOf(preset)}" + (preset.Name == own ? " (as Re-run this part)" : "")
+                       + (PartTranscription.HasModel(With(preset)) ? "" : $" · download {Gigabytes(ModelSize(preset))}");
             var item = new MenuFlyoutItem { Text = text };
             ToolTipService.SetToolTip(item, preset.Description);
             item.Click += (_, _) => CompareWith(preset);
@@ -917,7 +917,13 @@ public sealed partial class ReviewPage : UserControl
         }
     }
 
-    private static long ModelSize(Preset preset) => Models.Sources.TryGetValue(preset.Model, out var source) ? source.Size : 0;
+    /// <summary>The file's settings with another quality.</summary>
+    private JobSettings With(Preset preset) => (_transcript?.Settings ?? new JobSettings()) with { Preset = preset.Name };
+
+    /// <summary>The model <paramref name="preset"/> hears this file with: large-v3 for every quality when it translates.</summary>
+    private string ModelOf(Preset preset) => Presets.ModelFor(With(preset));
+
+    private long ModelSize(Preset preset) => Models.Sources.TryGetValue(ModelOf(preset), out var source) ? source.Size : 0;
 
     private static string Gigabytes(long bytes) => $"{bytes / 1e9:0.0} GB";
 
@@ -937,9 +943,10 @@ public sealed partial class ReviewPage : UserControl
         CommitPending();
         DropComparison();
         var range = CueTime.Range(start, end);
-        if (!PartTranscription.HasModel(preset.Name)
+        var model = ModelOf(preset);
+        if (!PartTranscription.HasModel(With(preset))
             && !await Dialogs.ConfirmAsync(XamlRoot,
-                   $"{preset.Name} uses the {preset.Model} model, which is not on this PC yet. Download it ({Gigabytes(ModelSize(preset))})? "
+                   $"{preset.Name} uses the {model} model, which is not on this PC yet. Download it ({Gigabytes(ModelSize(preset))})? "
                    + "It stays for next time, and a stopped download carries on where it left off.", "Download"))
             return;
         var work = _work = new CancellationTokenSource();
@@ -947,19 +954,19 @@ public sealed partial class ReviewPage : UserControl
         var ui = DispatcherQueue;
         try
         {
-            if (!PartTranscription.HasModel(preset.Name))
+            if (!PartTranscription.HasModel(With(preset)))
             {
-                StatusText.Text = $"Downloading {preset.Model}...";
-                await Task.Run(() => ModelDownload.DownloadAsync(preset.Model, (done, total) => ui.TryEnqueue(() =>
+                StatusText.Text = $"Downloading {model}...";
+                await Task.Run(() => ModelDownload.DownloadAsync(model, (done, total) => ui.TryEnqueue(() =>
                 {
                     WorkBar.Value = total > 0 ? done * 1000.0 / total : 0;
-                    StatusText.Text = $"Downloading {preset.Model}: {Gigabytes(done)} of {Gigabytes(total)}";
+                    StatusText.Text = $"Downloading {model}: {Gigabytes(done)} of {Gigabytes(total)}";
                 }), work.Token), work.Token);
             }
             var editor = _editor;
             WorkBar.IsIndeterminate = true;
-            StatusText.Text = $"Transcribing {range} with {preset.Name} ({preset.Model})...";
-            var cues = await PartTranscription.RunAsync(PartAudio(), start, end, _transcript.Settings with { Preset = preset.Name },
+            StatusText.Text = $"Transcribing {range} with {preset.Name} ({model})...";
+            var cues = await PartTranscription.RunAsync(PartAudio(), start, end, With(preset),
                                                         message => ui.TryEnqueue(() => StatusText.Text = message), work.Token);
             if (editor != _editor)
                 return; // the page moved on
@@ -1000,7 +1007,7 @@ public sealed partial class ReviewPage : UserControl
         var before = string.Join(" ", CuesIn(comparison.Start, comparison.End).Select(c => c.Text));
         var after = string.Join(" ", comparison.Cues.Select(c => c.Text));
         var (left, right) = TextDiff.Words(before, after);
-        CompareTitle.Text = $"{name.ToUpperInvariant()} · {comparison.Preset.Model.ToUpperInvariant()} HEARD {range}";
+        CompareTitle.Text = $"{name.ToUpperInvariant()} · {ModelOf(comparison.Preset).ToUpperInvariant()} HEARD {range}";
         CompareAfterLabel.Text = name;
         ShowDiff(CompareBefore, left, removed: true);
         ShowDiff(CompareAfter, right, removed: false);

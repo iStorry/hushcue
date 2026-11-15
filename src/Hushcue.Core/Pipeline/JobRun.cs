@@ -24,6 +24,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
     private sealed record EmbedWork(int Index, string Source, string Srt, bool TempSrt, string DestDir);
 
     private readonly Preset _preset = Presets.Get(settings.Preset);
+    private readonly string _model = Presets.ModelFor(settings);
     private readonly JobProgress _progress = new(files, progress, onFile);
     private readonly string?[] _outputs = new string?[files.Count];
     private readonly List<string> _embedFailures = [];
@@ -103,7 +104,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
         var seconds = audio.Length / (double)Audio.SampleRate;
         var rate = new TranscribeRate(seconds, TimeProvider.System);
         var speech = steps.SpeechProbabilities(audio, cancel);
-        var (cues, words, took) = TranscribeWithFallback(audio, speech, Report, f =>
+        var (cues, words, took, language) = TranscribeWithFallback(audio, speech, Report, f =>
         {
             var reading = rate.Measure(f);
             Report(0.08 + 0.9 * f, reading.Describe(), FileStage.Transcribing, reading);
@@ -116,7 +117,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
             log("WARNING: " + warning);
         if (settings.PreviewFirst)
         {
-            await PreviewAsync(index, cues, words, seconds, took, warnings, cancel);
+            await PreviewAsync(index, cues, words, seconds, took, warnings, language, cancel);
             return null;
         }
         var destDir = outDir ?? Path.GetDirectoryName(src) ?? "";
@@ -131,7 +132,7 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
             log($"Saved {srt} ({cues.Count} subtitles)");
         if (settings.Embed != EmbedMode.None && cues.Count == 0)
             log("No subtitles were found, so nothing was embedded in the video.");
-        onEvent(new FileTranscribed(src, cues, seconds, took, _device, tempSrt ? null : srt, warnings, words));
+        onEvent(new FileTranscribed(src, cues, seconds, took, _device, tempSrt ? null : srt, warnings, words, language));
 
         if (embedding)
         {
@@ -148,26 +149,27 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
     /// nothing is written to the output folder or the video. Without subtitles there is nothing to preview.
     /// </summary>
     private async Task PreviewAsync(int index, List<Cue> cues, List<Word> words, double seconds, TimeSpan took,
-                                    IReadOnlyList<string> warnings, CancellationToken cancel)
+                                    IReadOnlyList<string> warnings, string? language, CancellationToken cancel)
     {
         var src = files[index];
         if (cues.Count == 0)
         {
-            onEvent(new FileTranscribed(src, cues, seconds, took, _device, null, warnings, words));
+            onEvent(new FileTranscribed(src, cues, seconds, took, _device, null, warnings, words, language));
             _progress.Failed(JobStage.Transcribing, index, "Nothing was heard, so there is nothing to preview");
             return;
         }
         var srt = Previews.NewSrtPath(src, steps.PreviewRoot);
         await Srt.SaveAsync(srt, cues, cancel);
         log($"{Path.GetFileName(src)} is ready to preview ({cues.Count} subtitles); nothing is saved until it is kept.");
-        onEvent(new FileTranscribed(src, cues, seconds, took, _device, srt, warnings, words));
+        onEvent(new FileTranscribed(src, cues, seconds, took, _device, srt, warnings, words, language));
         _progress.ReadyForReview(index, srt);
     }
 
     /// <summary>Transcribe on the GPU; if CUDA fails (missing libraries, out of memory), retry once on the CPU.</summary>
-    /// <returns>the cues, the words they were made from, and the time taken from the start of decoding</returns>
+    /// <returns>the cues, the words they were made from, the time taken from the start of decoding, and the language
+    /// spoken (given or detected)</returns>
     /// <param name="speech">Silero's speech probabilities for <paramref name="audio"/>, for <see cref="UnheardCues"/></param>
-    private (List<Cue> Cues, List<Word> Words, TimeSpan Took) TranscribeWithFallback(
+    private (List<Cue> Cues, List<Word> Words, TimeSpan Took, string? Language) TranscribeWithFallback(
         float[] audio, float[] speech, Action<double, string, FileStage, RateReading?> report, Action<double> onFraction,
         Action<IReadOnlyList<Word>> onWords, CancellationToken cancel)
     {
@@ -178,19 +180,20 @@ internal sealed class JobRun(IReadOnlyList<string> files, string? outDir, JobSet
                 var model = steps.Cache.Get(modelPath, _device, steps.LoadModel, () =>
                 {
                     report(0.05, "Loading model...", FileStage.LoadingModel, null);
-                    log(_device == "cuda" ? $"Loading '{_preset.Model}' on GPU..." : $"Loading '{_preset.Model}' on CPU (slow)...");
+                    log(_device == "cuda" ? $"Loading '{_model}' on GPU..." : $"Loading '{_model}' on CPU (slow)...");
                 });
                 report(0.08, "Transcribing...", FileStage.Transcribing, null);
                 var clock = Stopwatch.StartNew();
+                string? language = null;
                 var decoded = FileTranscription.TranscribeWords(model, audio, settings, _preset, onFraction, log, cancel, onWords,
-                                                               speech);
+                                                               speech, spoken => language = spoken);
                 var words = settings.TrimWordEdges ? WordEdges.Trim(decoded, speech) : decoded;
                 var built = Cleanup.ToCues(words);
                 var cues = UnheardCues.Drop(built, speech);
                 if (cues.Count < built.Count)
                     log($"Dropped {built.Count - cues.Count} subtitle(s) with little or no speech under them: " +
                         string.Join(", ", built.Except(cues).Select(c => $"“{c.Text}” at {Review.CueTime.Range(c.Start, c.End)}")));
-                return (cues, words, clock.Elapsed);
+                return (cues, words, clock.Elapsed, language);
             }
             catch (EngineException e) when (_device == "cuda" && attempt == 0 && IsGpuError(e))
             {

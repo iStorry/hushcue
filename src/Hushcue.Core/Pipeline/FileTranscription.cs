@@ -32,9 +32,11 @@ internal static class FileTranscription
 
     /// <summary>The words <see cref="Transcribe"/> makes its cues from: decoded, with looped passages re-decoded.</summary>
     /// <param name="speechProbabilities">Silero's, for <see cref="JobSettings.ChunkOnSilence"/>; null decodes the whole audio</param>
+    /// <param name="onLanguage">the language spoken (its Whisper code, "de"): the one given, or the one detected</param>
     public static List<Word> TranscribeWords(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
                                              Action<double> onFraction, Action<string> log, CancellationToken cancel,
-                                             Action<IReadOnlyList<Word>>? onWords = null, float[]? speechProbabilities = null)
+                                             Action<IReadOnlyList<Word>>? onWords = null, float[]? speechProbabilities = null,
+                                             Action<string>? onLanguage = null)
     {
         var clips = settings.ChunkOnSilence && speechProbabilities is not null
             ? SpeechClips.CutAndMerge(speechProbabilities, audio.Length)
@@ -45,26 +47,46 @@ internal static class FileTranscription
             log($"Decoding {clips.Count / 2} stretch(es) of speech cut in silences: {Py.F0(speech)} s of "
                 + $"{Py.F0(audio.Length / (double)Audio.SampleRate)} s");
         }
+        string? language = null;
         var words = DecodeWords(model, audio, settings, preset, cancel, onFraction, log: log, onWords: onWords,
-                                clips: clips is { Count: > 0 } ? clips : null);
+                                clips: clips is { Count: > 0 } ? clips : null, onInfo: info =>
+                                {
+                                    language = info.Language;
+                                    if (settings.Language is null || settings.Translate)
+                                        log(DescribeLanguage(info, settings));
+                                    onLanguage?.Invoke(info.Language);
+                                });
+        // a looped passage is short, and may be too little to tell the language from: it is the file's
         if (settings.RecoverLoops)
-            words = RecoverLoops(model, audio, words, settings, preset, log, cancel);
+            words = RecoverLoops(model, audio, words, settings with { Language = language ?? settings.Language }, preset, log, cancel);
         return words;
+    }
+
+    /// <summary>"Detected German (98% sure); translating to English".</summary>
+    internal static string DescribeLanguage(TranscriptionInfo info, JobSettings settings)
+    {
+        var name = SubtitleTrack.LanguageName(info.Language) ?? info.Language;
+        var heard = settings.Language is null ? $"Detected {name} ({info.LanguageProbability:P0} sure)" : $"The speech is {name}";
+        if (!settings.Translate)
+            return heard;
+        return heard + (info.Language == "en" ? "; nothing to translate" : "; translating to English");
     }
 
     /// <summary>Run Whisper on 16 kHz audio and return its words without non-speech markers or stretched letters.</summary>
     /// <param name="log">where to say how much speech voice activity detection kept; null says nothing</param>
     /// <param name="onWords">each kept segment's words, as soon as it is decoded</param>
     /// <param name="clips">only these stretches, each decoded on its own (start, end, ... seconds); null: all of it</param>
+    /// <param name="onInfo">the language (given or detected) and the audio's length, before the first segment</param>
     public static List<Word> DecodeWords(ITranscriber model, float[] audio, JobSettings settings, Preset preset,
                                          CancellationToken cancel, Action<double>? onFraction = null,
                                          float repetitionPenalty = 1, Action<string>? log = null,
-                                         Action<IReadOnlyList<Word>>? onWords = null, IReadOnlyList<double>? clips = null)
+                                         Action<IReadOnlyList<Word>>? onWords = null, IReadOnlyList<double>? clips = null,
+                                         Action<TranscriptionInfo>? onInfo = null)
     {
         var options = new TranscribeOptions
         {
             Language = settings.Language,
-            Task = "transcribe",
+            Task = settings.Translate ? "translate" : "transcribe",
             BeamSize = preset.BeamSize,
             Temperatures = preset.Temperatures,
             ConditionOnPreviousText = settings.PreviousText,
@@ -79,6 +101,7 @@ internal static class FileTranscription
             Hotwords = Hotwords(settings),
         };
         var (segments, info) = model.Transcribe(audio, options, cancel);
+        onInfo?.Invoke(info);
         if (options.Vad is not null && log is not null)
             log($"Skipping silence: {info.DurationAfterVad:F0} s of {info.Duration:F0} s contain speech");
         var total = Math.Max(info.Duration, 1.0);

@@ -44,12 +44,27 @@ public static class Presets
 
     /// <summary>Display name to language code; null asks the model to detect it.</summary>
     public static readonly IReadOnlyList<(string Name, string? Code)> Languages = [("English", "en"), ("Auto-detect", null)];
+
+    /// <summary>The model every preset translates with: large-v3-turbo was trained without translation data and
+    /// writes the spoken language even when asked to translate.</summary>
+    public const string TranslationModel = "large-v3";
+
+    /// <summary>The model a run with these settings uses: the preset's own, or <see cref="TranslationModel"/> when
+    /// it translates.</summary>
+    public static string ModelFor(JobSettings settings) => ModelFor(Get(settings.Preset), settings.Translate);
+
+    /// <inheritdoc cref="ModelFor(JobSettings)"/>
+    public static string ModelFor(Preset preset, bool translate) => translate ? TranslationModel : preset.Model;
 }
 
 public sealed record JobSettings
 {
     public string Preset { get; init; } = Presets.Default;
     public string? Language { get; init; } = "en";
+    /// <summary>Write English subtitles for speech in another language (Whisper's translate task), with
+    /// <see cref="Presets.TranslationModel"/>. <see cref="Language"/> is then the language spoken: null detects it.
+    /// English speech is transcribed as usual.</summary>
+    public bool Translate { get; init; }
     /// <summary>Extra audio clean-up on top of the preset.</summary>
     public bool Enhance { get; init; }
     /// <summary>Names or words to spell correctly, given to Whisper as hotwords in every 30 s window.</summary>

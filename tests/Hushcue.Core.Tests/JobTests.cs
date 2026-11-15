@@ -381,6 +381,25 @@ public sealed class JobTests : IDisposable
         Assert.Equal("cpu", Assert.Single(run.Events.OfType<FileTranscribed>()).Device);
     }
 
+    [FfmpegFact]
+    public async Task TranslatingLoadsLargeV3AndReportsTheLanguage()
+    {
+        var models = new List<string>();
+        var steps = new JobSteps
+        {
+            CudaDeviceCount = () => 0,
+            FindModel = name => { models.Add(name); return "fake-model"; },
+            LoadModel = (_, _) => new FakeTranscriber(Hello, duration: 4) { Language = "es" },
+            SpeechProbabilities = FakeSpeech.Everywhere,
+            PreviewRoot = PreviewRoot,
+        };
+        var run = await RunAsync([Clip()], new JobSettings { Preset = "Balanced", Translate = true, Language = null }, steps);
+        Assert.Equal(["large-v3"], models);
+        Assert.Contains("Loading 'large-v3' on CPU (slow)...", run.Log);
+        Assert.Contains("Detected Spanish (100% sure); translating to English", run.Log);
+        Assert.Equal("es", Assert.Single(run.Events.OfType<FileTranscribed>()).Language);
+    }
+
     // --- preview first
 
     [FfmpegFact]

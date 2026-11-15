@@ -26,6 +26,10 @@
                                  Description="The language spoken in your videos. Auto-detect listens to the first 30 seconds.">
                 <ComboBox x:Name="LanguageBox" MinWidth="180" SelectionChanged="OnChanged" AutomationProperties.Name="Language" />
             </controls:SettingRow>
+            <controls:SettingRow Glyph="&#xE8C1;" Title="Translate to English"
+                                 Description="English subtitles for videos in other languages. The language is detected from the first 30 seconds; English videos are transcribed as usual. Every quality then uses the large-v3 model (3.1 GB, slower than Fast and Balanced's own), which is downloaded the first time.">
+                <ToggleSwitch x:Name="TranslateToggle" Toggled="OnChanged" AutomationProperties.Name="Translate to English" />
+            </controls:SettingRow>
             <controls:SettingRow Glyph="&#xE8D2;" Title="Vocabulary" ActionBelow="True"
                                  Description="Names or words Whisper should spell your way, comma separated.">
                 <TextBox x:Name="VocabularyBox" TextWrapping="Wrap" TextChanged="OnChanged"
